@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  nestjs-api:
+    build: .
+    container_name: nestjs-api-staging
+    environment:
+      - NODE_ENV=staging
+    env_file:
+      - .env
+    command: node dist/main
+    restart: always
+    networks:
+      - traefik-net
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.analisesapi-staging.rule=Host(`staging.api.analisesprosolutti.com`)'
+      - 'traefik.http.routers.analisesapi-staging.entrypoints=websecure'
+      - 'traefik.http.routers.analisesapi-staging.tls.certresolver=mytlschallenge'
+      - 'traefik.http.services.analisesapi-staging.loadbalancer.server.port=8080'
+    expose:
+      - '8080' # importante para o Traefik
+
+networks:
+  traefik-net:
+    external: true

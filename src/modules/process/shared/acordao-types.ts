@@ -1,0 +1,9 @@
+const acordaoTypes = {
+  DIMINUICAO: 'DIMINUIÇÃO',
+  REARBITRAMENTO: 'REARBITRAMENTO',
+  AUMENTO: 'AUMENTO',
+  CONDENACAOMANTIDA: 'CONDENAÇÃO MANTIDA'
+}
+
+export default acordaoTypes;
+

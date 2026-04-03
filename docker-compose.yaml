@@ -1,0 +1,54 @@
+version: '3'
+
+services:
+  redis-robo:
+    image: redis:7
+    container_name: redis-robo
+    restart: unless-stopped
+    ports:
+      - '6381:6379'
+    networks:
+      - traefik-net
+    volumes:
+      - redis-robo-data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfilename appendonly.aof
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --stop-writes-on-bgsave-error no
+      --dir /data
+      --aof-use-rdb-preamble yes
+      --aof-rewrite-incremental-fsync yes
+
+  nestjs-api:
+    build: .
+    container_name: nestjs-api
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - redis-robo
+    env_file:
+      - .env
+    command: node dist/src/main.js
+    restart: always
+    networks:
+      - traefik-net
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.analisesapi.rule=Host(`api.analisesprosolutti.com`)'
+      - 'traefik.http.routers.analisesapi.entrypoints=websecure'
+      - 'traefik.http.routers.analisesapi.tls.certresolver=mytlschallenge'
+      - 'traefik.http.services.analisesapi.loadbalancer.server.port=8080'
+    expose:
+      - '8080' # importante para o Traefik
+
+networks:
+  traefik-net:
+    external: true
+  app-network:
+    driver: bridge
+
+volumes:
+  redis-robo-data:

@@ -1,0 +1,75 @@
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsNotEmpty,
+  ValidateIf,
+  IsBoolean,
+} from 'class-validator';
+import { STAGEPROCESS } from '../interfaces/enum';
+
+export enum ProcessApprovalAction {
+  APPROVE = 'APPROVE',
+  REJECT = 'REJECT',
+}
+
+export enum RejectionReason {
+  // Pré-Análise
+  ARQUIVADO = 'PRÉ-ANÁLISE – ARQUIVADO',
+  CLASSE_INELEGIVEL = 'PRÉ-ANÁLISE – CLASSE INELEGÍVEL',
+  LISTA_EMPRESA_INELEGIVEL = 'PRÉ-ANÁLISE – LISTA DE EMPRESA INELEGÍVEL',
+  NAO_E_TRABALHISTA = 'PRÉ-ANÁLISE – NÃO É TRABALHISTA',
+  PROCESSO_FISICO = 'PRÉ-ANÁLISE – PROCESSO FÍSICO',
+  SEGREDO_JUSTICA = 'PRÉ-ANÁLISE – SEGREDO DE JUSTIÇA',
+  SEM_ACORDAO = 'PRÉ-ANÁLISE – SEM ACÓRDÃO',
+  PRE_ANALISE_IMPROCEDENTE = 'PRÉ-ANÁLISE – IMPROCEDENTE',
+  ACORDO = 'PRÉ-ANÁLISE – ACORDO',
+  PRE_ANALISE_VALOR_ABAIXO_MINIMO = 'PRÉ-ANÁLISE – VALOR ABAIXO DO MÍNIMO',
+  PRE_ANALISE_LIQUIDADO = 'PRÉ-ANÁLISE – LIQUIDADO',
+  PRE_ANALISE_SUSPENSO = 'PRÉ-ANÁLISE – SUSPENSO',
+  PRE_ANALISE_CCB_CESSAO_CREDITO = 'PRÉ-ANÁLISE – CLIENTE FEZ CCB OU CESSAO DE CREDITO',
+
+  // Análise
+  AGUARDAR_TRANSITO = 'ANÁLISE – AGUARDAR TRÂNSITO',
+  TRT_INACESSIVEL = 'ANÁLISE - FALHA AO TENTAR ACESSAR INFORMAÇÕES, TENTE NOVAMENTE MAIS TARDE',
+  AGUARDAR_DECISAO_TST = 'ANÁLISE – AGUARDAR DECISÃO DO TST',
+  ABAIXO_VALOR_MINIMO = 'ANÁLISE – ABAIXO DO VALOR MÍNIMO',
+  ANALISE_IMPROCEDENTE = 'ANÁLISE – IMPROCEDENTE',
+  LIQUIDADO = 'ANÁLISE – LIQUIDADO',
+  RISCO_TESE = 'ANÁLISE – RISCO DE TESE',
+  RISCO_PRAZO = 'ANÁLISE – RISCO DE PRAZO',
+  RISCO_TESE_PENDENTE_TRANSITO = 'ANÁLISE – RISCO DE TESE – PENDENTE TRÂNSITO EM JULGADO',
+  PROCESSO_PRINCIPAL_ARQUIVADO_SEM_PROVISORIA = 'ANÁLISE – PROCESSO PRINCIPAL ARQUIVADO E NÃO EXISTE EXECUÇÃO PROVISÓRIA',
+  EXECUCAO_PROVISORIA_ARQUIVADO_SEM_PRINCIPAL = 'ANÁLISE – EXECUÇÃO PROVISÓRIA ARQUIVADO E NÃO EXISTE PROCESSO PRINCIPAL',
+  PROCESSOS_ARQUIVADOS = 'ANÁLISE – EXECUÇÃO PROVISÓRIA E PROCESSO PRINCIPAL ARQUIVADOS',
+  PROCESSO_SEM_CREDITO = 'ANÁLISE – PROCESSO SEM CREDITO',
+}
+
+export class ProcessApprovalDto {
+  @IsNotEmpty()
+  @IsString()
+  processId: string;
+
+  @IsEnum(ProcessApprovalAction)
+  action: ProcessApprovalAction;
+
+  @ValidateIf((o) => o.action === ProcessApprovalAction.REJECT)
+  @IsNotEmpty({ message: 'Motivo da recusa é obrigatório' })
+  @IsString()
+  rejectionReason?: string; // Agora aceita qualquer string
+
+  @IsOptional()
+  @IsString()
+  rejectionDescription?: string;
+
+  // Novo campo para indicar se é um motivo customizado
+  @IsOptional()
+  @IsBoolean()
+  isCustomReason?: boolean;
+
+  @IsString()
+  userId: string;
+
+  @IsEnum(STAGEPROCESS)
+  stage: STAGEPROCESS;
+}
