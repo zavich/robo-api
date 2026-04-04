@@ -117,7 +117,7 @@ export class AwsServices {
     return file;
   }
   private s3Client = new S3Client({
-    region: process.env.AWS_REGION as string,
+    region: process.env.AWS_S3_REGION as string,
     credentials: {
       accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID as string,
       secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY as string,
