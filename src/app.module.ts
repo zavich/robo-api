@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from './database/database.module';
@@ -20,18 +20,21 @@ import { UserModule } from './modules/user/user.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    BullModule.forRoot({
-      url: process.env.REDIS_URL,
-      limiter: { max: 2, duration: 1000 },
-      defaultJobOptions: {
-        removeOnComplete: 100,
-        removeOnFail: 1000,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 1000,
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        url: configService.get<string>('REDIS_URL'),
+        limiter: { max: 2, duration: 1000 },
+        defaultJobOptions: {
+          removeOnComplete: 100,
+          removeOnFail: 1000,
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 1000,
+          },
         },
-      },
+      }),
     }),
     ScheduleModule.forRoot(),
     DatabaseModule,

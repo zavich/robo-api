@@ -1,8 +1,11 @@
+import * as dotenv from 'dotenv';
+// Carrega o .env o mais cedo possível (antes do NestFactory.create)
+dotenv.config();
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { Env } from './config/zod/env';
-import * as dotenv from 'dotenv';
 import * as bodyParser from 'body-parser';
 import { ExpressAdapter } from '@bull-board/express';
 import { Queue } from 'bull';
@@ -14,7 +17,6 @@ import * as cookieParser from 'cookie-parser';
 import { setMaxListeners } from 'events';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  dotenv.config();
   app.setGlobalPrefix('v1');
   patchNestJsSwagger();
   app.enableCors({
