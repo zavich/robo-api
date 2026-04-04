@@ -93,18 +93,15 @@ export class InsertProcessService {
     processCreate,
     documents = true,
   ) {
-    const match = processNumber.match(
-      /^\d{7}-\d{2}\.\d{4}\.\d\.(\d{2})\.\d{4}$/,
-    );
-    const regionTRT = match ? Number(match[1]) : null;
-
-    const url = process.env.SCRAPING_BASE_URL;
     try {
       this.logger.log(`Enviando processo ${processNumber} para a extração`);
-      await axios.post(`${url}/processos/${processNumber}`, {
-        documents,
-        priority: true,
-      });
+      await axios.post(
+        `${process.env.SCRAPING_BASE_URL}/processos/${processNumber}`,
+        {
+          documents,
+          priority: true,
+        },
+      );
       const logMessage = documents
         ? 'Processo enviado para o extração com documentos'
         : 'Processo enviado para a extração';

@@ -19,12 +19,8 @@ async function bootstrap() {
   patchNestJsSwagger();
   app.enableCors({
     origin: [
-      'http://localhost:3000',
-      'https://analisesprosolutti.com',
-      'https://staging.analisesprosolutti.com',
-      'https://scraping.api.analisesprosolutti.com',
-      'https://scraping-robo-api-production.up.railway.app',
-      'https://prosolutti-app-production.up.railway.app',
+      'http://localhost:8081',
+      'https://scraping-robo-production.up.railway.app',
     ],
     credentials: true, // Permite o envio de cookies
   });

@@ -22,10 +22,6 @@ import { UserModule } from './modules/user/user.module';
     }),
     BullModule.forRoot({
       url: process.env.REDIS_URL,
-      // redis: {
-      //   host: process.env.REDIS_HOST,
-      //   port: Number(process.env.REDIS_PORT),
-      // },
       limiter: { max: 2, duration: 1000 },
       defaultJobOptions: {
         removeOnComplete: 100,
