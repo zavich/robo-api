@@ -21,6 +21,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:8081',
       'https://scraping-robo-production.up.railway.app',
+      'https://painel-robo-production.up.railway.app',
     ],
     credentials: true, // Permite o envio de cookies
   });
