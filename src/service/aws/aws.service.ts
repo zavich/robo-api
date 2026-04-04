@@ -9,6 +9,7 @@ import { PublishCommand, PublishCommandInput } from '@aws-sdk/client-sns';
 import { BadRequestException, Logger } from '@nestjs/common';
 import * as mimeTypes from 'mime-types';
 import * as fs from 'fs';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export class AwsServices {
   async sendEmail(to: any, subject: any, text: any) {
@@ -108,13 +109,20 @@ export class AwsServices {
     }
   }
   async getSignedUrlS3(key: string) {
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
-      Key: key,
-    });
+    try {
+      const command = new GetObjectCommand({
+        Bucket: process.env.AWS_S3_BUCKET_NAME,
+        Key: key,
+      });
 
-    const file = await this.s3Client.send(command);
-    return file;
+      const signedUrl = await getSignedUrl(this.s3Client, command, {
+        expiresIn: 3600,
+      }); // URL válida por 1 hora
+      return signedUrl;
+    } catch (error) {
+      Logger.error(`Erro ao gerar URL assinada para o arquivo ${key}:`, error);
+      throw error;
+    }
   }
   private s3Client = new S3Client({
     region: process.env.AWS_S3_REGION as string,

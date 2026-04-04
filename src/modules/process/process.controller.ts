@@ -11,6 +11,7 @@ import {
   Res,
   StreamableFile,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -81,6 +82,7 @@ import { RunListLawsuitsValidationService } from './services/run-list-lawsuits-v
 import { SavedMovementsService } from './services/saved-movements.service';
 import { WebhookPipedriveService } from './services/webhook-pipedrive.service';
 import { WebhookService } from './services/webhook.service';
+import axios from 'axios';
 
 @ApiTags('Process')
 @Controller('process')
@@ -527,13 +529,21 @@ export class ProcessController {
     @Param('key') key: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const file = await this.awsService.getSignedUrlS3(key);
+    try {
+      const signedUrl = await this.awsService.getSignedUrlS3(key);
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': 'inline',
-    });
+      const response = await axios.get(signedUrl, {
+        responseType: 'arraybuffer',
+      });
 
-    return new StreamableFile(file.Body as any);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline',
+      });
+
+      return new StreamableFile(response.data);
+    } catch {
+      throw new BadRequestException('Erro ao obter o arquivo PDF.');
+    }
   }
 }

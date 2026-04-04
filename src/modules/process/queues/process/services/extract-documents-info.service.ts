@@ -6,6 +6,7 @@ import { StatusExtractionInsight } from 'src/modules/process/enums/status-extrac
 import { ProcessStatus } from 'src/modules/process/schema/process-status.schema';
 import { Process } from 'src/modules/process/schema/process.schema';
 import { Prompt } from 'src/modules/process/schema/prompt.schema';
+import { AwsServices } from 'src/service/aws/aws.service';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
 import { normalizeString } from 'src/utils/normalize-string';
@@ -23,6 +24,7 @@ export class ExtractDocumentsInfoService {
     private readonly promptModel: Model<Prompt>,
     @InjectModel(ProcessStatus.name)
     private readonly processStatusModule: Model<ProcessStatus>,
+    private readonly awsService: AwsServices,
   ) {}
   async execute(lawsuit: string) {
     try {
@@ -82,8 +84,11 @@ export class ExtractDocumentsInfoService {
       );
 
       try {
-        const response = await this.vertexAIService.executeWithRetry(
+        const signedUrl = await this.awsService.getSignedUrlS3(
           document.temp_link,
+        );
+        const response = await this.vertexAIService.executeWithRetry(
+          signedUrl,
           prompt,
         );
 

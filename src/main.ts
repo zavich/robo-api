@@ -22,6 +22,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:8081',
+      'http://localhost:3000',
       'https://scraping-robo-production.up.railway.app',
       'https://painel-robo-production.up.railway.app',
     ],

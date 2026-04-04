@@ -5,6 +5,7 @@ import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
 import { Process } from '../../schema/process.schema';
 import { Prompt } from '../../schema/prompt.schema';
 import { StatusExtractionInsight } from '../../enums/status-extraction-insight.enum';
+import { AwsServices } from 'src/service/aws/aws.service';
 
 @Injectable()
 export class FindInsightsService {
@@ -14,6 +15,7 @@ export class FindInsightsService {
     private readonly vertexAIService: VertexAIService,
     @InjectModel(Prompt.name)
     private readonly promptModule: Model<Prompt>,
+    private readonly awsService: AwsServices,
   ) {}
   async execute(number: string, documents: string[], promptId: string) {
     try {
@@ -80,8 +82,11 @@ export class FindInsightsService {
               : promptFind.text;
 
           try {
-            const response = await this.vertexAIService.executeWithRetry(
+            const signedUrl = await this.awsService.getSignedUrlS3(
               doc.temp_link,
+            );
+            const response = await this.vertexAIService.executeWithRetry(
+              signedUrl,
               fullPrompt,
             );
             console.log('response: ', response);
