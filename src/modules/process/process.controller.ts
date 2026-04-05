@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,8 +11,9 @@ import {
   Query,
   Res,
   StreamableFile,
+  UploadedFile,
   UseGuards,
-  BadRequestException,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -36,6 +38,8 @@ import { FindProcessService } from './services/lawsuit/find-lawsuit';
 import { ListLawsuitService } from './services/lawsuit/list-lawsuit';
 import { MarkProcessAsReadService } from './services/mark-process-as-read.service';
 
+import { FileInterceptor } from '@nestjs/platform-express';
+import axios from 'axios';
 import { AwsServices } from 'src/service/aws/aws.service';
 import {
   CompletedActivityDTO,
@@ -80,9 +84,9 @@ import { RemoveProvisionalLawsuitNumberService } from './services/remove-provisi
 import { LawsuitValidationService } from './services/run-lawsuit-validation.service';
 import { RunListLawsuitsValidationService } from './services/run-list-lawsuits-validation.service';
 import { SavedMovementsService } from './services/saved-movements.service';
+import { UploadXLSXService } from './services/upload-xlsx.service';
 import { WebhookPipedriveService } from './services/webhook-pipedrive.service';
 import { WebhookService } from './services/webhook.service';
-import axios from 'axios';
 
 @ApiTags('Process')
 @Controller('process')
@@ -113,6 +117,7 @@ export class ProcessController {
     private readonly updateActivityNotesService: UpdateActivityNotesService,
     private readonly metricsService: MetricsService,
     private readonly awsService: AwsServices,
+    private readonly uploadXLSXService: UploadXLSXService,
   ) {}
   @Patch(':id/mark-as-read')
   @ApiBearerAuth()
@@ -520,6 +525,16 @@ export class ProcessController {
     @Body(updateActivityNotesSchemaPipe) body: UpdateActivityNotesSchemaBody,
   ) {
     return this.updateActivityNotesService.execute(processId, body);
+  }
+
+  @Post('upload-xml')
+  @UseInterceptors(FileInterceptor('file'))
+  async atualizarSolvencia(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo foi enviado.');
+    }
+
+    return this.uploadXLSXService.execute(file.buffer);
   }
 
   @Get('/documents/:key')

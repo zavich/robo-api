@@ -64,6 +64,7 @@ import { RemoveProvisionalLawsuitNumberService } from './services/remove-provisi
 import { RunListLawsuitsValidationService } from './services/run-list-lawsuits-validation.service';
 import { SavedMovementsService } from './services/saved-movements.service';
 import { MetricsService } from './services/metrics.service';
+import { UploadXLSXService } from './services/upload-xlsx.service';
 
 @Module({
   imports: [
@@ -155,6 +156,7 @@ import { MetricsService } from './services/metrics.service';
     ChangeAssignedUserService,
     UpdateActivityNotesService,
     MetricsService,
+    UploadXLSXService,
   ],
 })
 export class ProcessModule {}
