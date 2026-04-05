@@ -16,37 +16,56 @@ export class CreateProcessService {
   async execute(body: CreateProcessSchemaBody) {
     try {
       const newArray: any[] = [];
-      for (const process of body.processes) {
-        const findProcess = await this.processModule.findOne({
-          number: process,
-        });
-        if (!findProcess) {
+
+      // Processamento em paralelo para verificar processos existentes
+      const findProcesses = await Promise.all(
+        body.processes.map((process) =>
+          this.processModule.findOne({ number: process }),
+        ),
+      );
+
+      body.processes.forEach((process, index) => {
+        if (!findProcesses[index]) {
           newArray.push(process);
         }
-      }
-      
+      });
+
       if (newArray.length === 0) {
         return { message: 'All processes already exist in database.' };
       }
 
-      const jobs = newArray.map((process) => ({
-        name: 'insert-process',
-        data: { processNumber: process },
-      }));
-      try {
-        await this.processQueue.addBulk(jobs);
-        return { message: 'Processes added to queue for processing.' };
-      } catch (queueError: any) {
-        if (queueError.name?.includes('Redis') || queueError.message?.includes('redis') || queueError.message?.includes('MaxRetriesPerRequestError')) {
-          console.warn(`[CreateProcessService] Redis unavailable, processes will need to be added manually: ${newArray.join(', ')}`);
-          return { 
-            message: 'Processes identified but could not be added to queue (Redis unavailable). Manual processing may be required.',
-            processes: newArray,
-            queueError: true
-          };
+      // Divisão em lotes para adicionar à fila
+      const batchSize = 100;
+      for (let i = 0; i < newArray.length; i += batchSize) {
+        const batch = newArray.slice(i, i + batchSize);
+        const jobs = batch.map((process) => ({
+          name: 'insert-process',
+          data: { processNumber: process },
+        }));
+
+        try {
+          await this.processQueue.addBulk(jobs);
+        } catch (queueError: any) {
+          if (
+            queueError.name?.includes('Redis') ||
+            queueError.message?.includes('redis') ||
+            queueError.message?.includes('MaxRetriesPerRequestError')
+          ) {
+            console.warn(
+              `[CreateProcessService] Redis unavailable, processes will need to be added manually: ${batch.join(', ')}`,
+            );
+            return {
+              message:
+                'Processes identified but could not be added to queue (Redis unavailable). Manual processing may be required.',
+              processes: batch,
+              queueError: true,
+            };
+          }
+          throw queueError;
         }
-        throw queueError;
       }
+
+      return { message: 'Processes added to queue for processing.' };
     } catch (error) {
       throw new BadRequestException(error.message);
     }
