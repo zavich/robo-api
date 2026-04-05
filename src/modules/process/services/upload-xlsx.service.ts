@@ -24,7 +24,7 @@ export class UploadXLSXService {
 
     const rows: any[] = XLSX.utils.sheet_to_json(sheet);
 
-    const empresasCriadas = [];
+    const lawsuits = [];
 
     for (const row of rows.slice(0, 1)) {
       const lawsuit = row['Processos 2025'] ? row['Processos 2025'] : null;
@@ -35,19 +35,19 @@ export class UploadXLSXService {
         `Processo ${lawsuit} já existe? ${jaExiste ? 'Sim' : 'Não'}`,
       );
       if (!jaExiste) {
-        await this.createProcessService.execute({
-          processes: [lawsuit],
-        });
-        empresasCriadas.push(lawsuit);
+        lawsuits.push(lawsuit);
       } else {
         this.logger.log(`Processo ${lawsuit} já existe, atualizando...`);
         return;
       }
     }
+    await this.createProcessService.execute({
+      processes: lawsuits,
+    });
 
     return {
       total: rows.length,
-      criadas: empresasCriadas.length,
+      criadas: lawsuits.length,
     };
   }
 }
