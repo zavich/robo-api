@@ -24,6 +24,7 @@ async function bootstrap() {
       'http://localhost:8081',
       'http://localhost:3000',
       'https://scraping-fetch-robo-staging.up.railway.app',
+      'https://scraping-fetch-robo-production.up.railway.app',
       'https://painel-robo-staging.up.railway.app',
     ],
     credentials: true, // Permite o envio de cookies
