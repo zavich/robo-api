@@ -26,6 +26,7 @@ async function bootstrap() {
       'https://scraping-fetch-robo-staging.up.railway.app',
       'https://scraping-fetch-robo-production.up.railway.app',
       'https://painel-robo-staging.up.railway.app',
+      'https://painel-robo-production.up.railway.app',
     ],
     credentials: true, // Permite o envio de cookies
   });
