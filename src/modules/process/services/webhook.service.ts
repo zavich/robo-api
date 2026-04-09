@@ -37,7 +37,7 @@ export class WebhookService {
 
   async execute(body: Root) {
     this.logger.log(`Recebendo requisição de ${body.numero_processo}`);
-    this.logger.debug(`Body completo: ${JSON.stringify(body)}`);
+
     try {
       const findProcess = await this.processModel
         .findOne({
