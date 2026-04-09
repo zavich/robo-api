@@ -23,6 +23,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:8081',
       'http://localhost:3000',
+      'http://217.196.61.185:8081',
       'https://scraping-fetch-robo-staging.up.railway.app',
       'https://scraping-fetch-robo-production.up.railway.app',
       'https://painel-robo-staging.up.railway.app',
