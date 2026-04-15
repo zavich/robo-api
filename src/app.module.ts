@@ -14,6 +14,7 @@ import { ReasonLossModule } from './modules/reason-loss/reason-refusal.module';
 import { StepsModule } from './modules/steps/steps.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { UserModule } from './modules/user/user.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -50,7 +51,7 @@ import { UserModule } from './modules/user/user.module';
     NotificationModule,
     UserModule,
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [],
 })
 export class AppModule {}
