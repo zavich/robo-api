@@ -117,10 +117,6 @@
           "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PROJECT_ID::"
         },
         {
-          "name": "REDIS_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:REDIS_URL::"
-        },
-        {
           "name": "GOOGLE_PRIVATE_KEY_ID",
           "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PRIVATE_KEY_ID::"
         }
