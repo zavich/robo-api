@@ -1,0 +1,183 @@
+{
+  "taskDefinitionArn": "arn:aws:ecs:us-east-2:339340413604:task-definition/robo-api:11",
+  "containerDefinitions": [
+    {
+      "name": "robo-api",
+      "image": "339340413604.dkr.ecr.us-east-2.amazonaws.com/robo-api:latest",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [
+        {
+          "name": "API_KEY_MASTER",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:API_KEY_MASTER::"
+        },
+        {
+          "name": "JWT_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:JWT_SECRET_KEY::"
+        },
+        {
+          "name": "MICROSOFT_SECRET_VALUE",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_SECRET_VALUE::"
+        },
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:DATABASE_URL::"
+        },
+        {
+          "name": "PIPEDRIVE_PROSOLUTTI_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:PIPEDRIVE_PROSOLUTTI_TOKEN::"
+        },
+        {
+          "name": "GOOGLE_PRIVATE_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PRIVATE_KEY::"
+        },
+        {
+          "name": "GOOGLE_CLIENT_EMAIL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_CLIENT_EMAIL::"
+        },
+        {
+          "name": "GOOGLE_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_CLIENT_ID::"
+        },
+        {
+          "name": "GOOGLE_VERTEX_MODEL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_VERTEX_MODEL::"
+        },
+        {
+          "name": "GOOGLE_VERTEX_LOCATION",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_VERTEX_LOCATION::"
+        },
+        {
+          "name": "MICROSOFT_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_CLIENT_ID::"
+        },
+        {
+          "name": "MICROSOFT_DIRECTORY_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_DIRECTORY_ID::"
+        },
+        {
+          "name": "MICROSOFT_SITE_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_SITE_ID::"
+        },
+        {
+          "name": "MICROSOFT_DRIVE_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_DRIVE_ID::"
+        },
+        {
+          "name": "MICROSOFT_ITEM_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_ITEM_ID::"
+        },
+        {
+          "name": "MICROSOFT_SECRET_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_SECRET_ID::"
+        },
+        {
+          "name": "EMPRESAQUI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:EMPRESAQUI_API_KEY::"
+        },
+        {
+          "name": "SCRAPING_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:SCRAPING_API_KEY::"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:REDIS_URL::"
+        },
+        {
+          "name": "SCRAPING_BASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:SCRAPING_BASE_URL::"
+        },
+        {
+          "name": "AWS_S3_BUCKET_NAME",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:AWS_S3_BUCKET_NAME::"
+        },
+        {
+          "name": "AWS_S3_REGION",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:AWS_S3_REGION::"
+        },
+        {
+          "name": "BASE_URL_EMPRESAQUI",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:BASE_URL_EMPRESAQUI::"
+        },
+        {
+          "name": "JWT_EXPIRES_IN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:JWT_EXPIRES_IN::"
+        },
+        {
+          "name": "GOOGLE_PROJECT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PROJECT_ID::"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:REDIS_URL::"
+        },
+        {
+          "name": "GOOGLE_PRIVATE_KEY_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PRIVATE_KEY_ID::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/robo-api",
+          "awslogs-region": "us-east-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "robo-api",
+  "executionRoleArn": "arn:aws:iam::339340413604:role/robo-task-role",
+  "networkMode": "awsvpc",
+  "revision": 11,
+  "volumes": [],
+  "status": "ACTIVE",
+  "requiresAttributes": [
+    {
+      "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+    },
+    {
+      "name": "ecs.capability.execution-role-awslogs"
+    },
+    {
+      "name": "com.amazonaws.ecs.capability.ecr-auth"
+    },
+    {
+      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+    },
+    {
+      "name": "ecs.capability.secrets.asm.environment-variables"
+    },
+    {
+      "name": "ecs.capability.execution-role-ecr-pull"
+    },
+    {
+      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+    },
+    {
+      "name": "ecs.capability.task-eni"
+    }
+  ],
+  "placementConstraints": [],
+  "compatibilities": ["EC2", "MANAGED_INSTANCES", "FARGATE"],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "registeredAt": "2026-04-14T21:21:18.802Z",
+  "registeredBy": "arn:aws:iam::339340413604:user/rafael.nicacio",
+  "tags": []
+}
