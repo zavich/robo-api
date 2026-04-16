@@ -28,13 +28,8 @@ async function bootstrap() {
   patchNestJsSwagger();
   app.enableCors({
     origin: [
-      'http://localhost:8081',
-      'http://localhost:3000',
-      'http://217.196.61.185:8081',
-      'https://scraping-fetch-robo-staging.up.railway.app',
-      'https://scraping-fetch-robo-production.up.railway.app',
-      'https://painel-robo-staging.up.railway.app',
-      'https://painel-robo-production.up.railway.app',
+      'https://scraping-api-prd.juri.capital',
+      'https://painel-robo-prd.juri.capital',
     ],
     credentials: true, // Permite o envio de cookies
   });
