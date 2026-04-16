@@ -6,15 +6,14 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from './database/database.module';
 import { AuthenticationModule } from './modules/authentication/authentication.module';
 import { CompanyModule } from './modules/company/company.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { ObservationModule } from './modules/observation/observation.module';
 import { PipedriveModule } from './modules/pipedrive/pipedrive.module';
 import { ProcessModule } from './modules/process/process.module';
 import { PromptModule } from './modules/prompts/prompt.module';
 import { ReasonLossModule } from './modules/reason-loss/reason-refusal.module';
 import { StepsModule } from './modules/steps/steps.module';
-import { NotificationModule } from './modules/notification/notification.module';
 import { UserModule } from './modules/user/user.module';
-import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -51,7 +50,7 @@ import { AppController } from './app.controller';
     NotificationModule,
     UserModule,
   ],
-  controllers: [AppController],
+  controllers: [],
   providers: [],
 })
 export class AppModule {}
