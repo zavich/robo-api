@@ -28,6 +28,7 @@ async function bootstrap() {
   patchNestJsSwagger();
   app.enableCors({
     origin: [
+      'http://localhost:3000',
       'https://scraping-api-prd.juri.capital',
       'https://painel-robo-prd.juri.capital',
     ],
