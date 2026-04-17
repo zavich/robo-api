@@ -12,10 +12,15 @@ import { Response } from 'express';
 import { AuthDto } from './dto/auth.dto';
 import { ApiKeyAuthGuard } from './guards/apikey-auth.guard';
 import { LoginService } from './services/login.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { SignUpService } from './services/sign-up.service';
 
 @Controller('auth')
 export class AuthenticationController {
-  constructor(private readonly loginService: LoginService) {}
+  constructor(
+    private readonly loginService: LoginService,
+    private readonly signUpService: SignUpService,
+  ) {}
 
   @Post('login')
   @HttpCode(200)
@@ -34,6 +39,12 @@ export class AuthenticationController {
     });
     return { message: 'Login successful' };
   }
+
+  @Post('signup')
+  async signUp(@Body() createUserDto: CreateUserDto) {
+    return this.signUpService.createUser(createUserDto);
+  }
+
   @Post('logout')
   @HttpCode(200)
   logout(@Res({ passthrough: true }) res: Response) {
