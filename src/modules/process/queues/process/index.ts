@@ -33,14 +33,15 @@ export class ProcessQueue {
     private readonly insertProcessService: InsertProcessService,
     private readonly initialPetitionService: InitialPetitionService,
   ) {
-    const redisConnection = new Redis({
-      maxRetriesPerRequest: null, // Necessário para BullMQ
+    const connection = new Redis(process.env.REDIS_URL!, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
     });
     this.processQueue = new Queue('process-queue', {
-      connection: redisConnection,
+      connection,
     });
     this.queueEvents = new QueueEvents('process-queue', {
-      connection: redisConnection,
+      connection,
     });
 
     this.queueEvents.on('waiting', ({ jobId }) =>
@@ -79,7 +80,7 @@ export class ProcessQueue {
             throw new Error(`Unknown job name: ${job.name}`);
         }
       },
-      { connection: redisConnection },
+      { connection },
     );
   }
 

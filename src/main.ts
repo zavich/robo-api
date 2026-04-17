@@ -58,10 +58,13 @@ async function bootstrap() {
   if (process.env?.ENVIRONMENT !== 'production') {
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/bull-board');
-    const redisClient = app.get('REDIS_CLIENT');
+    const connection = new Redis(process.env.REDIS_URL!, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+    });
 
     const aQueue = new Queue('process-queue', {
-      connection: redisClient,
+      connection,
     });
 
     createBullBoard({
@@ -70,7 +73,7 @@ async function bootstrap() {
     });
 
     app.use('/bull-board', serverAdapter.getRouter());
-
+    console.log('[BOOT] REDIS_URL:', process.env.REDIS_URL);
     console.log('✅ Bull Board carregado com a fila process-queue');
     const logger = new Logger('BullBoard');
 
