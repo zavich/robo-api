@@ -22,12 +22,14 @@ import { RedisHealthService } from './service/redis-health.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      cache: true,
+      envFilePath: process.env.NODE_ENV === 'local' ? '.env' : undefined,
     }),
     BullModule.forRootAsync({
       imports: [RedisModule],
       inject: ['REDIS_CLIENT'],
-      useFactory: (redisClient: any) => ({
-        connection: redisClient,
+      useFactory: (redis: any) => ({
+        connection: redis,
       }),
     }),
     ScheduleModule.forRoot(),

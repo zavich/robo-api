@@ -557,7 +557,8 @@ export class ProcessController {
       });
 
       return new StreamableFile(response.data);
-    } catch {
+    } catch (error) {
+      console.error(error);
       throw new BadRequestException('Erro ao obter o arquivo PDF.');
     }
   }

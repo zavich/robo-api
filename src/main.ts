@@ -1,6 +1,6 @@
-import * as dotenv from 'dotenv';
+// import * as dotenv from 'dotenv';
 // Carrega o .env o mais cedo possível (antes do NestFactory.create)
-dotenv.config();
+// dotenv.config();
 
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
@@ -58,11 +58,10 @@ async function bootstrap() {
   if (process.env?.ENVIRONMENT !== 'production') {
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/bull-board');
+    const redisClient = app.get('REDIS_CLIENT');
 
     const aQueue = new Queue('process-queue', {
-      connection: new Redis(process.env.REDIS_URL!, {
-        maxRetriesPerRequest: null,
-      }),
+      connection: redisClient,
     });
 
     createBullBoard({
