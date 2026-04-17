@@ -22,7 +22,6 @@ async function bootstrap() {
     res.status(200).json({ status: 'ok' });
   });
 
-  // Mantendo o prefixo global 'v1'
   app.setGlobalPrefix('v1');
   patchNestJsSwagger();
   app.enableCors({
