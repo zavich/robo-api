@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.999.0",
+    "@aws-sdk/client-secrets-manager": "^3.1032.0",
     "@aws-sdk/client-ses": "^3.699.0",
     "@aws-sdk/client-sns": "^3.699.0",
     "@aws-sdk/s3-request-presigner": "^3.999.0",
@@ -28,7 +29,6 @@
     "@bull-board/express": "^6.5.3",
     "@bull-board/nestjs": "^6.5.3",
     "@google-cloud/vertexai": "^1.9.0",
-    "@nestjs/bull": "^10.2.3",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.3.0",
@@ -44,7 +44,6 @@
     "axios": "^1.7.7",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
-    "bull": "^4.16.4",
     "bullmq": "^5.74.1",
     "class-validator": "^0.14.2",
     "cookie-parser": "^1.4.7",

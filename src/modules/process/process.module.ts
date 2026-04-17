@@ -1,4 +1,3 @@
-import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AwsAppModule } from 'src/service/aws/aws.module';
@@ -65,12 +64,12 @@ import { RunListLawsuitsValidationService } from './services/run-list-lawsuits-v
 import { SavedMovementsService } from './services/saved-movements.service';
 import { MetricsService } from './services/metrics.service';
 import { UploadXLSXService } from './services/upload-xlsx.service';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     BullModule.registerQueue({
       name: 'process-queue',
-      limiter: { max: 2, duration: 1000 },
     }),
     MongooseModule.forFeature([
       {
