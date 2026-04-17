@@ -1,13 +1,13 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Process } from '../schema/process.schema';
-import { Model } from 'mongoose';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
 import axios from 'axios';
-import { CreateProcessService } from './create-process.service';
-import { CLASSPROCESS } from '../interfaces/enum';
+import { Queue } from 'bullmq';
+import { Model } from 'mongoose';
 import { updatePipedriveCustomField } from 'src/service/pipedrive/update-custom-field';
+import { CLASSPROCESS } from '../interfaces/enum';
+import { Process } from '../schema/process.schema';
+import { CreateProcessService } from './create-process.service';
 
 @Injectable()
 export class InsertExecutionService {
@@ -18,7 +18,11 @@ export class InsertExecutionService {
     private readonly createProcessService: CreateProcessService,
   ) {}
 
-  async execute(id: string, lawsuitExecution: string, pipedriveFieldValue?: string) {
+  async execute(
+    id: string,
+    lawsuitExecution: string,
+    pipedriveFieldValue?: string,
+  ) {
     try {
       if (!id) {
         throw new BadRequestException('ID do processo é obrigatório');
@@ -92,11 +96,14 @@ export class InsertExecutionService {
             fieldValue: pipedriveFieldValue,
           });
         } catch (pipedriveError: any) {
-          console.error('[InsertExecutionService] Erro ao atualizar Pipedrive:', {
-            dealId: findLawsuit.dealId,
-            fieldValue: pipedriveFieldValue,
-            error: pipedriveError.message,
-          });
+          console.error(
+            '[InsertExecutionService] Erro ao atualizar Pipedrive:',
+            {
+              dealId: findLawsuit.dealId,
+              fieldValue: pipedriveFieldValue,
+              error: pipedriveError.message,
+            },
+          );
           // Não falha a operação principal se o Pipedrive falhar
         }
       }

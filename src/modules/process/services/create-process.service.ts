@@ -1,18 +1,25 @@
-import { InjectQueue } from '@nestjs/bull';
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Queue } from 'bull';
-import { CreateProcessSchemaBody } from '../dtos/create.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Process } from '../schema/process.schema';
+import { JobsOptions, Queue } from 'bullmq';
+import { Redis } from 'ioredis';
 import { Model } from 'mongoose';
+import { CreateProcessSchemaBody } from '../dtos/create.dto';
+import { Process } from '../schema/process.schema';
 
 @Injectable()
 export class CreateProcessService {
+  private processQueue: Queue;
+
   constructor(
-    @InjectQueue('process-queue') private readonly processQueue: Queue,
     @InjectModel(Process.name)
     private readonly processModule: Model<Process>,
-  ) {}
+  ) {
+    const redisConnection = new Redis();
+    this.processQueue = new Queue('process-queue', {
+      connection: redisConnection,
+    });
+  }
+
   async execute(body: CreateProcessSchemaBody) {
     try {
       const newArray: any[] = [];
@@ -44,7 +51,15 @@ export class CreateProcessService {
         }));
 
         try {
-          await this.processQueue.addBulk(jobs);
+          const jobOptions: JobsOptions = {
+            removeOnComplete: true,
+            attempts: 3,
+          };
+          await Promise.all(
+            jobs.map((job) =>
+              this.processQueue.add(job.name, job.data, jobOptions),
+            ),
+          );
         } catch (queueError: any) {
           if (
             queueError.name?.includes('Redis') ||

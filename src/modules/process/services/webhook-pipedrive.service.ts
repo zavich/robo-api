@@ -1,9 +1,9 @@
-import { InjectQueue } from '@nestjs/bull';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Process } from '../schema/process.schema';
-import { Queue } from 'bull';
+import { Queue } from 'bullmq';
 import { Model } from 'mongoose';
+import { Process } from '../schema/process.schema';
 
 @Injectable()
 export class WebhookPipedriveService {

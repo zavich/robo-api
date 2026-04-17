@@ -1,7 +1,7 @@
-import { InjectQueue } from '@nestjs/bull';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Queue } from 'bull';
+import { Queue } from 'bullmq';
 import { Model } from 'mongoose';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
@@ -255,23 +255,6 @@ export class WebhookService {
                     this.nextStepsService.execute(step.slug, body);
                     return;
                   }
-
-                  // const inserted = await this.insertProvisionProcess(
-                  //   body,
-                  //   findProcess,
-                  // );
-                  // if (inserted) {
-                  //   await this.processStatusModel.findByIdAndUpdate(
-                  //     findProcess.processStatus,
-                  //     {
-                  //       name: 'Processando',
-                  //       errorReason: '',
-                  //       log: 'Extraindo processo de execução provisória',
-                  //     },
-                  //   );
-
-                  //   return;
-                  // }
                 }
 
                 if (findProcess.processMain) {
@@ -351,7 +334,7 @@ export class WebhookService {
             ['transitado em julgado']?.some((term) =>
               movimento.conteudo
                 ?.normalize('NFD')
-                ?.replace(/[\u0300-\u036f]/g, '')
+                ?.replace(/[0-\u036f]/g, '')
                 ?.toLocaleLowerCase()
                 ?.includes(term),
             ),
@@ -362,7 +345,7 @@ export class WebhookService {
           ['distribuído por sorteio', 'sorteio']?.some((term) =>
             movimento.conteudo
               ?.normalize('NFD')
-              ?.replace(/[\u0300-\u036f]/g, '')
+              ?.replace(/[0-\u036f]/g, '')
               ?.toLocaleLowerCase()
               ?.includes(term),
           ),
@@ -391,100 +374,16 @@ export class WebhookService {
     }
   }
 
-  async insertProvisionProcess(body: Root, mainProcess) {
-    if (mainProcess.documents.find((doc) => doc.type === 'DecisaoPrevencao')) {
-      const doc = mainProcess.documents.find(
-        (doc) => doc.type === 'DecisaoPrevencao',
-      );
-      const findProcessProvision = await this.processModel.findOne({
-        number: doc?.data?.numero_execucao_provisorio,
-      });
-      if (doc.data?.numero_execucao_provisorio && !findProcessProvision) {
-        await this.processQueue.add('insert-process', {
-          processNumber: doc.data.numero_execucao_provisorio,
-          mainProcess: mainProcess.id,
-        });
-
-        return true;
-      }
-
-      console.log(
-        'Processo de execução provisória já existe na base ou numero de execução provisoria não encontrado',
-      );
-      return false;
-    }
-
-    // const uploadPath = path.resolve('tmp');
-    const mainProcessId = mainProcess.id;
-    // if (!fs.existsSync(uploadPath)) {
-    //   fs.mkdirSync(uploadPath, { recursive: true });
-    // }
-    const instancia = body.resposta?.instancias?.find(
-      (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-    );
-    const verifyCondition = instancia.movimentacoes.find((moviment) =>
-      normalizeString(moviment.conteudo).match(/.*decisao.* .*prevencao.*/i),
-    );
-    if (verifyCondition) {
-      const document = instancia.documentos_restritos.find(
-        (doc) =>
-          doc.tipo === 'DecisaoPrevencao' && doc.data === verifyCondition.data,
-      );
-      if (!document) {
-        console.log(`Documento ${document?.titulo} não encontrado.`);
-        return false;
-      }
-      const response = await this.vertexAIService.executeWithRetry(
-        document.link_api,
-        this.vertexAIService.getPromptIdentifyProvisionalExecution(
-          body.resposta.numero_unico,
-        ),
-      );
-      console.log(response);
-      const findProcessProvision = await this.processModel.findOne({
-        number: response.numero_execucao_provisorio,
-      });
-
-      await this.processModel.findOneAndUpdate(
-        {
-          number: body.numero_processo,
-          'documents.uniqueName': document.unique_name,
-          'documents.type': document.tipo,
-          'documents.date': document.data,
-        },
-        {
-          $set: {
-            'documents.$.data': response,
-          },
-        },
-        { new: true },
-      );
-
-      if (response?.numero_execucao_provisorio && !findProcessProvision) {
-        await this.processQueue.add('insert-process', {
-          processNumber: response.numero_execucao_provisorio,
-          mainProcessId,
-        });
-
-        return true;
-      }
-
-      console.log(
-        'Processo de execução provisória já existe na base ou numero de execução provisoria não encontrado',
-      );
-    }
-    return false;
-  }
   isProvisionalExecution(classProcess: string): boolean {
     return execucaoProvisoria.some((execucao) =>
       execucao
-        .normalize('NFD') // Normaliza para decompor caracteres
-        .replace(/[\u0300-\u036f]/g, '') // Remove acentuação
+        .normalize('NFD')
+        .replace(/[0-\u036f]/g, '')
         .toLowerCase()
         .includes(
           classProcess
             ?.normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[0-\u036f]/g, '')
             .toLowerCase(),
         ),
     );

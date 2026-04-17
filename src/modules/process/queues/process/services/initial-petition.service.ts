@@ -1,7 +1,7 @@
-import { InjectQueue } from '@nestjs/bull';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Queue } from 'bull';
+import { Queue } from 'bullmq';
 import { Model } from 'mongoose';
 import { ClaimedProcesses } from 'src/modules/process/schema/claimed-processes.schema';
 import { Company } from 'src/modules/process/schema/company.schema';
@@ -24,6 +24,7 @@ export class InitialPetitionService {
     @InjectQueue('process-queue')
     private readonly processQueue: Queue,
   ) {}
+
   async execute(processNumber: string) {
     this.logger.log(`Inicial Peticion Job ${processNumber}`);
     try {
@@ -64,43 +65,10 @@ export class InitialPetitionService {
               `Error in request MainLawsuit ${peticaoInicialDoc.data.numero_processo_principal}`,
             );
           }
-          // await this.processModule.findByIdAndUpdate(findProcess._id, {
-          //   situation: Situation.IN_PROGRESS,
-          // });
-          return;
-        }
-
-        if (findProcess.arquived && !findProcessMain) {
-          // await this.processModule.findByIdAndUpdate(findProcess._id, {
-          //   situation: Situation.ISSUED,
-          // });
-          return;
-        }
-
-        if (findProcess.arquived && findProcessMain?.arquived) {
-          // await this.processModule.findByIdAndUpdate(findProcess._id, {
-          //   situation: Situation.ISSUED,
-          // });
-          // await this.processModule.findByIdAndUpdate(findProcessMain._id, {
-          //   situation: Situation.ISSUED,
-          // });
-          return;
-        }
-
-        if (findProcess?.arquived && !findProcessMain?.arquived) {
-          // await this.processModule.findByIdAndUpdate(findProcess._id, {
-          //   situation: Situation.ISSUED,
-          // });
-          // await this.processModule.findByIdAndUpdate(findProcessMain._id, {
-          //   situation: Situation.IN_PROGRESS,
-          // });
           return;
         }
 
         if (!findProcess.arquived) {
-          // await this.processModule.findByIdAndUpdate(findProcess._id, {
-          //   situation: Situation.IN_PROGRESS,
-          // });
           return;
         }
       }
@@ -153,30 +121,6 @@ export class InitialPetitionService {
           calledByInitialPetitionProvisionalNumber: provisionalNumber?.number,
         });
       }
-
-      // const provisionalProcess = await this.processModule.findOneAndUpdate(
-      //   {
-      //     number: provisionalNumber.number,
-      //   },
-      //   {
-      //     $set: {
-      //       situation: Situation.PENDING,
-      //     },
-      //   },
-      // );
-
-      // await this.processStatusModule.updateOne(
-      //   {
-      //     processId: provisionalProcess.processStatus,
-      //   },
-      //   {
-      //     $set: {
-      //       name: processStatusName.WatingForLawsuitMain,
-      //       log: '',
-      //       errorReason: '',
-      //     },
-      //   },
-      // );
       return true;
     } catch (error) {
       this.logger.error('Error in request MainLawsuit: ', error);
@@ -191,6 +135,7 @@ export class InitialPetitionService {
       ).arquivado === true
     );
   }
+
   findMostRecentPeticaoInicial(docs: any[] = []): any {
     if (!docs.length) {
       return [];

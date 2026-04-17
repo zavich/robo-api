@@ -1,7 +1,6 @@
-import { InjectQueue, Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Job, Queue } from 'bull';
+import { Queue, QueueEvents, Worker } from 'bullmq';
 import { Model } from 'mongoose';
 import {
   InsertProceess,
@@ -11,17 +10,19 @@ import {
 import { Complainant } from '../../schema/complainant.schema';
 import { Process as ProcessSchema } from '../../schema/process.schema';
 
+import { Redis } from 'ioredis';
 import { ExtractDocumentsInfoService } from './services/extract-documents-info.service';
 import { InitialPetitionService } from './services/initial-petition.service';
 import { InsertProcessService } from './services/insert-process.service';
 import { ProcessValidationService } from './services/process-validation.service';
 import { SolvencyValidationService } from './services/solvency-validation.service';
 
-@Processor('process-queue')
 export class ProcessQueue {
   private readonly logger = new Logger();
+  private readonly processQueue: Queue;
+  private readonly queueEvents: QueueEvents;
+
   constructor(
-    @InjectQueue('process-queue') private readonly processQueue: Queue,
     @InjectModel(ProcessSchema.name)
     private readonly processModule: Model<ProcessSchema>,
     @InjectModel(Complainant.name)
@@ -32,32 +33,64 @@ export class ProcessQueue {
     private readonly insertProcessService: InsertProcessService,
     private readonly initialPetitionService: InitialPetitionService,
   ) {
-    this.processQueue.on('waiting', (jobId) =>
+    const redisConnection = new Redis({
+      maxRetriesPerRequest: null, // Necessário para BullMQ
+    });
+    this.processQueue = new Queue('process-queue', {
+      connection: redisConnection,
+    });
+    this.queueEvents = new QueueEvents('process-queue', {
+      connection: redisConnection,
+    });
+
+    this.queueEvents.on('waiting', ({ jobId }) =>
       console.log('Job aguardando:', jobId),
     );
-    this.processQueue.on('active', (job) =>
-      console.log('Job ativo:', job.id, job.name),
+    this.queueEvents.on('active', ({ jobId, prev }) =>
+      console.log('Job ativo:', jobId, prev),
     );
-    this.processQueue.on('completed', (job) =>
-      console.log('Job concluído:', job.id),
+    this.queueEvents.on('completed', ({ jobId }) =>
+      console.log('Job concluído:', jobId),
     );
-    this.processQueue.on('failed', (job, err) =>
-      console.error('Job falhou:', job.id, err),
+    this.queueEvents.on('failed', ({ jobId, failedReason }) =>
+      console.error('Job falhou:', jobId, failedReason),
+    );
+
+    new Worker(
+      'process-queue',
+      async (job) => {
+        switch (job.name) {
+          case 'insert-process':
+            await this.insertProcess(job.data);
+            break;
+          case 'process-validation':
+            await this.processValidationJob(job.data);
+            break;
+          case 'solvency-validation':
+            await this.solvencyValidationJob(job.data);
+            break;
+          case 'extract-document':
+            await this.extractDocumentJob(job.data);
+            break;
+          case 'initial-petition':
+            await this.initialPetitionJob(job.data);
+            break;
+          default:
+            throw new Error(`Unknown job name: ${job.name}`);
+        }
+      },
+      { connection: redisConnection },
     );
   }
 
-  @Process({
-    name: 'insert-process',
-    concurrency: 5,
-  })
-  async insertProcess(job: Job<InsertProceess>) {
+  async insertProcess(data: InsertProceess) {
     const {
       processNumber,
       mainProcessId,
       dealId,
       stageId,
       calledByInitialPetitionProvisionalNumber,
-    } = job.data;
+    } = data;
     try {
       await this.insertProcessService.execute({
         processNumber,
@@ -71,9 +104,9 @@ export class ProcessQueue {
       throw error;
     }
   }
-  @Process('process-validation')
-  async processValidationJob(job: Job<any>) {
-    const { processNumber } = job.data;
+
+  async processValidationJob(data: any) {
+    const { processNumber } = data;
     this.logger.log(`Job initial process analysis #${processNumber}`);
     try {
       const findProcess = await this.processModule.findOne({
@@ -86,26 +119,20 @@ export class ProcessQueue {
       throw error;
     }
   }
-  @Process('solvency-validation')
-  async solvencyValidationJob(job: Job<any>) {
+
+  async solvencyValidationJob(data: any) {
     try {
-      const { processNumber } = job.data;
+      const { processNumber } = data;
       this.logger.log(`Job solvency validation #${processNumber}`);
       return await this.solvencyValidationService.execute(processNumber);
     } catch (error) {
-      this.logger.error(
-        `Error in solvency validation #${job.data.processNumber}`,
-      );
+      this.logger.error(`Error in solvency validation #${data.processNumber}`);
       throw error;
     }
   }
-  @Process({
-    name: 'extract-document',
-    concurrency: 1,
-  })
-  async extractDocumentJob(job: Job<Root | LawsuitNumber>) {
-    const body = job.data;
-    // console.log('body: ', body);
+
+  async extractDocumentJob(data: Root | LawsuitNumber) {
+    const body = data;
     let processFound;
     if ('resposta' in body) {
       processFound = await this.processModule
@@ -123,9 +150,9 @@ export class ProcessQueue {
     await this.extractDocumentsInfoService.execute(processFound.number);
     this.logger.log('FINISH EXTRACT DOCUMENT JOB');
   }
-  @Process({ name: 'initial-petition' })
-  async initialPetitionJob(job: Job<any>) {
-    const { processNumber, resposta } = job.data;
+
+  async initialPetitionJob(data: any) {
+    const { processNumber, resposta } = data;
     await this.initialPetitionService.execute(
       processNumber || resposta.numero_unico,
     );

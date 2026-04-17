@@ -2,21 +2,22 @@ import * as dotenv from 'dotenv';
 // Carrega o .env o mais cedo possível (antes do NestFactory.create)
 dotenv.config();
 
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
-import { Env } from './config/zod/env';
-import * as bodyParser from 'body-parser';
-import { ExpressAdapter } from '@bull-board/express';
-import { Queue } from 'bull';
 import { createBullBoard } from '@bull-board/api';
-import { BullAdapter } from '@bull-board/api/bullAdapter';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { ExpressAdapter } from '@bull-board/express';
+import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { patchNestJsSwagger } from 'nestjs-zod';
+import * as bodyParser from 'body-parser';
+import { Queue } from 'bullmq';
 import * as cookieParser from 'cookie-parser';
 import { setMaxListeners } from 'events';
-import { Logger } from '@nestjs/common';
-import { RedisHealthService } from './service/redis-health.service';
+import Redis from 'ioredis';
+import { patchNestJsSwagger } from 'nestjs-zod';
+import { AppModule } from './app.module';
+import { Env } from './config/zod/env';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -35,6 +36,7 @@ async function bootstrap() {
     ],
     credentials: true,
   });
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Prosolutti Api')
     .setDescription('API Documentation')
@@ -43,34 +45,45 @@ async function bootstrap() {
     .build();
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api', app, swaggerDocument);
-  //expandir o limite do json
+
+  // Expandir o limite do JSON
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
   app.use(cookieParser());
   setMaxListeners(20);
+
   const configService = app.get<ConfigService<Env, true>>(ConfigService);
   const port = configService.get('PORT', { infer: true });
 
   if (process.env?.ENVIRONMENT !== 'production') {
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/bull-board');
-    const aQueue = app.get<Queue>(`BullQueue_process-queue`);
-    const redisHealthService = app.get(RedisHealthService);
+
+    const aQueue = new Queue('process-queue', {
+      connection: new Redis(process.env.REDIS_URL!, {
+        maxRetriesPerRequest: null,
+      }),
+    });
+
+    createBullBoard({
+      queues: [new BullMQAdapter(aQueue) as unknown as any], // Força a compatibilidade de tipos
+      serverAdapter,
+    });
+
+    app.use('/bull-board', serverAdapter.getRouter());
+
+    console.log('✅ Bull Board carregado com a fila process-queue');
     const logger = new Logger('BullBoard');
 
+    logger.warn(
+      `Tentando conectar ao Redis para Bull Board... ${process.env.REDIS_URL}`,
+    );
     try {
-      await redisHealthService.checkRedisHealth(process.env.REDIS_URL);
+      await aQueue.getJobCounts();
       logger.warn('Redis conectado com sucesso!');
     } catch (error) {
       logger.error('Falha ao conectar ao Redis:', error);
-      process.exit(1);
     }
-
-    createBullBoard({
-      queues: [new BullAdapter(aQueue)],
-      serverAdapter,
-    });
-    app.use('/bull-board', serverAdapter.getRouter());
   }
 
   const finalPort = port || 8080;

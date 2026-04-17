@@ -1,8 +1,10 @@
-import { BullModule } from '@nestjs/bull';
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AppController } from './app.controller';
+import { RedisModule } from './connection/redis.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthenticationModule } from './modules/authentication/authentication.module';
 import { CompanyModule } from './modules/company/company.module';
@@ -14,7 +16,6 @@ import { PromptModule } from './modules/prompts/prompt.module';
 import { ReasonLossModule } from './modules/reason-loss/reason-refusal.module';
 import { StepsModule } from './modules/steps/steps.module';
 import { UserModule } from './modules/user/user.module';
-import { AppController } from './app.controller';
 import { RedisHealthService } from './service/redis-health.service';
 
 @Module({
@@ -23,28 +24,10 @@ import { RedisHealthService } from './service/redis-health.service';
       isGlobal: true,
     }),
     BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        redis: {
-          url: configService.get<string>('REDIS_URL'),
-          tls: {
-            rejectUnauthorized: false,
-          },
-        },
-
-        prefix: '{bull}',
-
-        limiter: { max: 2, duration: 1000 },
-
-        defaultJobOptions: {
-          removeOnComplete: 100,
-          removeOnFail: 1000,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 1000,
-          },
-        },
+      imports: [RedisModule],
+      inject: ['REDIS_CLIENT'],
+      useFactory: (redisClient: any) => ({
+        connection: redisClient,
       }),
     }),
     ScheduleModule.forRoot(),
