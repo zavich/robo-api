@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Queue, QueueEvents, Worker } from 'bullmq';
 import { Model } from 'mongoose';
@@ -32,16 +32,13 @@ export class ProcessQueue {
     private readonly extractDocumentsInfoService: ExtractDocumentsInfoService,
     private readonly insertProcessService: InsertProcessService,
     private readonly initialPetitionService: InitialPetitionService,
+    @Inject('REDIS_CLIENT') private readonly redisClient: Redis,
   ) {
-    const connection = new Redis(process.env.REDIS_URL!, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: true,
-    });
     this.processQueue = new Queue('process-queue', {
-      connection,
+      connection: this.redisClient,
     });
     this.queueEvents = new QueueEvents('process-queue', {
-      connection,
+      connection: this.redisClient,
     });
 
     this.queueEvents.on('waiting', ({ jobId }) =>
@@ -80,7 +77,7 @@ export class ProcessQueue {
             throw new Error(`Unknown job name: ${job.name}`);
         }
       },
-      { connection },
+      { connection: this.redisClient },
     );
   }
 

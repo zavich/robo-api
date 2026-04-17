@@ -13,7 +13,6 @@ import * as bodyParser from 'body-parser';
 import { Queue } from 'bullmq';
 import * as cookieParser from 'cookie-parser';
 import { setMaxListeners } from 'events';
-import Redis from 'ioredis';
 import { patchNestJsSwagger } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { Env } from './config/zod/env';
@@ -58,13 +57,11 @@ async function bootstrap() {
   if (process.env?.ENVIRONMENT !== 'production') {
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/bull-board');
-    const connection = new Redis(process.env.REDIS_URL!, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: true,
-    });
+
+    const redisClient = app.get('REDIS_CLIENT');
 
     const aQueue = new Queue('process-queue', {
-      connection,
+      connection: redisClient,
     });
 
     createBullBoard({

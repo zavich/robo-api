@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { JobsOptions, Queue } from 'bullmq';
 import { Redis } from 'ioredis';
@@ -13,13 +13,10 @@ export class CreateProcessService {
   constructor(
     @InjectModel(Process.name)
     private readonly processModule: Model<Process>,
+    @Inject('REDIS_CLIENT') private readonly redisClient: Redis,
   ) {
-    const redisConnection = new Redis(process.env.REDIS_URL!, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: true,
-    });
     this.processQueue = new Queue('process-queue', {
-      connection: redisConnection,
+      connection: this.redisClient,
     });
   }
 
