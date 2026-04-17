@@ -20,7 +20,6 @@ import { RedisHealthService } from './service/redis-health.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Definindo a rota '/health' antes do prefixo global
   const httpAdapter = app.getHttpAdapter();
   httpAdapter.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
