@@ -14,7 +14,10 @@ export class CreateProcessService {
     @InjectModel(Process.name)
     private readonly processModule: Model<Process>,
   ) {
-    const redisConnection = new Redis();
+    const redisConnection = new Redis(process.env.REDIS_URL!, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+    });
     this.processQueue = new Queue('process-queue', {
       connection: redisConnection,
     });
