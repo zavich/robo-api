@@ -18,7 +18,6 @@ import { setMaxListeners } from 'events';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Adicionando exceção para a rota 'health'
   app.getHttpAdapter().get('/health', (req, res) => {
     res.status(200).json({ status: 'ok' });
   });
