@@ -25,6 +25,9 @@ import { AppController } from './app.controller';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         url: configService.get<string>('REDIS_URL'),
+        tls: {
+          rejectUnauthorized: false,
+        },
         limiter: { max: 2, duration: 1000 },
         defaultJobOptions: {
           removeOnComplete: 100,

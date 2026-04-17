@@ -67,6 +67,7 @@ async function bootstrap() {
         { removeOnComplete: true },
       );
       logger.warn('Redis conectado com sucesso!');
+      logger.warn(await aQueue.count());
     } catch (error) {
       logger.error('Falha ao conectar ao Redis:', error);
     }
