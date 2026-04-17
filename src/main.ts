@@ -18,10 +18,6 @@ import { setMaxListeners } from 'events';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.getHttpAdapter().get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
-  });
-
   app.setGlobalPrefix('v1');
   patchNestJsSwagger();
   app.enableCors({
@@ -58,6 +54,10 @@ async function bootstrap() {
     });
     app.use('/bull-board', serverAdapter.getRouter());
   }
+
+  app.getHttpAdapter().get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
 
   const finalPort = port || 8080;
   await app.listen(finalPort, '0.0.0.0');
