@@ -31,7 +31,11 @@ import { RedisHealthService } from './service/redis-health.service';
             rejectUnauthorized: false,
           },
         },
+
+        prefix: '{bull}',
+
         limiter: { max: 2, duration: 1000 },
+
         defaultJobOptions: {
           removeOnComplete: 100,
           removeOnFail: 1000,
