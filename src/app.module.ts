@@ -15,6 +15,7 @@ import { ReasonLossModule } from './modules/reason-loss/reason-refusal.module';
 import { StepsModule } from './modules/steps/steps.module';
 import { UserModule } from './modules/user/user.module';
 import { AppController } from './app.controller';
+import { RedisHealthService } from './service/redis-health.service';
 
 @Module({
   imports: [
@@ -55,6 +56,6 @@ import { AppController } from './app.controller';
     UserModule,
   ],
   controllers: [AppController],
-  providers: [],
+  providers: [RedisHealthService],
 })
 export class AppModule {}

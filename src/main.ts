@@ -16,6 +16,7 @@ import { patchNestJsSwagger } from 'nestjs-zod';
 import * as cookieParser from 'cookie-parser';
 import { setMaxListeners } from 'events';
 import { Logger } from '@nestjs/common';
+import { RedisHealthService } from './service/redis-health.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -55,21 +56,15 @@ async function bootstrap() {
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/bull-board');
     const aQueue = app.get<Queue>(`BullQueue_process-queue`);
+    const redisHealthService = app.get(RedisHealthService);
     const logger = new Logger('BullBoard');
-    logger.warn(
-      `Tentando conectar ao Redis para Bull Board... ${process.env.REDIS_URL}`,
-    );
+
     try {
-      await aQueue.isReady();
-      await aQueue.add(
-        'startup-check',
-        { ok: true },
-        { removeOnComplete: true },
-      );
+      await redisHealthService.checkRedisHealth(process.env.REDIS_URL);
       logger.warn('Redis conectado com sucesso!');
-      logger.warn(await aQueue.count());
     } catch (error) {
       logger.error('Falha ao conectar ao Redis:', error);
+      process.exit(1);
     }
 
     createBullBoard({
