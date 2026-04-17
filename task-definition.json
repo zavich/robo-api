@@ -34,6 +34,102 @@
         {
           "name": "DATABASE_URL",
           "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:DATABASE_URL::"
+        },
+        {
+          "name": "AWS_S3_REGION",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:AWS_S3_REGION::"
+        },
+        {
+          "name": "AWS_S3_BUCKET_NAME",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:AWS_S3_BUCKET_NAME::"
+        },
+        {
+          "name": "BASE_URL_EMPRESAQUI",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:BASE_URL_EMPRESAQUI::"
+        },
+        {
+          "name": "EMPRESAQUI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:EMPRESAQUI_API_KEY::"
+        },
+        {
+          "name": "GOOGLE_CLIENT_EMAIL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_CLIENT_EMAIL::"
+        },
+        {
+          "name": "GOOGLE_PRIVATE_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PRIVATE_KEY::"
+        },
+        {
+          "name": "GOOGLE_PRIVATE_KEY_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PRIVATE_KEY_ID::"
+        },
+        {
+          "name": "GOOGLE_PROJECT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_PROJECT_ID::"
+        },
+        {
+          "name": "GOOGLE_VERTEX_LOCATION",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_VERTEX_LOCATION::"
+        },
+        {
+          "name": "GOOGLE_VERTEX_MODEL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_VERTEX_MODEL::"
+        },
+        {
+          "name": "GOOGLE_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:GOOGLE_CLIENT_ID::"
+        },
+        {
+          "name": "JWT_EXPIRES_IN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:JWT_EXPIRES_IN::"
+        },
+        {
+          "name": "SCRAPING_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:SCRAPING_API_KEY::"
+        },
+        {
+          "name": "SCRAPING_BASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:SCRAPING_BASE_URL::"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:REDIS_URL::"
+        },
+        {
+          "name": "MICROSOFT_CLIENT_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_CLIENT_ID::"
+        },
+        {
+          "name": "MICROSOFT_DIRECTORY_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_DIRECTORY_ID::"
+        },
+        {
+          "name": "MICROSOFT_SECRET_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_SECRET_ID::"
+        },
+        {
+          "name": "MICROSOFT_SECRET_VALUE",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_SECRET_VALUE::"
+        },
+        {
+          "name": "MICROSOFT_SITE_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_SITE_ID::"
+        },
+        {
+          "name": "MICROSOFT_DRIVE_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_DRIVE_ID::"
+        },
+        {
+          "name": "MICROSOFT_ITEM_ID",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:MICROSOFT_ITEM_ID::"
+        },
+        {
+          "name": "PIPEDRIVE_PROSOLUTTI_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:PIPEDRIVE_PROSOLUTTI_URL::"
+        },
+        {
+          "name": "PIPEDRIVE_PROSOLUTTI_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod:PIPEDRIVE_PROSOLUTTI_TOKEN::"
         }
       ],
 
