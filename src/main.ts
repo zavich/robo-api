@@ -2,27 +2,21 @@ import * as dotenv from 'dotenv';
 // Carrega o .env o mais cedo possível (antes do NestFactory.create)
 dotenv.config();
 
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
-import { Env } from './config/zod/env';
-import * as bodyParser from 'body-parser';
-import { ExpressAdapter } from '@bull-board/express';
-import { Queue } from 'bull';
 import { createBullBoard } from '@bull-board/api';
 import { BullAdapter } from '@bull-board/api/bullAdapter';
+import { ExpressAdapter } from '@bull-board/express';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { patchNestJsSwagger } from 'nestjs-zod';
+import * as bodyParser from 'body-parser';
+import { Queue } from 'bull';
 import * as cookieParser from 'cookie-parser';
 import { setMaxListeners } from 'events';
+import { patchNestJsSwagger } from 'nestjs-zod';
+import { AppModule } from './app.module';
+import { Env } from './config/zod/env';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
-  // Definindo a rota '/health' antes do prefixo global
-  const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
-  });
 
   app.setGlobalPrefix('v1');
   patchNestJsSwagger();
