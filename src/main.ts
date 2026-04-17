@@ -32,7 +32,7 @@ async function bootstrap() {
       'https://scraping-api-prd.juri.capital',
       'https://painel-robo-prd.juri.capital',
     ],
-    credentials: true, // Permite o envio de cookies
+    credentials: true,
   });
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Prosolutti Api')
