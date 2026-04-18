@@ -10,6 +10,7 @@ import { BadRequestException, Logger } from '@nestjs/common';
 import * as mimeTypes from 'mime-types';
 import * as fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { fromContainerMetadata } from '@aws-sdk/credential-providers';
 
 export class AwsServices {
   async sendEmail(to: any, subject: any, text: any) {
@@ -126,5 +127,6 @@ export class AwsServices {
   }
   private s3Client = new S3Client({
     region: process.env.AWS_S3_REGION || 'us-east-2',
+    credentials: fromContainerMetadata(),
   });
 }
