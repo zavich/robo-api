@@ -139,14 +139,6 @@
         {
           "name": "PIPEDRIVE_PROSOLUTTI_TOKEN",
           "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod-0d7y3k:PIPEDRIVE_PROSOLUTTI_TOKEN::"
-        },
-        {
-          "name": "AWS_S3_ACCESS_KEY_ID",
-          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod-0d7y3k:AWS_S3_ACCESS_KEY_ID::"
-        },
-        {
-          "name": "AWS_S3_SECRET_ACCESS_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod-0d7y3k:AWS_S3_SECRET_ACCESS_KEY::"
         }
       ],
 
