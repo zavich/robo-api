@@ -61,18 +61,22 @@ jobs:
             --arg APP_ENV "production" \
             --arg NODE_ENV "production" \
             --arg API_URL "${{ secrets.API_URL }}" \
+            --arg TASK_ROLE "arn:aws:iam::339340413604:role/robo-task-role" \
+            --arg EXEC_ROLE "arn:aws:iam::339340413604:role/ecsTaskExecutionRole" \
             '
-            .containerDefinitions |= map(
-              if .name == env.CONTAINER_NAME then
-                .image = $IMAGE
-                | .environment = [
-                    {"name":"APP_ENV","value":$APP_ENV},
-                    {"name":"NODE_ENV","value":$NODE_ENV},
-                    {"name":"API_URL","value":$API_URL}
-                  ]
-              else .
-              end
-            )
+            .taskRoleArn = $TASK_ROLE
+            | .executionRoleArn = $EXEC_ROLE
+            | .containerDefinitions |= map(
+                if .name == env.CONTAINER_NAME then
+                  .image = $IMAGE
+                  | .environment = [
+                      {"name":"APP_ENV","value":$APP_ENV},
+                      {"name":"NODE_ENV","value":$NODE_ENV},
+                      {"name":"API_URL","value":$API_URL}
+                    ]
+                else .
+                end
+              )
             | del(
                 .taskDefinitionArn,
                 .revision,
