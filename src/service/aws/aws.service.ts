@@ -125,6 +125,6 @@ export class AwsServices {
     }
   }
   private s3Client = new S3Client({
-    region: process.env.AWS_S3_REGION as string,
+    region: process.env.AWS_S3_REGION || 'us-east-2',
   });
 }
