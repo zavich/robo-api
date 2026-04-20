@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   Res,
   StreamableFile,
   UploadedFile,
@@ -536,15 +537,13 @@ export class ProcessController {
 
     return this.uploadXLSXService.execute(file.buffer);
   }
-
-  @Get('/documents/:key')
+  @Get('/documents/*')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
-  async getFile(
-    @Param('key') key: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async getFile(@Request() req, @Res({ passthrough: true }) res: Response) {
     try {
+      const key = decodeURIComponent(req.params[0]);
+
       const signedUrl = await this.awsService.getSignedUrlS3(key);
 
       const response = await axios.get(signedUrl, {
@@ -559,7 +558,7 @@ export class ProcessController {
       return new StreamableFile(response.data);
     } catch (error) {
       console.error(error);
-      throw new BadRequestException('Erro ao obter o arquivo PDF.');
+      throw new BadRequestException('Erro ao obter arquivo.');
     }
   }
 }
