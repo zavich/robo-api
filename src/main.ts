@@ -30,8 +30,8 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'https://scraping-api-prd.juri.capital',
-      'https://painel-robo-prd.juri.capital',
+      'https://scraping-api.juri.capital',
+      'https://painel-robo.juri.capital',
     ],
     credentials: true,
   });
