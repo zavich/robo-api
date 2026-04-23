@@ -57,7 +57,7 @@ export class RunListLawsuitsValidationService {
       if (filters.length > 0) {
         pipeline.push({
           $match: {
-            $or: filters,
+            $and: filters,
           },
         });
       }
