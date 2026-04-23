@@ -19,9 +19,59 @@ export class RunListLawsuitsValidationService {
     @InjectModel(Step.name)
     private readonly stepService: Model<Step>,
   ) {}
-  async execute(lawsuits: string[], documents: boolean = false) {
+  async execute(
+    lawsuits: string[],
+    documents: boolean = false,
+    name?: string,
+    log?: string,
+    errorReason?: string,
+  ) {
+    let process: any[] = [];
+    if (lawsuits.length === 0) {
+      const filters = [];
+
+      if (name) {
+        filters.push({ 'processStatus.name': name });
+      }
+
+      if (errorReason) {
+        filters.push({ 'processStatus.errorReason': errorReason });
+      }
+
+      if (log) {
+        filters.push({ 'processStatus.log': log });
+      }
+
+      const pipeline: any[] = [
+        {
+          $lookup: {
+            from: 'processstatuses',
+            localField: 'processStatus',
+            foreignField: '_id',
+            as: 'processStatus',
+          },
+        },
+        { $unwind: '$processStatus' },
+      ];
+
+      if (filters.length > 0) {
+        pipeline.push({
+          $match: {
+            $or: filters,
+          },
+        });
+      }
+
+      pipeline.push({
+        $project: {
+          number: 1,
+        },
+      });
+      const result = await this.processModule.aggregate(pipeline);
+      process = result.map((item) => item.number);
+    }
     await Promise.all(
-      lawsuits.map(async (lawsuit) => {
+      process.map(async (lawsuit) => {
         const process: any = await this.processModule
           .findOne({ number: lawsuit })
           .populate({ path: 'processStatus', populate: ['step'] });

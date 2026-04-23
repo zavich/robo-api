@@ -344,12 +344,18 @@ export class ProcessController {
     body: {
       lawsuits: string[];
       documents?: boolean;
+      name?: string;
+      log?: string;
+      errorReason?: string;
     },
   ) {
     try {
       await this.runListLawsuitsValidationService.execute(
         body.lawsuits,
         body.documents,
+        body.name,
+        body.log,
+        body.errorReason,
       );
       return { message: 'Processamento iniciado' };
     } catch (error) {
