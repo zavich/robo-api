@@ -69,6 +69,8 @@ export class RunListLawsuitsValidationService {
       });
       const result = await this.processModule.aggregate(pipeline);
       process = result.map((item) => item.number);
+    } else {
+      process = lawsuits;
     }
     await Promise.all(
       process.map(async (lawsuit) => {
