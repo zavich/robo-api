@@ -85,6 +85,8 @@ export class FindInsightsService {
             const signedUrl = await this.awsService.getSignedUrlS3(
               doc.temp_link,
             );
+            console.log('signedUrl: ', signedUrl);
+
             const response = await this.vertexAIService.executeWithRetry(
               signedUrl,
               fullPrompt,

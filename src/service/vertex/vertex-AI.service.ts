@@ -1,7 +1,6 @@
 import { GenerateContentRequest, Part, VertexAI } from '@google-cloud/vertexai';
 import { BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { AxiosError } from 'axios';
 import { Model } from 'mongoose';
 import { Prompt } from 'src/modules/process/schema/prompt.schema';
 
@@ -112,11 +111,11 @@ export class VertexAIService {
       };
 
       const resp = await generativeModel.generateContent(request);
+
       const contentResponse = await resp.response;
-      const jsonParsed = JSON.parse(
-        contentResponse.candidates[0].content.parts[0].text,
-      );
-      return jsonParsed;
+      const responseJson = contentResponse.candidates[0].content.parts[0].text;
+
+      return responseJson;
     } catch (error) {
       console.error('VERTEX ERROR:', error);
       console.error('VERTEX RESPONSE:', error?.response?.data);

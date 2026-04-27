@@ -6,11 +6,10 @@ import {
 } from '@aws-sdk/client-s3';
 import { SendEmailCommand, SendEmailCommandInput } from '@aws-sdk/client-ses';
 import { PublishCommand, PublishCommandInput } from '@aws-sdk/client-sns';
-import { BadRequestException, Logger } from '@nestjs/common';
-import * as mimeTypes from 'mime-types';
-import * as fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { fromContainerMetadata } from '@aws-sdk/credential-providers';
+import { BadRequestException, Logger } from '@nestjs/common';
+import * as fs from 'fs';
+import * as mimeTypes from 'mime-types';
 
 export class AwsServices {
   async sendEmail(to: any, subject: any, text: any) {
@@ -126,6 +125,6 @@ export class AwsServices {
     }
   }
   private s3Client = new S3Client({
-    region: process.env.AWS_S3_REGION || 'us-east-2',
+    region: process.env.AWS_S3_REGION || 'sa-east-1',
   });
 }
