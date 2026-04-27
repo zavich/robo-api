@@ -111,6 +111,7 @@ export class VertexAIService {
       };
 
       const resp = await generativeModel.generateContent(request);
+      console.log('VERTEX RESPONSE:', JSON.stringify(resp, null, 2));
 
       const contentResponse = await resp.response;
       const responseJson = contentResponse.candidates[0].content.parts[0].text;
