@@ -66,11 +66,6 @@ export class VertexAIService {
     fileMimeType = 'application/pdf',
   ): Promise<any> {
     try {
-      console.log({
-        project: process.env.GOOGLE_PROJECT_ID,
-        location: process.env.GOOGLE_VERTEX_LOCATION,
-        model: process.env.GOOGLE_VERTEX_MODEL,
-      });
       const vertexAI = new VertexAI({
         project: process.env.GOOGLE_PROJECT_ID,
         location: process.env.GOOGLE_VERTEX_LOCATION,
