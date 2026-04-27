@@ -111,11 +111,11 @@ export class VertexAIService {
       };
 
       const resp = await generativeModel.generateContent(request);
-
       const contentResponse = await resp.response;
-      const responseJson = contentResponse.candidates[0].content.parts[0].text;
-
-      return responseJson;
+      const jsonParsed = JSON.parse(
+        contentResponse.candidates[0].content.parts[0].text,
+      );
+      return jsonParsed;
     } catch (error) {
       console.error('VERTEX ERROR:', error);
       console.error('VERTEX RESPONSE:', error?.response?.data);
