@@ -118,8 +118,9 @@ export class VertexAIService {
       );
       return jsonParsed;
     } catch (error) {
-      const AxiosError = error as AxiosError;
-      throw new BadRequestException(AxiosError);
+      console.error('VERTEX ERROR:', error);
+      console.error('VERTEX RESPONSE:', error?.response?.data);
+      throw error;
     }
   }
 

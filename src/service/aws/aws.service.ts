@@ -111,11 +111,6 @@ export class AwsServices {
   }
   async getSignedUrlS3(key: string) {
     try {
-      console.log('DEBUG ECS VARS:', {
-        relative_uri: process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI,
-        full_uri: process.env.AWS_CONTAINER_CREDENTIALS_FULL_URI,
-        aws_region: process.env.AWS_S3_REGION,
-      });
       const command = new GetObjectCommand({
         Bucket: process.env.AWS_S3_BUCKET_NAME,
         Key: key,
