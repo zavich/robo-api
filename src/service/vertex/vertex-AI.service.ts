@@ -66,6 +66,11 @@ export class VertexAIService {
     fileMimeType = 'application/pdf',
   ): Promise<any> {
     try {
+      console.log({
+        project: process.env.GOOGLE_PROJECT_ID,
+        location: process.env.GOOGLE_VERTEX_LOCATION,
+        model: process.env.GOOGLE_VERTEX_MODEL,
+      });
       const vertexAI = new VertexAI({
         project: process.env.GOOGLE_PROJECT_ID,
         location: process.env.GOOGLE_VERTEX_LOCATION,
@@ -111,7 +116,6 @@ export class VertexAIService {
       };
 
       const resp = await generativeModel.generateContent(request);
-      console.log('VERTEX RESPONSE:', JSON.stringify(resp, null, 2));
 
       const contentResponse = await resp.response;
       const responseJson = contentResponse.candidates[0].content.parts[0].text;
