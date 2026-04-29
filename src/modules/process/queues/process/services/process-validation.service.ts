@@ -3,10 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import axios, { AxiosError } from 'axios';
 import { Model } from 'mongoose';
 import { normalize } from 'path';
-import {
-  classesAprovar,
-  execucaoProvisoria,
-} from 'src/modules/process/mock/extract';
+import { classesAprovar } from 'src/modules/process/mock/extract';
 import { ProcessStatus } from 'src/modules/process/schema/process-status.schema';
 import { Step } from 'src/modules/process/schema/step.schema';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
@@ -27,8 +24,6 @@ export class ProcessValidationService {
 
   async execute(number) {
     try {
-      const match = number.match(/^\d{7}-\d{2}\.\d{4}\.\d\.(\d{2})\.\d{4}$/);
-      const regionTRT = match ? Number(match[1]) : null;
       const url = process.env.SCRAPING_BASE_URL;
       const step = await this.stepModule.findOne({
         slug: 'step-1',
@@ -56,19 +51,7 @@ export class ProcessValidationService {
           }
         }
       }
-      await this.processModule.findByIdAndUpdate(
-        processId,
-        {
-          class: this.isProvisionalExecution(
-            processData?.instancias?.find(
-              (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-            )?.classe,
-          )
-            ? 'PROVISIONAL_EXECUTION'
-            : 'MAIN',
-        },
-        { new: true },
-      );
+
       this.logger.log('PROCESS VALIDATION FINISHED!');
 
       await this.createOrUpdateProcessStatus(step, processData);
@@ -97,22 +80,6 @@ export class ProcessValidationService {
       {
         step: findNextStep?._id,
       },
-    );
-  }
-
-  // Verifica se o processo é Execução provisória ou principal
-  isProvisionalExecution(classProcess: string): boolean {
-    return execucaoProvisoria.some((execucao) =>
-      execucao
-        .normalize('NFD') // Normaliza para decompor caracteres
-        .replace(/[\u0300-\u036f]/g, '') // Remove acentuação
-        .toLowerCase()
-        .includes(
-          classProcess
-            ?.normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase(),
-        ),
     );
   }
 

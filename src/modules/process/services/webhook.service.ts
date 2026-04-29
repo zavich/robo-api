@@ -374,18 +374,20 @@ export class WebhookService {
     }
   }
 
-  isProvisionalExecution(classProcess: string): boolean {
+  isProvisionalExecution(classProcess?: string): boolean {
+    if (!classProcess) return false;
+
+    const normalizedClass = classProcess
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
     return execucaoProvisoria.some((execucao) =>
       execucao
         .normalize('NFD')
-        .replace(/[0-\u036f]/g, '')
+        .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
-        .includes(
-          classProcess
-            ?.normalize('NFD')
-            .replace(/[0-\u036f]/g, '')
-            .toLowerCase(),
-        ),
+        .includes(normalizedClass),
     );
   }
 }
