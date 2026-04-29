@@ -267,6 +267,9 @@ export class FindProcessService {
           _id: '$_id',
           root: { $first: '$$ROOT' },
           activities: { $push: '$activities' },
+          instancias: { $first: '$instancias' },
+          instanciasAutos: { $first: '$instanciasAutos' },
+          autosData: { $first: '$autosData' },
         },
       },
 
