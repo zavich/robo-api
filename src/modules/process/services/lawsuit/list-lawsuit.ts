@@ -49,13 +49,20 @@ export class ListLawsuitService {
         match.createdAt = dateFilter;
       }
     }
-
+    const andConditions: any[] = [];
     // 🔹 Busca
     if (search?.trim()) {
-      match.$or = [
-        { number: { $regex: search, $options: 'i' } },
-        { 'processParts.nome': { $regex: search, $options: 'i' } },
-      ];
+      andConditions.push({
+        $or: [
+          { number: { $regex: this.escapeRegex(search), $options: 'i' } },
+          {
+            'processParts.nome': {
+              $regex: this.escapeRegex(search),
+              $options: 'i',
+            },
+          },
+        ],
+      });
     }
 
     // 🔹 Filtro por activities
@@ -93,10 +100,9 @@ export class ListLawsuitService {
 
     // 🔹 Admin
     if (isAdmin) {
-      match.$or = [
-        { activities: { $exists: false } },
-        { activities: { $size: 0 } },
-      ];
+      andConditions.push({
+        $or: [{ activities: { $exists: false } }, { activities: { $size: 0 } }],
+      });
     }
 
     // 🔹 Pipeline otimizado
@@ -159,13 +165,13 @@ export class ListLawsuitService {
     ];
 
     if (emptyDocuments) {
-      match.$and = match.$and || [];
-
-      match.$and.push({
+      andConditions.push({
         $or: [{ documents: { $exists: false } }, { documents: { $size: 0 } }],
       });
     }
-
+    if (andConditions.length) {
+      match.$and = andConditions;
+    }
     const [processes, total] = await Promise.all([
       this.lawsuitModule.aggregate(pipeline).allowDiskUse(true),
       this.lawsuitModule.countDocuments(match),
@@ -180,5 +186,8 @@ export class ListLawsuitService {
       limit: limitNum,
       totalPages,
     };
+  }
+  escapeRegex(text: string) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
