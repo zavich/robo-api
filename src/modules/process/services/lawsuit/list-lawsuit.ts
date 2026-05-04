@@ -23,93 +23,117 @@ export class ListLawsuitService {
       startDate,
       endDate,
       lossReason,
-      emptyDocuments,
-      emptyInstances,
-      hasNewMovements: hasNewMovementsRaw,
       type,
+      emptyDocuments,
     } = query;
 
-    // Converter hasNewMovements para boolean
-    let hasNewMovements: boolean | undefined = undefined;
-    if (hasNewMovementsRaw !== undefined) {
-      if (typeof hasNewMovementsRaw === 'string') {
-        hasNewMovements = hasNewMovementsRaw === 'true';
-      } else {
-        hasNewMovements = Boolean(hasNewMovementsRaw);
-      }
-    }
+    const skip = (page - 1) * Number(limit);
+    const limitNum = Number(limit);
 
-    // Verificar o role do usuário primeiro para determinar o tipo de filtro de data
-    const userToFilter = userId;
-    const findUser = await this.userModule.findById(userToFilter);
-    const isAdvogado = findUser?.role === 'advogado';
-    const isAdmin = findUser?.role === 'admin';
+    const user = await this.userModule.findById(userId);
+    const isAdvogado = user?.role === 'advogado';
+    const isAdmin = user?.role === 'admin';
 
-    const initialMatch: any = {};
-    const searchMatch: any = {};
+    const match: any = {};
 
-    // Aplicar filtro de data baseado no role do usuário
+    // 🔹 Filtro de data
     if (!isAdvogado) {
-      // Para usuários que não são advogados, usar createdAt do processo
       const dateFilter: any = {};
       if (startDate) dateFilter.$gte = new Date(startDate);
       if (endDate) {
-        const endDateTime = new Date(endDate);
-        endDateTime.setHours(23, 59, 59, 999);
-        dateFilter.$lte = endDateTime;
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.$lte = end;
       }
-      if (Object.keys(dateFilter).length > 0)
-        initialMatch.createdAt = dateFilter;
+      if (Object.keys(dateFilter).length) {
+        match.createdAt = dateFilter;
+      }
     }
 
-    if (search && search.trim() !== '') {
-      searchMatch.$or = [
+    // 🔹 Busca
+    if (search?.trim()) {
+      match.$or = [
         { number: { $regex: search, $options: 'i' } },
         { 'processParts.nome': { $regex: search, $options: 'i' } },
       ];
     }
 
-    // Filtro por status e/ou lossReason dentro das activities (array)
-    const activityMatch: any = {};
-
-    if (status && status.trim() !== '') {
-      activityMatch.status = status;
+    // 🔹 Filtro por activities
+    if (status || lossReason || type) {
+      match.activities = {
+        $elemMatch: {
+          ...(status && { status }),
+          ...(lossReason && { lossReason }),
+          ...(type && { type }),
+        },
+      };
     }
 
-    if (lossReason && (lossReason as string).trim() !== '') {
-      activityMatch.lossReason = lossReason;
+    // 🔹 Filtros de advogado
+    if (isAdvogado) {
+      match['activities.assignedTo'] = userId;
+
+      if (startDate || endDate) {
+        const activityDateFilter: any = {};
+        if (startDate) activityDateFilter.$gte = new Date(startDate);
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          activityDateFilter.$lte = end;
+        }
+
+        match.activities = {
+          $elemMatch: {
+            assignedTo: userId,
+            createdAt: activityDateFilter,
+          },
+        };
+      }
     }
 
-    if (type && type.trim() !== '') {
-      activityMatch.type = type;
+    // 🔹 Admin
+    if (isAdmin) {
+      match.$or = [
+        { activities: { $exists: false } },
+        { activities: { $size: 0 } },
+      ];
     }
 
-    // Só aplicar o filtro de activities se houver pelo menos um critério
-    if (Object.keys(activityMatch).length > 0) {
-      searchMatch.activities = { $elemMatch: activityMatch };
-    }
+    // 🔹 Pipeline otimizado
+    const pipeline: any[] = [
+      { $match: match },
 
-    const emptyFilters: any = {};
-    if (emptyDocuments !== undefined)
-      emptyFilters.isDocuments = !emptyDocuments;
-    if (emptyInstances !== undefined)
-      emptyFilters.isInstancias = !emptyInstances;
+      // 🔥 usa índice (ESSENCIAL)
+      { $sort: { createdAt: -1 } },
 
-    const skip = (page - 1) * Number(limit);
-    const limitNum = Number(limit);
+      { $skip: skip },
 
-    // Pipeline principal sem o sort problemático no início
-    const basePipeline: any[] = [
-      { $match: { ...initialMatch, ...searchMatch } },
+      // buffer maior pra manter qualidade da ordenação
+      { $limit: limitNum * 10 },
+
+      // 🔥 calcula flags
       {
         $addFields: {
-          isInstancias: {
+          hasDocuments: {
+            $gt: [{ $size: { $ifNull: ['$documents', []] } }, 0],
+          },
+          hasInstancias: {
             $gt: [{ $size: { $ifNull: ['$instancias', []] } }, 0],
           },
-          isDocuments: { $gt: [{ $size: { $ifNull: ['$documents', []] } }, 0] },
         },
       },
-      ...(Object.keys(emptyFilters).length ? [{ $match: emptyFilters }] : []),
+
+      // 🔥 ordenação FINAL (prioridade correta)
+      {
+        $sort: {
+          hasDocuments: -1, // 1º prioridade
+          hasInstancias: -1, // 2º prioridade
+          createdAt: -1, // 3º
+        },
+      },
+
+      { $limit: limitNum },
+
       {
         $lookup: {
           from: 'processstatuses',
@@ -119,88 +143,42 @@ export class ListLawsuitService {
         },
       },
       {
-        $addFields: { processStatus: { $arrayElemAt: ['$processStatus', 0] } },
+        $addFields: {
+          processStatus: { $arrayElemAt: ['$processStatus', 0] },
+        },
       },
-    ];
 
-    // Aplicar filtro por hasNewMovements **depois** de calcular o campo
-    if (hasNewMovements !== undefined) {
-      basePipeline.push({ $match: { hasNewMovementsNow: hasNewMovements } });
-    }
-
-    // Aplicar filtro por assignedTo nas atividades e filtro de data para advogados
-    if (isAdvogado) {
-      basePipeline.push({
-        $match: {
-          'activities.assignedTo': userToFilter,
-        },
-      });
-
-      // Para advogados, aplicar filtro de data nas atividades
-      if (startDate || endDate) {
-        const activityDateFilter: any = {};
-        if (startDate) activityDateFilter.$gte = new Date(startDate);
-        if (endDate) {
-          const endDateTime = new Date(endDate);
-          endDateTime.setHours(23, 59, 59, 999);
-          activityDateFilter.$lte = endDateTime;
-        }
-
-        basePipeline.push({
-          $match: {
-            'activities.createdAt': activityDateFilter,
-          },
-        });
-      }
-    }
-
-    // Se for admin, filtrar apenas processos que não possuem atividades
-    if (isAdmin) {
-      basePipeline.push({
-        $match: {
-          $or: [
-            { activities: { $exists: false } },
-            { activities: { $size: 0 } },
-          ],
-        },
-      });
-    }
-    // Usar $facet para contar total e aplicar paginação com sort
-    const pipeline = [
-      ...basePipeline,
       {
-        $facet: {
-          data: [
-            { $sort: { createdAt: -1 } }, // Sort apenas nos dados paginados
-            { $skip: skip },
-            { $limit: limitNum },
-            {
-              $project: {
-                instanciasAutosWithDocs: 0,
-                moviments: 0,
-                documents: 0,
-                formPipedrive: 0,
-              },
-            },
-          ],
-          total: [{ $count: 'count' }],
+        $project: {
+          instanciasAutosWithDocs: 0,
+          moviments: 0,
+          documents: 0,
+          formPipedrive: 0,
         },
       },
     ];
 
-    const [result] = await this.lawsuitModule
-      .aggregate(pipeline)
-      .allowDiskUse(true);
+    if (emptyDocuments) {
+      match.$and = match.$and || [];
 
-    const total = result.total[0]?.count || 0;
-    const processes = result.data || [];
+      match.$and.push({
+        $or: [{ documents: { $exists: false } }, { documents: { $size: 0 } }],
+      });
+    }
+
+    const [processes, total] = await Promise.all([
+      this.lawsuitModule.aggregate(pipeline).allowDiskUse(true),
+      this.lawsuitModule.countDocuments(match),
+    ]);
+
+    const totalPages = Math.ceil(total / limitNum);
 
     return {
       processes,
       total,
       page: Number(page),
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
+      totalPages,
     };
   }
 }
