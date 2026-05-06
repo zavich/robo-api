@@ -77,7 +77,11 @@ export class ListLawsuitService {
       match.instanciasAutos = { $exists: true, $not: { $size: 0 } };
     }
     if (hasAcordao) {
-      match['documents.title'] = { $regex: /acordao/i };
+      match.documents = {
+        $elemMatch: {
+          title: { $regex: /ac[oó]rd[aã]o/i },
+        },
+      };
     }
     // 🔹 Filtro por activities
     if (status || lossReason) {
