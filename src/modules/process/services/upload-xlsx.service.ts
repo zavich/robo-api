@@ -16,38 +16,68 @@ export class UploadXLSXService {
   ) {}
 
   async execute(buffer: Buffer) {
-    // Lê o Excel
     const workbook = XLSX.read(buffer, { type: 'buffer' });
 
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
 
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+    // pega tudo como matriz (igual frontend)
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    const lawsuits = [];
+    const processNumberRegex = /^\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/;
 
-    for (const row of rows.slice(0, 1)) {
-      const lawsuit = row['Processos 2025'] ? row['Processos 2025'] : null;
-      if (!lawsuit) continue;
+    const foundProcesses: string[] = [];
 
-      const jaExiste = await this.processModel.findOne({ number: lawsuit });
-      this.logger.log(
-        `Processo ${lawsuit} já existe? ${jaExiste ? 'Sim' : 'Não'}`,
-      );
-      if (!jaExiste) {
-        lawsuits.push(lawsuit);
-      } else {
-        this.logger.log(`Processo ${lawsuit} já existe, atualizando...`);
-        return;
+    // 🔥 Extrai todos os processos de qualquer coluna
+    for (const row of rows) {
+      if (!row || !row.length) continue;
+
+      for (const cell of row) {
+        if (typeof cell === 'string' && processNumberRegex.test(cell.trim())) {
+          foundProcesses.push(cell.trim());
+        }
       }
     }
-    await this.createProcessService.execute({
-      processes: lawsuits,
-    });
+
+    // remove duplicados
+    const uniqueProcesses = [...new Set(foundProcesses)];
+
+    if (!uniqueProcesses.length) {
+      return {
+        total: rows.length,
+        criadas: 0,
+        message: 'Nenhum processo válido encontrado',
+      };
+    }
+
+    // 🔥 busca todos de uma vez (performance)
+    const existing = await this.processModel
+      .find({ number: { $in: uniqueProcesses } })
+      .select('number')
+      .lean();
+
+    const existingNumbers = new Set(existing.map((e) => e.number));
+
+    const newProcesses = uniqueProcesses.filter(
+      (num) => !existingNumbers.has(num),
+    );
+
+    const duplicatedProcesses = uniqueProcesses.filter((num) =>
+      existingNumbers.has(num),
+    );
+
+    // 🔥 chama seu service
+    if (newProcesses.length) {
+      await this.createProcessService.execute({
+        processes: newProcesses,
+      });
+    }
 
     return {
-      total: rows.length,
-      criadas: lawsuits.length,
+      totalLinhas: rows.length,
+      encontrados: uniqueProcesses.length,
+      criados: newProcesses.length,
+      duplicados: duplicatedProcesses.length,
     };
   }
 }
