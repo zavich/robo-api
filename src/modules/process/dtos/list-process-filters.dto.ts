@@ -1,6 +1,6 @@
-import { z } from 'zod';
 import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
-import { ActivityStatus } from '../interfaces/enum';
+import { z } from 'zod';
+import { CLASSPROCESS } from '../interfaces/enum';
 
 const ListProcessFiltersSchema = z.object({
   page: z.coerce.number().min(1).optional().default(1),
@@ -27,10 +27,22 @@ const ListProcessFiltersSchema = z.object({
     .boolean()
     .optional()
     .describe('Filtra processos com novos movimentos'),
-  type: z
-    .nativeEnum(ActivityStatus)
+  classProcess: z
+    .nativeEnum(CLASSPROCESS)
     .optional()
-    .describe('Filtro por tipo do processo'),
+    .describe('Filtro por classe do processo'),
+  hasSecondInstance: z
+    .boolean()
+    .optional()
+    .describe('Filtra processos que possuem segunda instância'),
+  hasAutos: z
+    .boolean()
+    .optional()
+    .describe('Filtra processos que possuem movimentação no TST'),
+  hasAcordao: z
+    .boolean()
+    .optional()
+    .describe('Filtra processos que possuem acórdão'),
 });
 
 class ListProcessFiltersDto extends createZodDto(ListProcessFiltersSchema) {}
@@ -38,8 +50,8 @@ class ListProcessFiltersDto extends createZodDto(ListProcessFiltersSchema) {}
 type ListProcessFiltersType = z.infer<typeof ListProcessFiltersSchema>;
 const listProcessSchemaPipe = new ZodValidationPipe(ListProcessFiltersSchema);
 export {
-  ListProcessFiltersSchema,
   ListProcessFiltersDto,
+  ListProcessFiltersSchema,
   ListProcessFiltersType,
   listProcessSchemaPipe,
 };

@@ -23,8 +23,11 @@ export class ListLawsuitService {
       startDate,
       endDate,
       lossReason,
-      type,
+      classProcess,
       emptyDocuments,
+      hasSecondInstance,
+      hasAutos,
+      hasAcordao,
     } = query;
 
     const skip = (page - 1) * Number(limit);
@@ -64,14 +67,24 @@ export class ListLawsuitService {
         ],
       });
     }
-
+    if (classProcess) {
+      match.class = classProcess;
+    }
+    if (hasSecondInstance) {
+      match.instancias = { $size: 2 };
+    }
+    if (hasAutos) {
+      match.instanciasAutos = { $exists: true, $not: { $size: 0 } };
+    }
+    if (hasAcordao) {
+      match['documents.title'] = { $regex: /acordao/i };
+    }
     // 🔹 Filtro por activities
-    if (status || lossReason || type) {
+    if (status || lossReason) {
       match.activities = {
         $elemMatch: {
           ...(status && { status }),
           ...(lossReason && { lossReason }),
-          ...(type && { type }),
         },
       };
     }
