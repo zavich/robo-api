@@ -42,6 +42,15 @@ export class InsertProcessService {
     calledByInitialPetitionProvisionalNumber = null,
   }: iInsertProcessData) {
     try {
+      const findProcess = await this.processModule.findOne({
+        number: processNumber,
+      });
+      if (findProcess) {
+        this.logger.warn(
+          `Processo ${processNumber} já existe na base de dados`,
+        );
+        return;
+      }
       const findStep = await this.stepModule.findOne({ slug: 'step-1' });
       const processStatus = await this.processStatusModule.create({
         log: 'Esperando ser processado',
