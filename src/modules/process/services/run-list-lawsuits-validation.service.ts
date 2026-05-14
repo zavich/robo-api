@@ -94,15 +94,23 @@ export class RunListLawsuitsValidationService {
     }
     await Promise.all(
       process.map(async (lawsuit) => {
-        const process: any = await this.processModule
-          .findOne({ number: lawsuit })
+        const numberKey = (lawsuit ?? '').toString().trim();
+        if (!numberKey) {
+          this.logger.warn(
+            'Invalid process number: ' + JSON.stringify(lawsuit),
+          );
+          return;
+        }
+
+        const proc: any = await this.processModule
+          .findOne({ number: numberKey })
           .populate({ path: 'processStatus', populate: ['step'] });
-        if (!process) {
-          this.logger.warn(`Process ${lawsuit} not found`);
+        if (!proc) {
+          this.logger.warn('Process ' + numberKey + ' not found');
           return;
         }
         await this.processModule.findByIdAndUpdate(
-          process._id,
+          proc._id,
           {
             $set: {
               synchronizedAt: new Date(),
@@ -110,11 +118,9 @@ export class RunListLawsuitsValidationService {
           },
           { new: true },
         );
-        const findStep = await this.stepService.findOne({
-          slug: 'step-1',
-        });
+        const findStep = await this.stepService.findOne({ slug: 'step-1' });
         await this.processStatusService.findByIdAndUpdate(
-          process.processStatus._id,
+          proc.processStatus._id,
           {
             $set: {
               step: findStep._id,
@@ -124,8 +130,8 @@ export class RunListLawsuitsValidationService {
           { new: true },
         );
         return this.insertProcessService.fetchProcessExtract(
-          process.number,
-          process,
+          proc.number,
+          proc,
           documents,
         );
       }),
