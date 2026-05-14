@@ -122,6 +122,16 @@ export class ListLawsuitService {
       });
     }
 
+    // aplicar filtros finais antes de montar o pipeline
+    if (emptyDocuments) {
+      andConditions.push({
+        $or: [{ documents: { $exists: false } }, { documents: { $size: 0 } }],
+      });
+    }
+    if (andConditions.length) {
+      match.$and = andConditions;
+    }
+
     // 🔹 Pipeline otimizado
     const pipeline: any[] = [
       { $match: match },
@@ -181,14 +191,6 @@ export class ListLawsuitService {
       },
     ];
 
-    if (emptyDocuments) {
-      andConditions.push({
-        $or: [{ documents: { $exists: false } }, { documents: { $size: 0 } }],
-      });
-    }
-    if (andConditions.length) {
-      match.$and = andConditions;
-    }
     const [processes, total] = await Promise.all([
       this.lawsuitModule.aggregate(pipeline).allowDiskUse(true),
       this.lawsuitModule.countDocuments(match),
