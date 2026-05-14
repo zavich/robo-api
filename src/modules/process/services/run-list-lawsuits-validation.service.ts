@@ -52,6 +52,26 @@ export class RunListLawsuitsValidationService {
           },
         },
         { $unwind: '$processStatus' },
+        // Filtrar apenas processos com campo `documents` presente e que seja um array vazio
+        {
+          $match: {
+            $and: [
+              { documents: { $exists: true } },
+              {
+                $expr: {
+                  $eq: [
+                    {
+                      $size: {
+                        $cond: [{ $isArray: '$documents' }, '$documents', []],
+                      },
+                    },
+                    0,
+                  ],
+                },
+              },
+            ],
+          },
+        },
       ];
 
       if (filters.length > 0) {
