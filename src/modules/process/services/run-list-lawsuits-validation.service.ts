@@ -27,6 +27,47 @@ export class RunListLawsuitsValidationService {
     log?: string,
     errorReason?: string,
   ) {
+    // const response = await this.processModule.aggregate([
+    //   {
+    //     $match: {
+    //       documents: {
+    //         $exists: true,
+    //         $ne: [],
+    //       },
+    //     },
+    //   },
+    //   {
+    //     $lookup: {
+    //       from: 'processstatuses',
+    //       localField: 'processStatus',
+    //       foreignField: '_id',
+    //       as: 'status',
+    //     },
+    //   },
+    //   {
+    //     $unwind: '$status',
+    //   },
+    //   {
+    //     $match: {
+    //       'status.name': 'PROCESSING_WITH_DOCUMENTS',
+    //     },
+    //   },
+    // ]);
+    // console.log(response.length);
+    // for (const process of response) {
+    //   await this.processStatusService.findByIdAndUpdate(
+    //     process.processStatus,
+    //     {
+    //       $set: {
+    //         name: 'EXTRACTION_DOCUMENTS_FINISHED',
+    //         log: 'Extração de documentos finalizada',
+    //         errorReason: '',
+    //       },
+    //     },
+    //     { new: true },
+    //   );
+    // }
+    // return;
     let process: any[] = [];
     if (lawsuits.length === 0) {
       const filters = [];
@@ -124,7 +165,7 @@ export class RunListLawsuitsValidationService {
           proc.processStatus._id,
           {
             $set: {
-              name: document
+              name: documents
                 ? PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
                 : PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
               step: findStep._id,
