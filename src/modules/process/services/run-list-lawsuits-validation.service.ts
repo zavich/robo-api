@@ -5,6 +5,7 @@ import { Process as ProcessEntity } from 'src/modules/process/schema/process.sch
 import { InsertProcessService } from '../queues/process/services/insert-process.service';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Step } from '../schema/step.schema';
+import { PROCESSSTATUSENUM } from '../enums/process-status.enum';
 
 @Injectable()
 export class RunListLawsuitsValidationService {
@@ -123,6 +124,9 @@ export class RunListLawsuitsValidationService {
           proc.processStatus._id,
           {
             $set: {
+              name: document
+                ? PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
+                : PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
               step: findStep._id,
               errorReason: '',
             },
