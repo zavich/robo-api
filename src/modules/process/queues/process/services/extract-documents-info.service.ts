@@ -11,6 +11,7 @@ import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
 import { normalizeString } from 'src/utils/normalize-string';
 import { sleep } from 'src/utils/sleep';
+
 @Injectable()
 export class ExtractDocumentsInfoService {
   private readonly logger = new Logger(ExtractDocumentsInfoService.name);
@@ -38,25 +39,39 @@ export class ExtractDocumentsInfoService {
           log: 'Extração de documentos finalizada',
         },
       );
+
+      const documentsToProcess = [];
+
       const promptPeticaoInicial =
         processFound.class === 'MAIN'
           ? await this.vertexAIService.getPromptProcessoPrincipal()
           : await this.vertexAIService.getPromptExecucaoProvisoria();
-      const promptPlanilhaCalc = await this.promptModel.findOne({
-        type: 'PlanilhaCalculo',
+      documentsToProcess.push({
+        type: /.*peticao.*inicial.*/i,
+        prompt: promptPeticaoInicial,
       });
-      await this.extractDocument(
-        processFound?.documents,
-        lawsuit,
-        /.*peticao.*inicial.*/i,
-        promptPeticaoInicial,
-      );
-      await this.extractDocument(
-        processFound?.documents,
-        lawsuit,
-        /.*planilha.*de.*calculo.*/i,
-        promptPlanilhaCalc.text,
-      );
+
+      // const promptPlanilhaCalc = await this.promptModel.findOne({
+      //   type: 'PlanilhaCalculo',
+      // });
+      // if (promptPlanilhaCalc) {
+      //   documentsToProcess.push({
+      //     type: /.*planilha.*de.*calculo.*/i,
+      //     prompt: promptPlanilhaCalc.text,
+      //   });
+      // }
+
+      // Usando for...of para garantir processamento sequencial com sleep
+      for (const docInfo of documentsToProcess) {
+        await this.extractDocument(
+          processFound?.documents,
+          lawsuit,
+          docInfo.type,
+          docInfo.prompt,
+        );
+        await sleep(5000); // Adiciona um intervalo de 5 segundos entre as chamadas
+      }
+
       this.logger.log('START EXTRACT DOCUMENT JOB: ' + lawsuit);
       this.nextStepsService.execute('step-4', { processNumber: lawsuit });
     } catch (error) {
@@ -69,48 +84,58 @@ export class ExtractDocumentsInfoService {
     type: RegExp,
     prompt: string,
   ) {
-    const documentFound = documents.filter((doc) =>
-      type.test(normalizeString(doc.title)),
+    if (!documents) {
+      console.log('Nenhum documento encontrado no processo.');
+      return;
+    }
+    // Garantir que apenas o primeiro documento correspondente seja processado
+    const document = documents.find(
+      (doc) => type.test(normalizeString(doc.title)) && doc.data === undefined,
     );
-    console.log(`${type} encontrados: `, documentFound);
-    for (const document of documentFound) {
-      if (document.data) {
-        continue;
-      }
-      // Marcar documento como PROCESSING
-      await this.lawsuitModel.updateOne(
-        { number: lawsuit, 'documents._id': document._id },
-        { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
+
+    if (!document) {
+      console.log(
+        `Nenhum documento do tipo ${type} encontrado para processar.`,
+      );
+      return;
+    }
+
+    console.log(`${type} encontrado: `, document);
+
+    // Marcar documento como PROCESSING
+    await this.lawsuitModel.updateOne(
+      { number: lawsuit, 'documents._id': document._id },
+      { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
+    );
+
+    try {
+      const signedUrl = await this.awsService.getSignedUrlS3(
+        document.temp_link,
+      );
+      const response = await this.vertexAIService.executeWithRetry(
+        signedUrl,
+        prompt,
       );
 
-      try {
-        const signedUrl = await this.awsService.getSignedUrlS3(
-          document.temp_link,
-        );
-        const response = await this.vertexAIService.executeWithRetry(
-          signedUrl,
-          prompt,
-        );
+      console.log('Response from Vertex AI: ', response);
 
-        console.log('Response from Vertex AI: ', response);
-
-        await this.lawsuitModel.updateOne(
-          { number: lawsuit, 'documents._id': document._id },
-          {
-            $set: {
-              'documents.$.data': response,
-              'documents.$.status': StatusExtractionInsight.COMPLETED,
-            },
+      await this.lawsuitModel.updateOne(
+        { number: lawsuit, 'documents._id': document._id },
+        {
+          $set: {
+            'documents.$.data': response,
+            'documents.$.status': StatusExtractionInsight.COMPLETED,
           },
-        );
-      } catch (error) {
-        await this.lawsuitModel.updateOne(
-          { number: lawsuit, 'documents._id': document._id },
-          { $set: { 'documents.$.status': StatusExtractionInsight.ERROR } },
-        );
-        console.log('Error ao extrair dados do vertex: ', error);
-      }
-      await sleep(3000);
+        },
+      );
+    } catch (error) {
+      await this.lawsuitModel.updateOne(
+        { number: lawsuit, 'documents._id': document._id },
+        { $set: { 'documents.$.status': StatusExtractionInsight.ERROR } },
+      );
+      console.log('Error ao extrair dados do vertex: ', error);
+      // Propagar o erro para que a fila possa tratá-lo, se necessário
+      throw error;
     }
   }
 }
