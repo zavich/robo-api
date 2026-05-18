@@ -25,14 +25,27 @@ export class LawsuitValidationService {
     private readonly stepService: Model<Step>,
   ) {}
 
-  async execute(number: string, step: string, isAll: boolean) {
+  async execute(
+    number: string,
+    step: string,
+    isAll: boolean,
+    startDate: string,
+    endDate: string,
+  ) {
     try {
       if (isAll) {
         console.log('Executing Lawsuit Validation');
+        const start = new Date(`${startDate}T00:00:00.000-03:00`);
+        const end = new Date(`${endDate}T23:59:59.999-03:00`);
+
         const processes = await this.processModule.aggregate([
           {
             $match: {
-              documents: { $ne: 0 },
+              documents: {
+                $exists: true,
+                $ne: [],
+              },
+              createdAt: { $gte: start, $lte: end },
             },
           },
           {
@@ -53,19 +66,10 @@ export class LawsuitValidationService {
             },
           },
           { $unwind: '$processStatus.step' },
-          // {
-          //   $match: {
-          //     'processStatus.errorReason':
-          //       'Documento da petição inicial não encontrado ou não acessível',
-          //     instanciasAutosWithDocs: { $size: 0 },
-          //   },
-          // },
-          { $limit: 2 },
         ]);
         const findStep = await this.stepService.findOne({
           slug: step,
         });
-
         for (const process of processes) {
           if (process.documents?.length === 0) {
             console.log(

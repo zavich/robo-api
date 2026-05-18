@@ -288,13 +288,22 @@ export class ProcessController {
 
   @Post('run-lawsuit-validation')
   async runLawsuitValidation(
-    @Body() body: { number: string; step: string; isAll: boolean },
+    @Body()
+    body: {
+      number: string;
+      step: string;
+      isAll: boolean;
+      startDate: string;
+      endDate: string;
+    },
   ) {
     try {
       return await this.lawsuitValidationService.execute(
         body.number,
         body.step,
         body.isAll,
+        body.startDate,
+        body.endDate,
       );
     } catch (error) {
       throw error;
