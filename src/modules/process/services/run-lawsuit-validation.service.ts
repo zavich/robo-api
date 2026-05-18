@@ -45,7 +45,10 @@ export class LawsuitValidationService {
                 $exists: true,
                 $ne: [],
               },
-              createdAt: { $gte: start, $lte: end },
+              createdAt: {
+                $gte: start,
+                $lte: end,
+              },
             },
           },
           {

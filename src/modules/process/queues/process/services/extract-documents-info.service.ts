@@ -107,13 +107,15 @@ export class ExtractDocumentsInfoService {
       { number: lawsuit, 'documents._id': document._id },
       { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
     );
+    const gsKey = `${lawsuit}_${document.temp_link}_${Date.now()}`;
 
     try {
       const signedUrl = await this.awsService.getSignedUrlS3(
         document.temp_link,
       );
+      const gsUri = await this.vertexAIService.uploadS3ToGCS(signedUrl, gsKey);
       const response = await this.vertexAIService.executeWithRetry(
-        signedUrl,
+        gsUri,
         prompt,
       );
 
@@ -136,6 +138,8 @@ export class ExtractDocumentsInfoService {
       console.log('Error ao extrair dados do vertex: ', error);
       // Propagar o erro para que a fila possa tratá-lo, se necessário
       throw error;
+    } finally {
+      await this.vertexAIService.deleteFileFromGCS(gsKey);
     }
   }
 }
