@@ -31,6 +31,11 @@ export class LawsuitValidationService {
         console.log('Executing Lawsuit Validation');
         const processes = await this.processModule.aggregate([
           {
+            $match: {
+              documents: { $ne: 0 },
+            },
+          },
+          {
             $lookup: {
               from: 'processstatuses',
               localField: 'processStatus',
@@ -48,58 +53,62 @@ export class LawsuitValidationService {
             },
           },
           { $unwind: '$processStatus.step' },
-          {
-            $match: {
-              'processStatus.errorReason':
-                'Documento da petição inicial não encontrado ou não acessível',
-              instanciasAutosWithDocs: { $size: 0 },
-            },
-          },
+          // {
+          //   $match: {
+          //     'processStatus.errorReason':
+          //       'Documento da petição inicial não encontrado ou não acessível',
+          //     instanciasAutosWithDocs: { $size: 0 },
+          //   },
+          // },
           { $limit: 2 },
         ]);
         const findStep = await this.stepService.findOne({
           slug: step,
         });
 
-        await Promise.all(
-          processes.map(async (process) => {
-            if (process.instanciasAutosWithDocs.length > 0) {
-              this.logger.warn(
-                `Process ${process.number} already has documents in the autos`,
-              );
-              return;
-            }
-            await this.processModule.findByIdAndUpdate(
-              process._id,
-              {
-                $set: {
-                  situation: Situation.PENDING,
-                },
-              },
-              { new: true },
+        for (const process of processes) {
+          if (process.documents?.length === 0) {
+            console.log(
+              `Process ${process.number} has no documents, skipping...`,
             );
-            await this.processStatusService.findByIdAndUpdate(
-              process.processStatus._id,
-              {
-                $set: {
-                  log: null,
-                  errorReason: null,
-                  step: findStep._id,
-                },
+            continue;
+          }
+          await this.processModule.findByIdAndUpdate(
+            process._id,
+            {
+              $set: {
+                situation: Situation.PENDING,
               },
-            );
-            console.log(`Processing: ${process.number}`);
-            return this.nextStepsService.execute(step, {
-              processNumber: process.number,
-              mainProcessId:
-                process.class === 'MAIN' ? process._id : process.processMain,
-            });
-          }),
-        );
+            },
+            { new: true },
+          );
+          await this.processStatusService.findByIdAndUpdate(
+            process.processStatus._id,
+            {
+              $set: {
+                log: null,
+                errorReason: null,
+                step: findStep._id,
+              },
+            },
+          );
+          console.log(`Processing: ${process.number}`);
+          await this.nextStepsService.execute(step, {
+            processNumber: process.number,
+            mainProcessId:
+              process.class === 'MAIN' ? process._id : process.processMain,
+          });
+        }
       } else {
         const process: any = await this.processModule
           .findOne({ number })
           .populate({ path: 'processStatus', populate: ['step'] });
+        if (process.documents?.length === 0) {
+          console.log(
+            `Process ${process.number} has no documents, skipping...`,
+          );
+          return;
+        }
         await this.processModule.findByIdAndUpdate(
           process._id,
           {
