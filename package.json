@@ -29,6 +29,7 @@
     "@bull-board/api": "^6.5.3",
     "@bull-board/express": "^6.5.3",
     "@bull-board/nestjs": "^6.5.3",
+    "@google-cloud/storage": "^7.19.0",
     "@google-cloud/vertexai": "^1.9.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^10.0.0",

@@ -81,12 +81,17 @@ export class FindInsightsService {
               ? `${promptFind.text}\n\n${contextText}`
               : promptFind.text;
 
+          const gsKey = `${number}_${doc.temp_link}_${Date.now()}`;
           try {
             const signedUrl = await this.awsService.getSignedUrlS3(
               doc.temp_link,
             );
-            const response = await this.vertexAIService.executeWithRetry(
+            const gsUri = await this.vertexAIService.uploadS3ToGCS(
               signedUrl,
+              gsKey,
+            );
+            const response = await this.vertexAIService.executeWithRetry(
+              gsUri,
               fullPrompt,
             );
             console.log('response: ', response);
@@ -118,6 +123,8 @@ export class FindInsightsService {
               },
             );
             console.error('Erro ao extrair insight do documento:', error);
+          } finally {
+            await this.vertexAIService.deleteFileFromGCS(gsKey);
           }
         }),
       );
