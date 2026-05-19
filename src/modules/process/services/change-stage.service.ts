@@ -9,7 +9,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Process, ProcessDocument } from '../schema/process.schema';
 import { ProcessDecisions, ProcessDecisionsDocument } from '../schema/process-decisions.schema';
-import { User, UserDocument, UserRole } from '../../user/schema/user.schema';
 import { ChangeStageDTO } from '../dtos/change-stage.dto';
 import { CLASSPROCESS, StageByCode, STAGEPROCESS } from '../interfaces/enum';
 import { updateStageToPipedrive } from '../../../service/pipedrive/update-stage';
@@ -24,8 +23,6 @@ export class ChangeStageService {
     private readonly processModel: Model<ProcessDocument>,
     @InjectModel(ProcessDecisions.name)
     private readonly processDecisionModel: Model<ProcessDecisionsDocument>,
-    @InjectModel(User.name)
-    private readonly userModel: Model<UserDocument>,
   ) { }
 
   async execute(
@@ -33,17 +30,7 @@ export class ChangeStageService {
     userId: string,
   ) {
     try {
-      // 1. Validar se o usuário é admin
-      const user = await this.userModel.findById(userId);
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      if (user.role !== UserRole.ADMIN) {
-        throw new ForbiddenException('Only admin users can change process stages');
-      }
-
-      // 2. Buscar o processo
+      // 1. Buscar o processo
       const process = await this.processModel.findById(changeStageData.processId);
       if (!process) {
         throw new NotFoundException('Process not found');

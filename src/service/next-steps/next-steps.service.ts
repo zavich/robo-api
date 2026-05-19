@@ -1,9 +1,11 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
 @Injectable()
 export class NextStepsService {
+  private readonly logger = new Logger(NextStepsService.name);
+
   constructor(
     @InjectQueue('insert-process-queue')
     private readonly insertProcessQueue: Queue,
@@ -17,18 +19,37 @@ export class NextStepsService {
     private readonly initialPetitionQueue: Queue,
   ) {}
 
+  private async checkBackpressure(queue: Queue, queueName: string): Promise<void> {
+    const { waiting, delayed } = await queue.getJobCounts();
+    const pending = waiting + delayed;
+    const threshold = Number(process.env.MAX_QUEUE_PENDING ?? 500);
+
+    if (pending >= threshold) {
+      this.logger.warn(
+        `Backpressure: fila '${queueName}' tem ${pending} jobs pendentes (max ${threshold}). Job rejeitado.`,
+      );
+      throw new Error(
+        `Backpressure: fila '${queueName}' tem ${pending} jobs pendentes (max ${threshold}). Job rejeitado.`,
+      );
+    }
+  }
+
   async execute(step: string, data: unknown) {
     switch (step) {
       case 'step-1':
+        await this.checkBackpressure(this.processValidationQueue, 'process-validation-queue');
         await this.processValidationQueue.add('process-validation', data);
         break;
       case 'step-2':
+        await this.checkBackpressure(this.solvencyValidationQueue, 'solvency-validation-queue');
         await this.solvencyValidationQueue.add('solvency-validation', data);
         break;
       case 'step-3':
+        await this.checkBackpressure(this.extractDocumentQueue, 'extract-document-queue');
         await this.extractDocumentQueue.add('extract-document', data);
         break;
       case 'step-4':
+        await this.checkBackpressure(this.initialPetitionQueue, 'initial-petition-queue');
         await this.initialPetitionQueue.add('initial-petition', data);
         break;
       default:

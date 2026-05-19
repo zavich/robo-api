@@ -41,6 +41,21 @@ export class AppController {
       throw new ServiceUnavailableException({ status: 'degraded', checks });
     }
 
-    return { status: 'ok', checks };
+    // EST-008: OOM detection
+    const mem = process.memoryUsage();
+    const rssMB = Math.round(mem.rss / 1024 / 1024);
+    const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
+    const OOM_THRESHOLD_MB = Number(process.env.OOM_THRESHOLD_MB ?? 1800);
+    if (rssMB >= OOM_THRESHOLD_MB) {
+      throw new ServiceUnavailableException(
+        `OOM risk: RSS=${rssMB}MB >= threshold=${OOM_THRESHOLD_MB}MB`,
+      );
+    }
+
+    return {
+      status: 'ok',
+      checks: { mongodb: 'ok', redis: 'ok' },
+      memory: { rssMB, heapUsedMB },
+    };
   }
 }

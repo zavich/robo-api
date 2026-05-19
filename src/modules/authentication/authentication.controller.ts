@@ -17,6 +17,8 @@ import { ApiKeyAuthGuard } from './guards/apikey-auth.guard';
 import { LoginService } from './services/login.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
+import { CheckPermissions } from './decorators/check-permissions.decorator';
+import { getPermissionsForRole } from './constants/permissions.constant';
 
 @Controller('auth')
 export class AuthenticationController {
@@ -37,16 +39,18 @@ export class AuthenticationController {
 
     res.cookie('prosolutti_accessToken', accessToken, {
       httpOnly: true,
-      secure: true, // Railway = HTTPS sempre
-      sameSite: 'none', // obrigatório porque é cross-site
+      secure: true,
+      sameSite: 'none',
       path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dias em milissegundos
+      maxAge: 1000 * 60 * 60 * 24 * 7,
     });
     return { message: 'Login successful' };
   }
 
   @Post('signup')
   @Throttle({ auth: { ttl: 60000, limit: 5 } })
+  @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('user_management')
   async signUp(@Body() createUserDto: CreateUserDto) {
     return this.signUpService.createUser(createUserDto);
   }
@@ -84,12 +88,14 @@ export class AuthenticationController {
       secure: process.env.NODE_ENV === 'production',
     });
 
-    // você ainda pode invalidar o refreshToken no banco, se usar
     return { message: 'Logout realizado com sucesso' };
   }
+
   @Get('me')
   @UseGuards(ApiKeyAuthGuard)
-  getProfile(@Req() req: { user: { id: string } }) {
-    return req.user;
+  getProfile(@Req() req: Request) {
+    const user = (req as any).user;
+    const permissions = user?.permissions ?? getPermissionsForRole(user?.role);
+    return { ...user, permissions };
   }
 }

@@ -7,11 +7,13 @@ import { Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import Redis from 'ioredis';
 import { User, UserDocument } from 'src/modules/user/schema/user.schema';
+import { getPermissionsForRole, Permission } from '../constants/permissions.constant';
 
 export type iJwtPayload = {
   sub: string;
   email: string;
   jti?: string;
+  permissions?: Permission[];
 };
 
 @Injectable()
@@ -50,6 +52,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!user) {
       throw new UnauthorizedException();
     }
-    return user;
+
+    const permissions = payload.permissions ?? getPermissionsForRole(user.role);
+    return { ...user.toObject(), permissions };
   }
 }

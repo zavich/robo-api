@@ -20,6 +20,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
+import { CheckPermissions } from '../authentication/decorators/check-permissions.decorator';
 import {
   ChangeStageSchemaBody,
   changeStageSchemaPipe,
@@ -162,6 +163,7 @@ export class ProcessController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   async process(
     @Body(createProcessSchemaPipe)
     createProcessService: CreateProcessDTO,
@@ -331,6 +333,7 @@ export class ProcessController {
   @Post('insert-lawsuit-manual')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   async lawsuitManual(
     @Body(insertLawsuitManualSchemaPipe) body: InsertLawsuitManualDTO,
   ) {
@@ -423,6 +426,7 @@ export class ProcessController {
   @Post('change-stage')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('change_stage')
   async changeStage(
     @Body(changeStageSchemaPipe) body: ChangeStageSchemaBody,
     @Res() res: Response,
@@ -493,6 +497,7 @@ export class ProcessController {
   @Post('bulk-update')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('mass_edit')
   async bulkUpdate(
     @Body(bulkUpdateSchemaPipe) body: BulkUpdateSchemaBody,
     @Res() res: Response,
@@ -515,6 +520,7 @@ export class ProcessController {
   @Post('activity')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('create_activity')
   async createActivity(
     @Body(createActivitySchemaPipe) dto: CreateActivitySchemaBody,
     @Res() res: Response,

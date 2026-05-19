@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { Request } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
+import { CheckPermissions } from '../authentication/decorators/check-permissions.decorator';
 import { UpdateUserSchemaBody, updateUserSchemaPipe } from './dto/update.dto';
 import { UpdateUserService } from './services/update.service';
 import { ListUserService } from './services/list.service';
@@ -13,15 +15,20 @@ export class UsersController {
     private readonly updateUserService: UpdateUserService,
     private readonly listUserService: ListUserService,
   ) {}
+
   @Get('')
+  @CheckPermissions('user_management')
   async listAllUsers() {
     return await this.listUserService.execute();
   }
+
   @Patch(':id')
   async update(
     @Param('id') id: string,
     @Body(updateUserSchemaPipe) body: UpdateUserSchemaBody,
+    @Req() req: Request,
   ) {
-    return await this.updateUserService.execute(id, body);
+    const requester = (req as any).user;
+    return await this.updateUserService.execute(id, body, requester);
   }
 }
