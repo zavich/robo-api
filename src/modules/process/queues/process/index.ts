@@ -77,7 +77,7 @@ export class ProcessQueue {
             throw new Error(`Unknown job name: ${job.name}`);
         }
       },
-      { connection: this.redisClient },
+      { connection: this.redisClient, concurrency: 10 },
     );
   }
 
