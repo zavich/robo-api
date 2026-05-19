@@ -12,7 +12,9 @@ import * as fs from 'fs';
 import * as mimeTypes from 'mime-types';
 
 export class AwsServices {
-  async sendEmail(to: any, subject: any, text: any) {
+  private readonly logger = new Logger(AwsServices.name);
+
+  async sendEmail(to: string, subject: string, text: string) {
     const params: SendEmailCommandInput = {
       Destination: {
         ToAddresses: [to],
@@ -32,11 +34,11 @@ export class AwsServices {
 
     try {
       const command = new SendEmailCommand(params);
-      console.log(command);
+      this.logger.log(command);
 
       // await sesClient.send(command);
     } catch (error) {
-      console.error('Error sending email', error);
+      this.logger.error('Error sending email', error);
     }
   }
 
@@ -55,10 +57,10 @@ export class AwsServices {
 
     try {
       const command = new PublishCommand(params);
-      console.log('command', command);
+      this.logger.log('command' + JSON.stringify(command));
       // await snsClient.send(command);
     } catch (error) {
-      Logger.error('Error sending sms' + error);
+      this.logger.error('Error sending sms' + error);
       throw new BadRequestException('Error send sms');
     }
   }
@@ -73,9 +75,9 @@ export class AwsServices {
 
     try {
       await this.s3Client.send(command);
-      console.log(`Arquivo ${key} excluído com sucesso do S3.`);
+      this.logger.log(`Arquivo ${key} excluído com sucesso do S3.`);
     } catch (error) {
-      Logger.error(`Erro ao excluir o arquivo ${key} do S3:`, error);
+      this.logger.error(`Erro ao excluir o arquivo ${key} do S3:`, error);
 
       throw error;
     }
@@ -104,7 +106,7 @@ export class AwsServices {
         type: params.ContentType,
       };
     } catch (error) {
-      Logger.error(`Erro ao realizar upload do arquivo  do S3:`, error);
+      this.logger.error(`Erro ao realizar upload do arquivo  do S3:`, error);
       throw error;
     }
   }
@@ -120,7 +122,7 @@ export class AwsServices {
       }); // URL válida por 1 hora
       return signedUrl;
     } catch (error) {
-      Logger.error(`Erro ao gerar URL assinada para o arquivo ${key}:`, error);
+      this.logger.error(`Erro ao gerar URL assinada para o arquivo ${key}:`, error);
       throw error;
     }
   }

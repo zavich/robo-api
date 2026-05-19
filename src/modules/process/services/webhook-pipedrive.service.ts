@@ -10,18 +10,18 @@ export class WebhookPipedriveService {
   private readonly logger = new Logger(WebhookPipedriveService.name);
 
   constructor(
-    @InjectQueue('process-queue') private readonly processQueue: Queue,
+    @InjectQueue('insert-process-queue') private readonly processQueue: Queue,
     @InjectModel(Process.name)
     private readonly processModule: Model<Process>,
   ) {}
 
-  async execute(body: any): Promise<void> {
+  async execute(body: Record<string, unknown>): Promise<void> {
     try {
-      const { num_processo, deal_id, stage_id } = body;
+      const { num_processo, deal_id, stage_id } = body as { num_processo: string; deal_id: number; stage_id: number };
 
-      console.log('Lawsuit: ', num_processo);
-      console.log('deal id: ', deal_id);
-      console.log('stage id: ', stage_id);
+      this.logger.log('Lawsuit: ', num_processo);
+      this.logger.log('deal id: ', deal_id);
+      this.logger.log('stage id: ', stage_id);
       const findProcess = await this.processModule.findOne({
         number: num_processo,
       });
@@ -43,7 +43,7 @@ export class WebhookPipedriveService {
         `Lawsuit ${num_processo} inserted in the queue by pipedrive webhook`,
       );
     } catch (error) {
-      console.error('Error on WebhookPipedriveService: ', error);
+      this.logger.error('Error on WebhookPipedriveService: ', error);
     }
   }
 }

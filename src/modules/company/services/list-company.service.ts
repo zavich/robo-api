@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, PipelineStage } from 'mongoose';
 import { Company } from 'src/modules/process/schema/company.schema';
+
+interface ListCompanyQuery {
+  page?: number | string;
+  limit?: number | string;
+  search?: string;
+}
 
 @Injectable()
 export class ListCompanyService {
@@ -10,10 +16,10 @@ export class ListCompanyService {
     private readonly companyRepository: Model<Company>,
   ) {}
 
-  async execute(query: any) {
+  async execute(query: ListCompanyQuery) {
     const { page = 1, limit = 10, search } = query;
 
-    const pipeline: any[] = [];
+    const pipeline: PipelineStage[] = [];
 
     if (search && search.trim() !== '') {
       pipeline.push({
@@ -33,7 +39,7 @@ export class ListCompanyService {
         },
       },
       {
-        $skip: (page - 1) * Number(limit),
+        $skip: (Number(page) - 1) * Number(limit),
       },
       {
         $limit: Number(limit),
@@ -41,7 +47,7 @@ export class ListCompanyService {
     );
 
     // Count pipeline
-    const countPipeline: any[] = [];
+    const countPipeline: PipelineStage[] = [];
     if (search && search.trim() !== '') {
       countPipeline.push({
         $match: {

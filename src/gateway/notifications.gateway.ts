@@ -4,10 +4,16 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
-  cors: { origin: '*' },
+  cors: {
+    origin: process.env.FRONTEND_URL
+      ? process.env.FRONTEND_URL.split(',')
+      : ['http://localhost:3000'],
+    credentials: true,
+  },
 })
 export class NotificationsGateway
   implements OnGatewayConnection, OnGatewayDisconnect
@@ -15,25 +21,27 @@ export class NotificationsGateway
   @WebSocketServer()
   server: Server;
 
+  private readonly logger = new Logger(NotificationsGateway.name);
+
   // Broadcast geral
-  broadcast(notification: any) {
+  broadcast(notification: Record<string, unknown>) {
     this.server.emit('notification', notification);
   }
 
   // Broadcast para usuário específico
-  notificationUser(notification: any, userId: string) {
+  notificationUser(notification: Record<string, unknown>, userId: string) {
     this.server.to(userId).emit('notification', notification);
   }
 
   handleConnection(client: Socket) {
-    const userId = client.handshake.auth.userId;
+    const userId = client.handshake.auth.userId as string | undefined;
     if (userId) {
-      client.join(userId); // adiciona o usuário em uma "room" com seu ID
+      client.join(userId);
     }
-    console.log(`Cliente conectado: ${client.id}, userId: ${userId}`);
+    this.logger.debug(`Cliente conectado: ${client.id}, userId: ${userId}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Cliente desconectado: ${client.id}`);
+    this.logger.debug(`Cliente desconectado: ${client.id}`);
   }
 }

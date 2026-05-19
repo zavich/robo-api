@@ -1,5 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import { Queue } from 'bullmq';
@@ -11,10 +11,12 @@ import { CreateProcessService } from './create-process.service';
 
 @Injectable()
 export class InsertExecutionService {
+  private readonly logger = new Logger(InsertExecutionService.name);
+
   constructor(
     @InjectModel(Process.name)
     private readonly lawsuitModel: Model<Process>,
-    @InjectQueue('process-queue') private readonly processQueue: Queue,
+    @InjectQueue('insert-process-queue') private readonly processQueue: Queue,
     private readonly createProcessService: CreateProcessService,
   ) {}
 
@@ -56,25 +58,26 @@ export class InsertExecutionService {
 
           // Se houve erro na fila mas processo foi identificado, ainda aguarda
           if (createResult.queueError) {
-            console.warn(
+            this.logger.warn(
               `[InsertExecutionService] Queue error occurred but process creation initiated`,
             );
           }
 
           await new Promise((resolve) => setTimeout(resolve, 1000));
-        } catch (createError: any) {
-          console.error(
+        } catch (createError: unknown) {
+          const ce = createError as Error;
+          this.logger.error(
             `[InsertExecutionService] Error creating execution process:`,
             {
-              message: createError.message,
-              name: createError.name,
+              message: ce.message,
+              name: ce.name,
               isRedisError:
-                createError.message?.includes('redis') ||
-                createError.message?.includes('Redis'),
+                ce.message?.includes('redis') ||
+                ce.message?.includes('Redis'),
             },
           );
           // Continua mesmo se houver erro na criação, pois pode ser que o processo já esteja sendo processado
-          console.log(
+          this.logger.log(
             `[InsertExecutionService] Continuing despite creation error - process may be in queue or Redis unavailable`,
           );
         }
@@ -95,13 +98,14 @@ export class InsertExecutionService {
             fieldKey: 'fc5f94cbf972eacef5050f1f53b4f88f1770f87c',
             fieldValue: pipedriveFieldValue,
           });
-        } catch (pipedriveError: any) {
-          console.error(
+        } catch (pipedriveError: unknown) {
+          const pe = pipedriveError as Error;
+          this.logger.error(
             '[InsertExecutionService] Erro ao atualizar Pipedrive:',
             {
               dealId: findLawsuit.dealId,
               fieldValue: pipedriveFieldValue,
-              error: pipedriveError.message,
+              error: pe.message,
             },
           );
           // Não falha a operação principal se o Pipedrive falhar
@@ -118,7 +122,7 @@ export class InsertExecutionService {
         pipedriveFieldValue: pipedriveFieldValue || null,
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         if (error.response) {
           // Erro da API (ex: 404, 500)
@@ -147,9 +151,10 @@ export class InsertExecutionService {
       }
 
       // Se não for AxiosError, relança normal
-      console.error(`[InsertExecutionService] Non-Axios error:`, {
-        message: error.message,
-        stack: error.stack,
+      const err = error as Error;
+      this.logger.error(`[InsertExecutionService] Non-Axios error:`, {
+        message: err.message,
+        stack: err.stack,
       });
       throw error;
     }

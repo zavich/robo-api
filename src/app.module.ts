@@ -1,8 +1,12 @@
 import { BullModule } from '@nestjs/bullmq';
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import Redis from 'ioredis';
+import { CorrelationIdMiddleware } from './middleware/correlation-id.middleware';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { RedisModule } from './connection/redis.module';
 import { DatabaseModule } from './database/database.module';
@@ -28,11 +32,23 @@ import { RedisHealthService } from './service/redis-health.service';
     BullModule.forRootAsync({
       imports: [RedisModule],
       inject: ['REDIS_CLIENT'],
-      useFactory: (redis: any) => ({
+      useFactory: (redis: Redis) => ({
         connection: redis,
       }),
     }),
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000, // 1 minuto
+        limit: 100,  // 100 requests/min por IP (geral)
+      },
+      {
+        name: 'auth',
+        ttl: 60000,  // 1 minuto
+        limit: 10,   // 10 tentativas de login por IP por minuto
+      },
+    ]),
     DatabaseModule,
     MongooseModule.forRoot(process.env.DATABASE_URL),
     ProcessModule,
@@ -47,6 +63,13 @@ import { RedisHealthService } from './service/redis-health.service';
     UserModule,
   ],
   controllers: [AppController],
-  providers: [RedisHealthService],
+  providers: [
+    RedisHealthService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+  }
+}

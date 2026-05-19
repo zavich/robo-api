@@ -17,22 +17,28 @@ import { patchNestJsSwagger } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { Env } from './config/zod/env';
 
+const bootstrapLogger = new Logger('Bootstrap');
+
+process.on('unhandledRejection', (reason) => {
+  bootstrapLogger.error('Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  bootstrapLogger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
-  });
-
-  app.setGlobalPrefix('v1');
+  app.setGlobalPrefix('v1', { exclude: ['health'] });
   patchNestJsSwagger();
+  const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+    : ['http://localhost:3000', 'https://scraping-api.juri.capital', 'https://painel-robo.juri.capital'];
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'https://scraping-api.juri.capital',
-      'https://painel-robo.juri.capital',
-    ],
+    origin: allowedOrigins,
     credentials: true,
   });
 
@@ -60,25 +66,36 @@ async function bootstrap() {
 
     const redisClient = app.get('REDIS_CLIENT');
 
-    const aQueue = new Queue('process-queue', {
-      connection: redisClient,
-    });
+    const insertProcessQueue = new Queue('insert-process-queue', { connection: redisClient });
+    const processValidationQueue = new Queue('process-validation-queue', { connection: redisClient });
+    const solvencyValidationQueue = new Queue('solvency-validation-queue', { connection: redisClient });
+    const extractDocumentQueue = new Queue('extract-document-queue', { connection: redisClient });
+    const initialPetitionQueue = new Queue('initial-petition-queue', { connection: redisClient });
 
     createBullBoard({
-      queues: [new BullMQAdapter(aQueue) as unknown as any], // Força a compatibilidade de tipos
+      queues: [
+        new BullMQAdapter(insertProcessQueue) as any,
+        new BullMQAdapter(processValidationQueue) as any,
+        new BullMQAdapter(solvencyValidationQueue) as any,
+        new BullMQAdapter(extractDocumentQueue) as any,
+        new BullMQAdapter(initialPetitionQueue) as any,
+      ],
       serverAdapter,
     });
 
     app.use('/bull-board', serverAdapter.getRouter());
-    console.log('[BOOT] REDIS_URL:', process.env.REDIS_URL);
-    console.log('✅ Bull Board carregado com a fila process-queue');
+    bootstrapLogger.log(`[BOOT] REDIS_URL: ${process.env.REDIS_URL}`);
+    bootstrapLogger.log(
+      'Bull Board carregado com as filas: insert-process-queue, process-validation-queue, ' +
+      'solvency-validation-queue, extract-document-queue, initial-petition-queue',
+    );
     const logger = new Logger('BullBoard');
 
     logger.warn(
       `Tentando conectar ao Redis para Bull Board... ${process.env.REDIS_URL}`,
     );
     try {
-      await aQueue.getJobCounts();
+      await insertProcessQueue.getJobCounts();
       logger.warn('Redis conectado com sucesso!');
     } catch (error) {
       logger.error('Falha ao conectar ao Redis:', error);

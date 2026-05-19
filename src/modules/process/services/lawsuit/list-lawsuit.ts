@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { FilterQuery, Model, PipelineStage } from 'mongoose';
 import { Process as ProcessEntity } from '../../schema/process.schema';
 import { User } from 'src/modules/user/schema/user.schema';
 import { ListProcessFiltersDto } from '../../dtos/list-process-filters.dto';
@@ -37,11 +37,11 @@ export class ListLawsuitService {
     const isAdvogado = user?.role === 'advogado';
     const isAdmin = user?.role === 'admin';
 
-    const match: any = {};
+    const match: FilterQuery<ProcessEntity> = {};
 
     // 🔹 Filtro de data
     if (!isAdvogado) {
-      const dateFilter: any = {};
+      const dateFilter: Record<string, Date> = {};
       if (startDate) dateFilter.$gte = new Date(startDate);
       if (endDate) {
         const end = new Date(endDate);
@@ -52,7 +52,7 @@ export class ListLawsuitService {
         match.createdAt = dateFilter;
       }
     }
-    const andConditions: any[] = [];
+    const andConditions: FilterQuery<ProcessEntity>[] = [];
     // 🔹 Busca
     if (search?.trim()) {
       andConditions.push({
@@ -98,7 +98,7 @@ export class ListLawsuitService {
       match['activities.assignedTo'] = userId;
 
       if (startDate || endDate) {
-        const activityDateFilter: any = {};
+        const activityDateFilter: Record<string, Date> = {};
         if (startDate) activityDateFilter.$gte = new Date(startDate);
         if (endDate) {
           const end = new Date(endDate);
@@ -133,7 +133,7 @@ export class ListLawsuitService {
     }
 
     // 🔹 Pipeline otimizado
-    const pipeline: any[] = [
+    const pipeline: PipelineStage[] = [
       { $match: match },
 
       // 🔥 usa índice (ESSENCIAL)

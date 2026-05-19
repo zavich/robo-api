@@ -4,13 +4,16 @@ import { Model } from 'mongoose';
 import { PROCESSSTATUSENUM } from 'src/modules/process/enums/process-status.enum';
 import { StatusExtractionInsight } from 'src/modules/process/enums/status-extraction-insight.enum';
 import { ProcessStatus } from 'src/modules/process/schema/process-status.schema';
-import { Process } from 'src/modules/process/schema/process.schema';
+import { Process, RestrictedDocument } from 'src/modules/process/schema/process.schema';
 import { Prompt } from 'src/modules/process/schema/prompt.schema';
 import { AwsServices } from 'src/service/aws/aws.service';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
 import { normalizeString } from 'src/utils/normalize-string';
-import { sleep } from 'src/utils/sleep';
+
+interface ExtractionResult {
+  status: 'COMPLETED' | 'ERROR' | 'SKIPPED';
+}
 @Injectable()
 export class ExtractDocumentsInfoService {
   private readonly logger = new Logger(ExtractDocumentsInfoService.name);
@@ -45,72 +48,103 @@ export class ExtractDocumentsInfoService {
       const promptPlanilhaCalc = await this.promptModel.findOne({
         type: 'PlanilhaCalculo',
       });
-      await this.extractDocument(
-        processFound?.documents,
-        lawsuit,
-        /.*peticao.*inicial.*/i,
-        promptPeticaoInicial,
-      );
-      await this.extractDocument(
-        processFound?.documents,
-        lawsuit,
-        /.*planilha.*de.*calculo.*/i,
-        promptPlanilhaCalc.text,
-      );
+      const [resultPeticao, resultPlanilha] = await Promise.all([
+        this.extractDocument(
+          processFound?.documents,
+          lawsuit,
+          /.*peticao.*inicial.*/i,
+          promptPeticaoInicial,
+        ),
+        this.extractDocument(
+          processFound?.documents,
+          lawsuit,
+          /.*planilha.*de.*calculo.*/i,
+          promptPlanilhaCalc.text,
+        ),
+      ]);
+
+      const results = [resultPeticao, resultPlanilha];
+      const allFailed = results.every((r) => r.status === 'ERROR');
+
+      if (allFailed) {
+        this.logger.error(
+          `Todos os documentos falharam na extração para ${lawsuit}. Pipeline não avança.`,
+        );
+        await this.processStatusModule.findByIdAndUpdate(
+          processFound.processStatus,
+          {
+            name: PROCESSSTATUSENUM.ERROR,
+            log: 'Todos os documentos falharam na extração',
+            errorReason: 'Falha na extração de documentos via Vertex AI',
+          },
+        );
+        return;
+      }
+
       this.logger.log('START EXTRACT DOCUMENT JOB: ' + lawsuit);
-      this.nextStepsService.execute('step-4', { processNumber: lawsuit });
+      await this.nextStepsService.execute('step-4', { processNumber: lawsuit });
     } catch (error) {
-      console.log('Error ao extrair dados do vertex: ', error);
+      this.logger.error('Erro ao extrair dados do vertex: ', error);
     }
   }
   async extractDocument(
-    documents: any[],
+    documents: RestrictedDocument[],
     lawsuit: string,
     type: RegExp,
     prompt: string,
-  ) {
+  ): Promise<ExtractionResult> {
     const documentFound = documents.filter((doc) =>
       type.test(normalizeString(doc.title)),
     );
-    console.log(`${type} encontrados: `, documentFound);
-    for (const document of documentFound) {
-      if (document.data) {
-        continue;
-      }
-      // Marcar documento como PROCESSING
-      await this.lawsuitModel.updateOne(
-        { number: lawsuit, 'documents._id': document._id },
-        { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
-      );
+    this.logger.log(`${type} encontrados: ${documentFound.length}`);
 
-      try {
-        const signedUrl = await this.awsService.getSignedUrlS3(
-          document.temp_link,
-        );
-        const response = await this.vertexAIService.executeWithRetry(
-          signedUrl,
-          prompt,
-        );
-
-        console.log('Response from Vertex AI: ', response);
-
-        await this.lawsuitModel.updateOne(
-          { number: lawsuit, 'documents._id': document._id },
-          {
-            $set: {
-              'documents.$.data': response,
-              'documents.$.status': StatusExtractionInsight.COMPLETED,
-            },
-          },
-        );
-      } catch (error) {
-        await this.lawsuitModel.updateOne(
-          { number: lawsuit, 'documents._id': document._id },
-          { $set: { 'documents.$.status': StatusExtractionInsight.ERROR } },
-        );
-        console.log('Error ao extrair dados do vertex: ', error);
-      }
-      await sleep(3000);
+    if (documentFound.length === 0) {
+      return { status: 'SKIPPED' };
     }
+
+    const results = await Promise.all(
+      documentFound.map(async (document) => {
+        if (document.data) {
+          return true;
+        }
+
+        // Marcar documento como PROCESSING
+        await this.lawsuitModel.updateOne(
+          { number: lawsuit, 'documents._id': document._id },
+          { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
+        );
+
+        try {
+          const signedUrl = await this.awsService.getSignedUrlS3(
+            document.temp_link,
+          );
+          const response = await this.vertexAIService.executeWithRetry(
+            signedUrl,
+            prompt,
+          );
+
+          await this.lawsuitModel.updateOne(
+            { number: lawsuit, 'documents._id': document._id },
+            {
+              $set: {
+                'documents.$.data': response,
+                'documents.$.status': StatusExtractionInsight.COMPLETED,
+              },
+            },
+          );
+          return true;
+        } catch (error) {
+          await this.lawsuitModel.updateOne(
+            { number: lawsuit, 'documents._id': document._id },
+            { $set: { 'documents.$.status': StatusExtractionInsight.ERROR } },
+          );
+          this.logger.error('Erro ao extrair dados do vertex: ', error);
+          return false;
+        }
+      }),
+    );
+
+    const hasSuccess = results.some((r) => r === true);
+    return { status: hasSuccess ? 'COMPLETED' : 'ERROR' };
   }
 }

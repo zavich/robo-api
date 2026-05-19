@@ -14,7 +14,7 @@ import { PROCESSSTATUSENUM } from 'src/modules/process/enums/process-status.enum
 
 interface iInsertProcessData {
   processNumber: string;
-  mainProcessId?: any | null;
+  mainProcessId?: string | null;
   dealId?: number | null;
   stageId?: number | null;
   calledByInitialPetitionProvisionalNumber?: string | null;
@@ -92,7 +92,7 @@ export class InsertProcessService {
       });
       await this.fetchProcessExtract(processNumber, processCreate);
     } catch (error) {
-      console.log('ERROR: ', error);
+      this.logger.error('Erro ao inserir processo:', error);
       throw error;
     }
   }
@@ -127,10 +127,10 @@ export class InsertProcessService {
       );
     } catch (error) {
       const axiosError = error as AxiosError;
-      console.log(axiosError.response?.status);
+      this.logger.debug(`HTTP ${axiosError.response?.status ?? 'sem status'} ao enviar para extração`);
       if (axiosError.response?.status === 422) {
         await this.processModule.findByIdAndUpdate(processCreate._id, {
-          integrationId: (axiosError.response.data as any).async_id,
+          integrationId: (axiosError.response.data as { async_id?: string }).async_id,
         });
         await this.processStatusModule.findByIdAndUpdate(
           processCreate.processStatus,

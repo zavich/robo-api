@@ -11,7 +11,16 @@ export class SharePointService {
 
   private readonly itemId = process.env.MICROSOFT_ITEM_ID;
 
+  private cachedToken: string | null = null;
+  private tokenExpiresAt = 0;
+
   async getAccessToken(): Promise<string> {
+    const now = Date.now();
+    // Reutiliza token enquanto tiver mais de 60s de validade
+    if (this.cachedToken && now < this.tokenExpiresAt - 60_000) {
+      return this.cachedToken;
+    }
+
     const params = new URLSearchParams();
     params.append('client_id', process.env.MICROSOFT_CLIENT_ID);
     params.append('client_secret', process.env.MICROSOFT_SECRET_VALUE);
@@ -23,7 +32,11 @@ export class SharePointService {
       params,
     );
 
-    return response.data.access_token;
+    this.cachedToken = response.data.access_token as string;
+    const expiresIn: number = (response.data.expires_in ?? 3600) * 1000;
+    this.tokenExpiresAt = now + expiresIn;
+
+    return this.cachedToken;
   }
 
   async downloadSolvenciaXLSX(): Promise<Buffer> {

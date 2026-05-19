@@ -18,7 +18,7 @@ export class CreateNotificationsService {
 
     // envia para o frontend em tempo real
     await this.gateway.notificationUser(
-      notification,
+      notification as unknown as Record<string, unknown>,
       notification.userId.toString(),
     );
 

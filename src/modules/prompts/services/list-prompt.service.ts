@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, PipelineStage } from 'mongoose';
 import { Prompt } from 'src/modules/process/schema/prompt.schema';
 import { ListPromptDto } from '../dtos/list-prompt.dto';
 
@@ -15,7 +15,7 @@ export class ListPromptService {
     const { page = 1, limit, search } = query;
 
     try {
-      const pipeline: any[] = [];
+      const pipeline: PipelineStage[] = [];
 
       // Filtro de busca por nome ou texto do prompt
       if (search && search.trim() !== '') {

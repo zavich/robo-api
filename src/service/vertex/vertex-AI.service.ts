@@ -1,10 +1,12 @@
 import { GenerateContentRequest, Part, VertexAI } from '@google-cloud/vertexai';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Prompt } from 'src/modules/process/schema/prompt.schema';
 
 export class VertexAIService {
+  private readonly logger = new Logger(VertexAIService.name);
+
   constructor(
     @InjectModel(Prompt.name)
     private readonly promptModel: Model<Prompt>,
@@ -44,7 +46,7 @@ export class VertexAIService {
 
         if (statusCode === 429) {
           const backoff = attempt * delayMs;
-          console.warn(
+          this.logger.warn(
             `[RateLimit] Tentativa ${attempt}/${retries} falhou com 429. Aguardando ${backoff / 1000}s antes da próxima tentativa...`,
           );
 
@@ -117,8 +119,8 @@ export class VertexAIService {
       );
       return jsonParsed;
     } catch (error) {
-      console.error('VERTEX ERROR:', error);
-      console.error('VERTEX RESPONSE:', error?.response?.data);
+      this.logger.error('VERTEX ERROR:', error);
+      this.logger.error('VERTEX RESPONSE:', (error as { response?: { data?: unknown } })?.response?.data);
       throw error;
     }
   }

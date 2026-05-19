@@ -1,5 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+
+interface EmpresaQuiData {
+  cnpj: string;
+  razao?: string;
+  email?: string;
+  fantasia?: string;
+  natureza_juridica?: string;
+  situacao_cadastral?: string;
+  regime_tributario?: string;
+  socios?: Record<string, unknown>[];
+  capital_social?: string;
+  faturamento?: string;
+  porte?: string;
+  calculoOwner?: string;
+  [key: string]: unknown;
+}
 import axios from 'axios';
 import { Model } from 'mongoose';
 import { PROCESSSTATUSENUM } from 'src/modules/process/enums/process-status.enum';
@@ -101,47 +117,65 @@ export class SolvencyValidationService {
 
       this.logger.log(`Encontradas ${companies.length} empresas para validar.`);
 
-      // Garantindo execução síncrona de cada empresa
-      for (const company of companies) {
-        this.logger.log(
-          `Iniciando validação da empresa: ${company.documento.numero}`,
-        );
-        if (company.documento?.tipo !== 'CNPJ') {
-          this.logger.log(
-            `Documento ${company.documento.numero} não é CNPJ. Pulando...`,
-          );
-          continue;
-        }
-        const companyData = await this.fetchCompany(company.documento.numero);
-        this.logger.log(
-          `Dados recebidos da empresa: ${company.documento.numero}`,
-        );
-        if (!companyData) {
-          this.logger.error(
-            `Nenhum dado encontrado para a empresa: ${company.documento.numero}`,
-          );
-          continue;
-        }
-        await this.createOrUpdateCompanyData(companyData, findProcess._id);
-        findProcess.processParts = findProcess.processParts.map((parte) => {
-          if (
-            parte.documento &&
-            parte.documento.numero === company.documento.numero
-          ) {
-            return {
-              ...parte,
-              nome: companyData.razao || parte.nome,
-            };
-          }
-          return parte;
-        });
+      const cnpjCompanies = companies.filter(
+        (c) => c.documento?.tipo === 'CNPJ',
+      );
 
-        await this.processModule.findByIdAndUpdate(findProcess._id, {
-          processParts: findProcess.processParts,
-        });
-        this.logger.log(
-          `Empresa ${company.documento.numero} atualizada com sucesso`,
+      if (cnpjCompanies.length > 0) {
+        // PERF-004: pré-carregar todas as empresas e claimed processes em batch
+        const cnpjList = cnpjCompanies.map((c) => c.documento.numero);
+        const [existingCompanies, existingClaimed] = await Promise.all([
+          this.companyModule.find({ cnpj: { $in: cnpjList } }).lean(),
+          this.claimedProcessesModule
+            .find({ processId: findProcess._id })
+            .lean(),
+        ]);
+
+        const companyByCnpj = new Map(
+          existingCompanies.map((c) => [c.cnpj, c]),
         );
+        const claimedCompanyIds = new Set(
+          existingClaimed.map((cp) => String(cp.companyId)),
+        );
+
+        // PERF-004: buscar EmpresaQui sequencialmente (rate-limited) mas
+        //           fazer as escritas em MongoDB em batch no final
+        const updatedParts = [...findProcess.processParts];
+
+        for (const company of cnpjCompanies) {
+          const cnpj = company.documento.numero;
+          this.logger.log(`Iniciando validação da empresa: ${cnpj}`);
+
+          const companyData = await this.fetchCompany(cnpj);
+          if (!companyData) {
+            this.logger.error(`Nenhum dado encontrado para a empresa: ${cnpj}`);
+            continue;
+          }
+
+          await this.createOrUpdateCompanyDataBatch(
+            companyData,
+            findProcess._id,
+            companyByCnpj as Map<string, Company>,
+            claimedCompanyIds,
+          );
+
+          // Atualiza processParts em memória (1 update ao final do loop)
+          for (let i = 0; i < updatedParts.length; i++) {
+            if (updatedParts[i].documento?.numero === cnpj) {
+              updatedParts[i] = {
+                ...updatedParts[i],
+                nome: companyData.razao || updatedParts[i].nome,
+              };
+            }
+          }
+
+          this.logger.log(`Empresa ${cnpj} atualizada com sucesso`);
+        }
+
+        // PERF-004: um único update no processModule ao fim
+        await this.processModule.findByIdAndUpdate(findProcess._id, {
+          processParts: updatedParts,
+        });
       }
       const namesStatuses =
         findProcess.processStatus.name ===
@@ -209,8 +243,57 @@ export class SolvencyValidationService {
     );
   }
 
-  // Função auxiliar para salvar os dados da empresa
-  private async createOrUpdateCompanyData(companyData: any, processId: string) {
+  // PERF-004: versão batch que reutiliza dados pré-carregados
+  private async createOrUpdateCompanyDataBatch(
+    companyData: EmpresaQuiData,
+    processId: string,
+    companyByCnpj: Map<string, Company>,
+    claimedCompanyIds: Set<string>,
+  ) {
+    const existingCompany = companyByCnpj.get(companyData.cnpj);
+    const updateFields = {
+      email: companyData?.email,
+      fantasyName: companyData?.fantasia,
+      legalNature: companyData?.natureza_juridica,
+      registrationStatus: companyData?.situacao_cadastral,
+      taxRegime: companyData?.regime_tributario,
+      partners: companyData?.socios,
+      socialCapital: companyData?.capital_social,
+      invoicing: companyData?.faturamento,
+      porte: companyData?.porte,
+    };
+
+    if (existingCompany) {
+      if (!claimedCompanyIds.has(String((existingCompany as any)._id))) {
+        await this.claimedProcessesModule.create({
+          companyId: (existingCompany as any)._id,
+          processId,
+        });
+        claimedCompanyIds.add(String((existingCompany as any)._id));
+      }
+      return this.companyModule.findByIdAndUpdate(
+        (existingCompany as any)._id,
+        updateFields,
+        { new: true, timestamps: false },
+      );
+    } else {
+      const createdCompany = await this.companyModule.create({
+        name: companyData?.razao,
+        cnpj: companyData?.cnpj,
+        ...updateFields,
+      });
+      companyByCnpj.set(companyData.cnpj, createdCompany);
+      await this.claimedProcessesModule.create({
+        companyId: createdCompany._id,
+        processId,
+      });
+      claimedCompanyIds.add(String(createdCompany._id));
+      return createdCompany;
+    }
+  }
+
+  // Função auxiliar legada para salvar os dados da empresa
+  private async createOrUpdateCompanyData(companyData: EmpresaQuiData, processId: string) {
     const existingCompany = await this.companyModule.findOne({
       cnpj: companyData.cnpj,
     });
@@ -259,7 +342,7 @@ export class SolvencyValidationService {
         companyId: createdCompany._id,
         processId,
       });
-      console.log('Empresa criada com sucesso:', createdCompany);
+      this.logger.log(`Empresa criada com sucesso: ${String(createdCompany._id)}`);
 
       return createdCompany;
     }
@@ -291,15 +374,17 @@ export class SolvencyValidationService {
     return data;
   }
 
-  // Buscar dados da empresa
-  private async fetchCompany(cnpj) {
-    try {
-      if (cnpj === null) {
-        return null;
-      }
+  // Buscar dados da empresa com retry limitado (BUG-005)
+  private async fetchCompany(cnpj: string, attempt = 0): Promise<EmpresaQuiData | null> {
+    const MAX_ATTEMPTS = 5;
 
+    if (cnpj === null) {
+      return null;
+    }
+
+    try {
       await sleep(1500);
-      console.log('Buscando dados da empresa');
+      this.logger.log(`Buscando dados da empresa ${cnpj} (tentativa ${attempt + 1}/${MAX_ATTEMPTS})`);
       const { data } = await axios.get(
         `${process.env.BASE_URL_EMPRESAQUI}/${process.env.EMPRESAQUI_API_KEY}/${cnpj}`,
       );
@@ -309,19 +394,25 @@ export class SolvencyValidationService {
       }
       return await this.transformarSocios(data);
     } catch (error) {
-      if (
-        error?.response?.status === 429 &&
-        error?.response?.statusText === 'Too Many Requests'
-      ) {
-        this.logger.log('Erro ao buscar dados da empresa, tentando novamnete');
-        await sleep(30000);
-        return this.fetchCompany(cnpj);
-      } else if (error.response.status === 404) {
-        this.logger.log('Empresa não encontrada', error);
+      const status = error?.response?.status;
+
+      if (status === 429 && attempt < MAX_ATTEMPTS - 1) {
+        const delay = Math.min(30000 * Math.pow(2, attempt), 300000); // max 5 min
+        this.logger.warn(
+          `EmpresaQui 429 para ${cnpj} — retry ${attempt + 1}/${MAX_ATTEMPTS} em ${delay / 1000}s`,
+        );
+        await sleep(delay);
+        return this.fetchCompany(cnpj, attempt + 1);
+      } else if (status === 429) {
+        this.logger.error(`EmpresaQui 429 para ${cnpj} — maximo de tentativas atingido`);
+        return null;
+      } else if (status === 404) {
+        this.logger.log(`Empresa ${cnpj} não encontrada na EmpresaQui`);
+        return null;
       } else {
-        this.logger.log('Erro ao buscar dados da empresa', error);
+        this.logger.error(`Erro ao buscar dados da empresa ${cnpj}:`, error?.message);
+        return null;
       }
-      // throw new BadGatewayException('Erro ao buscar dados da empresa', error);
     }
   }
 }

@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import axios, { AxiosInstance } from "axios";
 
 @Injectable()
 export class BrapiService {
+  private readonly logger = new Logger(BrapiService.name);
   private axiosApi: AxiosInstance;
 
   constructor() {
@@ -18,14 +19,14 @@ export class BrapiService {
   async getCurrentSelicRate() {
     try {
       const response = await this.axiosApi.get('/prime-rate');
-      console.log('REPONSE BRAPI: ', response?.data);
+      this.logger.debug(`BRAPI response: ${JSON.stringify(response?.data)}`);
       const value = Number(response?.data['prime-rate'][0]?.value);
       if (!value) {
         throw new Error('Error getting current Selic rate');
       }
       return value;
     } catch (error) {
-      console.error('Error getting current Selic rate: ', error);
+      this.logger.error('Error getting current Selic rate:', error);
       throw new Error('Error getting current Selic rate');
     }
   }

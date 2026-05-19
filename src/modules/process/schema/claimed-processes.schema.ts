@@ -14,7 +14,7 @@ class ClaimedProcesses {
   processId: mongoose.Types.ObjectId;
 
   // @Prop()
-  // responsibility?: any;
+  // responsibility?: unknown;
 }
 
 type ClaimedProcessesDocument = ClaimedProcesses & Document;

@@ -41,6 +41,7 @@
     "@nestjs/platform-socket.io": "^10.4.20",
     "@nestjs/schedule": "^4.1.1",
     "@nestjs/swagger": "^7.4.2",
+    "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^10.4.20",
     "axios": "^1.7.7",
     "bcrypt": "^6.0.0",
@@ -102,6 +103,9 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }

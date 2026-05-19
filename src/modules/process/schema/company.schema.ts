@@ -18,7 +18,7 @@ class Company {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: ProcessEntity.name })
   process: mongoose.Schema.Types.ObjectId;
 
-  @Prop()
+  @Prop({ index: true })
   cnpj: string;
 
   @Prop()
@@ -53,7 +53,7 @@ class Company {
   errorReason: string;
 
   @Prop()
-  partners: Array<any>;
+  partners: Array<Record<string, unknown>>;
 
   @Prop()
   socialCapital: string;
@@ -68,7 +68,7 @@ class Company {
   porte: string;
 
   @Prop({ type: mongoose.Schema.Types.Mixed })
-  cndt: any;
+  cndt: Record<string, unknown>;
 
   @Prop()
   score: number;

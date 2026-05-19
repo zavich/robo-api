@@ -60,7 +60,6 @@ export class ProcessValidationService {
         processNumber: number,
       });
     } catch (error) {
-      console.log('Error validar processo!', error);
       this.logger.error('Error validar processo!', error);
     }
   }
@@ -72,7 +71,7 @@ export class ProcessValidationService {
     );
   }
 
-  private async createOrUpdateProcessStatus(step: any, process: any) {
+  private async createOrUpdateProcessStatus(step: Step, process: ProcessEntity) {
     const findNextStep = await this.stepModule.findOne({ slug: step.next });
 
     return await this.processStatusModule.findByIdAndUpdate(
@@ -83,10 +82,10 @@ export class ProcessValidationService {
     );
   }
 
-  executionIsExtinct(process: any): boolean {
-    const instances = process?.instancias || [];
-    const hasExtinctExecution = instances.some((instance: any) =>
-      instance?.movimentacoes?.some((movement: any) =>
+  executionIsExtinct(process: ProcessEntity): boolean {
+    const instances = (process?.instancias as Array<Record<string, unknown>>) || [];
+    const hasExtinctExecution = instances.some((instance) =>
+      (instance?.movimentacoes as Array<{ conteudo?: string }>)?.some((movement) =>
         ['extinta a execu\u00e7\u00e3o', 'o cumprimento da senten\u00e7a'].some(
           (term) =>
             movement?.conteudo
@@ -105,41 +104,41 @@ export class ProcessValidationService {
     return hasExtinctExecution;
   }
 
-  wasSentToRecords(process): { instance: any; movements: any[] }[] {
-    const instances = process?.instancias || [];
+  wasSentToRecords(process: ProcessEntity): { instance: Record<string, unknown>; movements: Array<{ conteudo?: string }> }[] {
+    const instances = (process?.instancias as Array<Record<string, unknown>>) || [];
     const instancesWithMovements = instances
-      .map((instance: any) => {
-        const movements = instance?.movimentacoes?.filter((movement: any) =>
+      .map((instance) => {
+        const movements = (instance?.movimentacoes as Array<{ conteudo?: string }>)?.filter((movement) =>
           movement?.conteudo?.includes(
             'Remetidos os autos para Tribunal Superior do Trabalho para processar recurso',
           ),
         );
         return movements?.length > 0 ? { instance, movements } : null;
       })
-      .filter((instance: any) => instance !== null);
+      .filter((instance): instance is { instance: Record<string, unknown>; movements: Array<{ conteudo?: string }> } => instance !== null);
     return instancesWithMovements;
   }
 
   // Verifica se o processo é trabalhista
-  isLaborProcess(process: any): boolean {
+  isLaborProcess(process: ProcessEntity): boolean {
     const subject = process?.instancias?.find(
       (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
     )?.area;
-    return subject?.toLowerCase().includes('trabalhista');
+    return (subject as string | undefined)?.toLowerCase().includes('trabalhista') ?? false;
   }
 
   // Verifica se o processo está em segredo de justiça
-  isUnderSecrecy(process: any): boolean {
-    const instances = process?.instancias || [];
+  isUnderSecrecy(process: ProcessEntity): boolean {
+    const instances = (process?.instancias as Array<{ segredo?: boolean }>) || [];
     const hasSecrecy = instances.every(
-      (instance: any) => instance?.segredo === true,
+      (instance) => instance?.segredo === true,
     );
     return hasSecrecy;
   }
 
   // Verifica se o processo está ativo
 
-  isProcessArchived(process: any): boolean {
+  isProcessArchived(process: ProcessEntity): boolean {
     return (
       process?.instancias.find(
         (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
@@ -147,7 +146,7 @@ export class ProcessValidationService {
     );
   }
   // Verifica se o processo é procedente
-  isProcedentProcess(process: any): boolean {
+  isProcedentProcess(process: ProcessEntity): boolean {
     const authorKeywords = [
       'autor',
       'reclamante',
@@ -155,8 +154,8 @@ export class ProcessValidationService {
       'polo ativo',
       'exequente',
     ];
-    const autor = process.instancias
-      ?.find((instancia) => instancia.instancia === 'PRIMEIRO_GRAU')
+    const autor = (process.instancias
+      ?.find((instancia) => instancia.instancia === 'PRIMEIRO_GRAU') as { partes?: Array<{ tipo?: string; principal?: boolean; nome?: string }> } | undefined)
       ?.partes?.find(
         (item) =>
           authorKeywords.some((keyword) =>
@@ -175,18 +174,18 @@ export class ProcessValidationService {
     );
 
     // Verifique se as instâncias existem antes de acessar suas movimentações
-    const movementsFirst = firstDegreeInstance?.movimentacoes || [];
-    const movementsSecond = secondDegreeInstance?.movimentacoes || [];
+    const movementsFirst = (firstDegreeInstance?.movimentacoes as Array<{ conteudo?: string }>) || [];
+    const movementsSecond = (secondDegreeInstance?.movimentacoes as Array<{ conteudo?: string }>) || [];
 
     // Verifica se há movimentação de 1º grau indicando improcedência
     const firstDegreeRegex =
       /julgado(?:\(s\))?\s+improcedente(?:\(s\))?\s+o(?:\(s\))?\s+pedido(?:\(s\))?/i;
 
-    const isFirstDegreeImprocedent = movementsFirst.some((movement: any) =>
+    const isFirstDegreeImprocedent = movementsFirst.some((movement: { conteudo?: string }) =>
       firstDegreeRegex.test(movement?.conteudo || ''),
     );
 
-    const isSecondDegreeImprocedent = movementsSecond.some((movement: any) => {
+    const isSecondDegreeImprocedent = movementsSecond.some((movement: { conteudo?: string }) => {
       if (!authorName) return false;
 
       const content = normalizeString(movement?.conteudo || '');
@@ -200,13 +199,13 @@ export class ProcessValidationService {
   }
 
   // Verifica se a classe é aprovada (exemplo baseado em uma lista de classes aprovadas)
-  isClassApproved(process: any): boolean {
+  isClassApproved(process: ProcessEntity): boolean {
     const processClass = process?.instancias?.find(
       (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
     ).classe;
 
     return classesAprovar.some((approvedClass) =>
-      processClass?.includes(approvedClass),
+      (processClass as string | undefined)?.includes(approvedClass),
     );
   }
 }

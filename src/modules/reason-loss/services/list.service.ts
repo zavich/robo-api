@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, PipelineStage } from 'mongoose';
 import { ReasonLoss } from '../schema/reason-refusal.schema';
 import { ListReasonLossDto } from '../dto/list-reason-loss.dto';
 
@@ -15,7 +15,7 @@ export class ListReasonLossService {
     const { page = 1, limit = 10, search } = query;
 
     try {
-      const pipeline: any[] = [];
+      const pipeline: PipelineStage[] = [];
 
       // Filtro de busca por key ou label
       if (search && search.trim() !== '') {

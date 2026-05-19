@@ -42,7 +42,6 @@ export class NotificationsController {
   @Patch(':id/read')
   async markAsRead(@Param('id') id: string, @Req() req) {
     const userId = req.user.id; // obtém o usuário logado
-    console.log('userId', userId);
 
     return await this.readNotificationService.execute(id, userId);
   }

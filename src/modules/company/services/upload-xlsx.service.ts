@@ -25,29 +25,31 @@ export class UploadXLSXCompanyService {
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
 
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet);
 
     const empresasCriadas = [];
     const empresasAtualizadas = [];
 
     for (const row of rows) {
-      const cnpj = row['CNPJ']
-        ? row['CNPJ'].toString().replace(/\D/g, '')
+      const cnpjRaw = row['CNPJ'];
+      const cnpj = cnpjRaw
+        ? cnpjRaw.toString().replace(/\D/g, '')
         : null;
       if (!cnpj) continue;
 
       const jaExiste = await this.companyModel.findOne({ cnpj });
 
+      const solvencia = row['SOLVÊNCIA'] as string | undefined;
       const dataToUpdate = {
-        fantasyName: row['RECLAMADA '] || row['RECLAMADA'] || null,
-        name: row['RECLAMADA '] || row['RECLAMADA'] || null,
-        reason: row['EXPLICAÇÃO'] || null,
-        specialRule: row['SOLVÊNCIA']?.trim().toLowerCase() || null,
+        fantasyName: (row['RECLAMADA '] || row['RECLAMADA'] || null) as string | null,
+        name: (row['RECLAMADA '] || row['RECLAMADA'] || null) as string | null,
+        reason: (row['EXPLICAÇÃO'] || null) as string | null,
+        specialRule: solvencia?.trim().toLowerCase() || null,
         score:
           typeof row['SCORE'] === 'number'
             ? row['SCORE']
             : typeof row['SCORE '] === 'number'
-              ? row['SCORE ']
+              ? row['SCORE '] as number
               : null,
       };
       this.logger.log(
@@ -57,7 +59,7 @@ export class UploadXLSXCompanyService {
         const novaEmpresa = {
           cnpj,
           ...dataToUpdate,
-          faturamento: row['FATURAMENTO'] || null,
+          faturamento: (row['FATURAMENTO'] || null) as string | null,
         };
 
         await this.companyModel.create(novaEmpresa);

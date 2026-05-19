@@ -14,7 +14,7 @@ import {
 } from '../../modules/process/schema/process.schema';
 @Injectable()
 export default class PipedriveService {
-  private readonly logger = new Logger();
+  private readonly logger = new Logger(PipedriveService.name);
   constructor(
     @InjectModel(Process.name) private readonly processModel: Model<Process>,
   ) {}
@@ -55,7 +55,7 @@ export default class PipedriveService {
       const planilhasCalc =
         findProcessByDealId?.class === 'MAIN'
           ? findProcessByDealId?.documents.filter(
-              (doc: any) => doc.type === ProcessDocumentType.PlanilhaCalculo,
+              (doc) => doc.type === ProcessDocumentType.PlanilhaCalculo,
             )
           : (lawsuit?.documents as unknown as RestrictedDocumentType[])?.filter(
               (doc) => doc.type === ProcessDocumentType.PlanilhaCalculo,
@@ -75,13 +75,14 @@ export default class PipedriveService {
               findProcessByDealId?.documents as unknown as RestrictedDocumentType[]
             ).find(
               (doc) => doc.type === ProcessDocumentType.HomologacaoDeCalculo,
-            )?.data as any)
+            )?.data as { calculoOwner?: string } | undefined)
           : ((lawsuit?.documents as unknown as RestrictedDocumentType[])?.find(
               (doc) => doc.type === ProcessDocumentType.HomologacaoDeCalculo,
-            )?.data as any);
+            )?.data as { calculoOwner?: string } | undefined);
       interface AcordaoData {
         hipotese?: string;
-        [key: string]: any;
+        valor_condenacao?: string;
+        [key: string]: unknown;
       }
       const acordao =
         findProcessByDealId?.class === 'MAIN'
@@ -124,7 +125,7 @@ export default class PipedriveService {
               })
               .flatMap((doc) =>
                 doc.data && 'recursos' in doc.data
-                  ? ((doc.data as { recursos?: any[] }).recursos ?? [])
+                  ? ((doc.data as { recursos?: Record<string, unknown>[] }).recursos ?? [])
                   : [],
               )
               .filter((recurso) => recurso.provido)
@@ -137,7 +138,7 @@ export default class PipedriveService {
               })
               .flatMap((doc) =>
                 doc.data && 'recursos' in doc.data
-                  ? ((doc.data as { recursos?: any[] }).recursos ?? [])
+                  ? ((doc.data as { recursos?: Record<string, unknown>[] }).recursos ?? [])
                   : [],
               )
               .filter((recurso) => recurso.provido);
@@ -147,7 +148,7 @@ export default class PipedriveService {
           ? acordaoRecursos
               .map((recurso, index) => {
                 const materias =
-                  recurso.materias?.map((m) => m.name).join(', ') ||
+                  (recurso.materias as any[])?.map((m) => m.name).join(', ') ||
                   'Não informado';
                 return `Recurso ${index + 1}:
 - Tipo: ${recurso.name}
@@ -162,16 +163,16 @@ export default class PipedriveService {
 
       const calculoHomologadoPorOwner = `
       \n\nCálculo do Reclamante:
-      ${this.calcularTotaisPorOwner(planilhasCalc, 'reclamante')}
+      ${this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], 'reclamante')}
 
       \n\nCálculo da Reclamada:
-      ${this.calcularTotaisPorOwner(planilhasCalc, 'reclamada')}
+      ${this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], 'reclamada')}
 
       \n\nCálculo do Perito:
-      ${this.calcularTotaisPorOwner(planilhasCalc, 'perito')}
+      ${this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], 'perito')}
 
       \n\nCálculo Homologado ${homologadoOwner || ''}:
-      ${homologadoOwner ? this.calcularTotaisPorOwner(planilhasCalc, homologadoOwner) : 'Não identificado'}
+      ${homologadoOwner ? this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], homologadoOwner) : 'Não identificado'}
 `;
 
       const bodyNote = {
@@ -248,7 +249,7 @@ export default class PipedriveService {
 
       return response.data;
     } catch (error) {
-      console.log(`Error updating Pipedrive deal: ${error}`);
+      this.logger.log(`Error updating Pipedrive deal: ${error}`);
 
       if (error?.response?.status === 429 || error?.response?.status === 403) {
         this.logger.warn(
@@ -279,18 +280,18 @@ export default class PipedriveService {
       return dataAtual > dataMaisRecente ? atual : maisRecente;
     }, null);
   }
-  calcularTotaisPorOwner(planilhasCalc: any[], owner: string) {
-    const docs = planilhasCalc?.filter((doc) => doc?.data?.ownerType === owner);
+  calcularTotaisPorOwner(planilhasCalc: RestrictedDocumentType[], owner: string) {
+    const docs = planilhasCalc?.filter((doc) => (doc?.data as any)?.ownerType === owner);
     if (docs?.length === 0) return 'Não identificado';
 
     const bruto = docs
-      ?.reduce((acc, doc) => acc + (doc?.data?.bruto || 0), 0)
+      ?.reduce((acc, doc) => acc + ((doc?.data as any)?.bruto || 0), 0)
       .toFixed(2);
     const liquido = docs
-      ?.reduce((acc, doc) => acc + (doc?.data?.liquido || 0), 0)
+      ?.reduce((acc, doc) => acc + ((doc?.data as any)?.liquido || 0), 0)
       .toFixed(2);
     const fgts = docs
-      ?.reduce((acc, doc) => acc + (doc?.data?.fgts || 0), 0)
+      ?.reduce((acc, doc) => acc + ((doc?.data as any)?.fgts || 0), 0)
       .toFixed(2);
 
     return `bruto: ${bruto}\nliquido: ${liquido}\nFGTS: ${fgts}`;

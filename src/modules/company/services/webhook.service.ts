@@ -12,10 +12,10 @@ export class WebhookService {
     private readonly companyModel: Model<Company>,
   ) {}
   // Example: Handle incoming webhook payload
-  async execute(payload: any, type: string) {
+  async execute(payload: Record<string, unknown>, type: string) {
     try {
       this.logger.log(`Received webhook of type: ${type}`, payload);
-      const cleanCnpj = payload.cnpj.replace(/\D/g, '');
+      const cleanCnpj = (payload.cnpj as string).replace(/\D/g, '');
       const findCompany = await this.companyModel.findOne({
         cnpj: cleanCnpj,
       });
@@ -27,7 +27,7 @@ export class WebhookService {
         $set: {
           cndt: {
             status: StatusDocs.CONCLUDED,
-            temp_link: payload.temp_link,
+            temp_link: payload.temp_link as string,
           },
         },
       });

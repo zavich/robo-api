@@ -11,6 +11,13 @@ interface UpdateActivityParams {
   dueTime?: string;
 }
 
+interface PipedriveActivity {
+  id: number;
+  type: string;
+  subject: string;
+  [key: string]: unknown;
+}
+
 export async function findActivityByDealId(
   dealId: number,
   type?: string,
@@ -21,7 +28,7 @@ export async function findActivityByDealId(
   const normalizedBase = hasApiSegment ? baseUrl : `${baseUrl}/api`;
   const activitiesUrl = `${normalizedBase}/v2/activities`;
 
-  const params: Record<string, any> = {
+  const params: Record<string, unknown> = {
     deal_id: dealId,
     limit: 100,
   };
@@ -40,24 +47,23 @@ export async function findActivityByDealId(
       },
     });
 
-    const activities = response.data?.data || [];
+    const activities: PipedriveActivity[] = response.data?.data || [];
 
     if (activities.length === 0) {
-      console.log(`[findActivityByDealId] Nenhuma atividade encontrada para dealId: ${dealId}, type: ${type}, subject: ${subject}`);
       return null;
     }
 
     let filteredActivities = activities;
 
     if (type && type.trim() !== '') {
-      filteredActivities = filteredActivities.filter((activity: any) =>
+      filteredActivities = filteredActivities.filter((activity: PipedriveActivity) =>
         activity.type === type.trim()
       );
     }
 
     if (subject && subject.trim() !== '') {
       const subjectLower = subject.trim().toLowerCase();
-      filteredActivities = filteredActivities.filter((activity: any) =>
+      filteredActivities = filteredActivities.filter((activity: PipedriveActivity) =>
         activity.subject && activity.subject.toLowerCase().includes(subjectLower)
       );
     }
@@ -69,12 +75,13 @@ export async function findActivityByDealId(
     }
 
     return null;
-  } catch (error: any) {
-    if (error.response?.status === 404 || error.response?.status === 400) {
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { status?: number; data?: { error?: string } }; message?: string };
+    if (axiosError.response?.status === 404 || axiosError.response?.status === 400) {
       return null;
     }
     throw new Error(
-      `Failed to find activity in Pipedrive: ${error.response?.data?.error || error.message}`,
+      `Failed to find activity in Pipedrive: ${axiosError.response?.data?.error || axiosError.message}`,
     );
   }
 }
@@ -88,13 +95,13 @@ export async function updateActivity({
   activityId,
   dueDate,
   dueTime,
-}: UpdateActivityParams): Promise<any> {
+}: UpdateActivityParams): Promise<Record<string, unknown>> {
   const baseUrl = process.env.PIPEDRIVE_PROSOLUTTI_URL;
   const hasApiSegment = /\/api($|\/)/.test(baseUrl);
   const normalizedBase = hasApiSegment ? baseUrl : `${baseUrl}/api`;
   const activitiesUrl = `${normalizedBase}/v2/activities`;
 
-  const body: Record<string, any> = {
+  const body: Record<string, unknown> = {
     deal_id: dealId,
     done: done ? 1 : 0,
   };
@@ -131,9 +138,10 @@ export async function updateActivity({
     });
 
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: { error?: string } }; message?: string };
     throw new Error(
-      `Failed to update activity in Pipedrive: ${error.response?.data?.error || error.message}`,
+      `Failed to update activity in Pipedrive: ${axiosError.response?.data?.error || axiosError.message}`,
     );
   }
 }

@@ -1,6 +1,7 @@
 import { Logger, Inject } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
 import { InjectModel } from '@nestjs/mongoose';
-import { Queue, QueueEvents, Worker } from 'bullmq';
+import { Queue } from 'bullmq';
 import { Model } from 'mongoose';
 import {
   InsertProceess,
@@ -19,8 +20,6 @@ import { SolvencyValidationService } from './services/solvency-validation.servic
 
 export class ProcessQueue {
   private readonly logger = new Logger();
-  private readonly processQueue: Queue;
-  private readonly queueEvents: QueueEvents;
 
   constructor(
     @InjectModel(ProcessSchema.name)
@@ -33,53 +32,17 @@ export class ProcessQueue {
     private readonly insertProcessService: InsertProcessService,
     private readonly initialPetitionService: InitialPetitionService,
     @Inject('REDIS_CLIENT') private readonly redisClient: Redis,
-  ) {
-    this.processQueue = new Queue('process-queue', {
-      connection: this.redisClient,
-    });
-    this.queueEvents = new QueueEvents('process-queue', {
-      connection: this.redisClient,
-    });
-
-    this.queueEvents.on('waiting', ({ jobId }) =>
-      console.log('Job aguardando:', jobId),
-    );
-    this.queueEvents.on('active', ({ jobId, prev }) =>
-      console.log('Job ativo:', jobId, prev),
-    );
-    this.queueEvents.on('completed', ({ jobId }) =>
-      console.log('Job concluído:', jobId),
-    );
-    this.queueEvents.on('failed', ({ jobId, failedReason }) =>
-      console.error('Job falhou:', jobId, failedReason),
-    );
-
-    new Worker(
-      'process-queue',
-      async (job) => {
-        switch (job.name) {
-          case 'insert-process':
-            await this.insertProcess(job.data);
-            break;
-          case 'process-validation':
-            await this.processValidationJob(job.data);
-            break;
-          case 'solvency-validation':
-            await this.solvencyValidationJob(job.data);
-            break;
-          case 'extract-document':
-            await this.extractDocumentJob(job.data);
-            break;
-          case 'initial-petition':
-            await this.initialPetitionJob(job.data);
-            break;
-          default:
-            throw new Error(`Unknown job name: ${job.name}`);
-        }
-      },
-      { connection: this.redisClient },
-    );
-  }
+    @InjectQueue('insert-process-queue')
+    private readonly insertProcessQueue: Queue,
+    @InjectQueue('process-validation-queue')
+    private readonly processValidationQueue: Queue,
+    @InjectQueue('solvency-validation-queue')
+    private readonly solvencyValidationQueue: Queue,
+    @InjectQueue('extract-document-queue')
+    private readonly extractDocumentQueue: Queue,
+    @InjectQueue('initial-petition-queue')
+    private readonly initialPetitionQueue: Queue,
+  ) {}
 
   async insertProcess(data: InsertProceess) {
     const {
@@ -103,7 +66,7 @@ export class ProcessQueue {
     }
   }
 
-  async processValidationJob(data: any) {
+  async processValidationJob(data: { processNumber: string }) {
     const { processNumber } = data;
     this.logger.log(`Job initial process analysis #${processNumber}`);
     try {
@@ -118,7 +81,7 @@ export class ProcessQueue {
     }
   }
 
-  async solvencyValidationJob(data: any) {
+  async solvencyValidationJob(data: { processNumber: string }) {
     try {
       const { processNumber } = data;
       this.logger.log(`Job solvency validation #${processNumber}`);
@@ -149,7 +112,7 @@ export class ProcessQueue {
     this.logger.log('FINISH EXTRACT DOCUMENT JOB');
   }
 
-  async initialPetitionJob(data: any) {
+  async initialPetitionJob(data: { processNumber?: string; resposta?: { numero_unico: string } }) {
     const { processNumber, resposta } = data;
     await this.initialPetitionService.execute(
       processNumber || resposta.numero_unico,

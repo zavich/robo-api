@@ -88,7 +88,7 @@ export interface RestrictedDocument extends Document {
   type: string;
   title: string;
   extension: string;
-  data: any;
+  data: Record<string, unknown>;
   temp_link: string;
   uniqueName?: string;
   date?: string;
@@ -100,7 +100,7 @@ export interface ProcessPartsDTO extends Document {
   tipo: string;
   polo: string;
   principal: boolean;
-  documento: any;
+  documento: Record<string, unknown>;
 }
 const ActivityDocumentSchema = new mongoose.Schema(
   {
@@ -158,7 +158,7 @@ class Process {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: ProcessStatus.name })
   processStatus: mongoose.Types.ObjectId;
 
-  @Prop()
+  @Prop({ index: true, unique: true, sparse: true })
   number: string;
 
   @Prop()
@@ -168,7 +168,7 @@ class Process {
   // ISSUE= DE ALGUM ERROR NO PROCESSO
   // FINISHED = PROCESSO ESTIVER PASSADO PELA A ESTEIRA DE VALIDAÇÃO
   // ARCHIVED
-  @Prop({ enum: Situation })
+  @Prop({ enum: Situation, index: true })
   situation: Situation;
 
   @Prop()
@@ -190,7 +190,7 @@ class Process {
   autosData: typeof AutosDataSchema;
 
   @Prop()
-  moviments: Array<any>;
+  moviments: Array<Record<string, unknown>>;
 
   @Prop()
   class: string;
@@ -223,10 +223,10 @@ class Process {
   origem: string;
 
   @Prop()
-  instanciasAutos: Array<any>;
+  instanciasAutos: Array<Record<string, unknown>>;
 
   @Prop()
-  instancias: Array<any>;
+  instancias: Array<Record<string, unknown>>;
 
   /**
    * Valor do Credito definido em liberacoes
@@ -249,7 +249,7 @@ class Process {
   @Prop()
   calledByProvisionalLawsuitNumber: string;
 
-  @Prop({ enum: STAGEPROCESS, default: STAGEPROCESS.PRE_ANALISE })
+  @Prop({ enum: STAGEPROCESS, default: STAGEPROCESS.PRE_ANALISE, index: true })
   stage: STAGEPROCESS;
 
   @Prop()
@@ -259,13 +259,16 @@ class Process {
   synchronizedAt: Date;
 
   @Prop({ type: mongoose.Schema.Types.Mixed })
-  oldMoviments: any;
+  oldMoviments: Record<string, unknown>;
 
   @Prop({ type: mongoose.Schema.Types.Mixed })
-  formPipedrive: any;
+  formPipedrive: Record<string, unknown>;
 
   @Prop({ type: [ActivityDocumentSchema], default: [] })
   activities: ActivityDocument[];
+
+  @Prop({ type: Number, default: 0 })
+  scraperRetryCount: number;
 }
 
 type ProcessDocument = Process & Document;

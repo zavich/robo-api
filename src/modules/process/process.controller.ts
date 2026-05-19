@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Logger,
   Param,
   Patch,
   Post,
@@ -29,6 +30,14 @@ import {
   insertExecutionSchemaPipe,
 } from './dtos/insert-execution.dto';
 import { ListProcessFiltersDto } from './dtos/list-process-filters.dto';
+import {
+  RunValidationSchemaBody,
+  runValidationSchemaPipe,
+} from './dtos/run-validation.dto';
+import {
+  WebhookPipedriveSchemaBody,
+  webhookPipedriveSchemaPipe,
+} from './dtos/webhook-pipedrive.dto';
 import { Root } from './interfaces/process.interface';
 import { CreateProcessService } from './services/create-process.service';
 import { DeleteInsightsDocumentService } from './services/documents/delete-insights.service';
@@ -67,6 +76,18 @@ import {
   UpdateProcessSchemaBody,
   updateProcessSchemaPipe,
 } from './dtos/update-lawsuit.dto';
+import {
+  RunDocumentsInsightsSchemaBody,
+  runDocumentsInsightsSchemaPipe,
+} from './dtos/run-documents-insights.dto';
+import {
+  RunLawsuitsSchemaBody,
+  runLawsuitsSchemaPipe,
+} from './dtos/run-lawsuits.dto';
+import {
+  InsertLawsuitManualDTO,
+  insertLawsuitManualSchemaPipe,
+} from './dtos/insert-lawsuit-manual.dto';
 import { ChangeAssignedUserService } from './services/activity/change-assigned.service';
 import { CompletedActivityService } from './services/activity/completed.service';
 import { CreateActivityService } from './services/activity/create.service';
@@ -92,6 +113,8 @@ import { WebhookService } from './services/webhook.service';
 @ApiTags('Process')
 @Controller('process')
 export class ProcessController {
+  private readonly logger = new Logger(ProcessController.name);
+
   constructor(
     private readonly createProcessService: CreateProcessService,
     private readonly webhookService: WebhookService,
@@ -125,7 +148,7 @@ export class ProcessController {
   @UseGuards(ApiKeyAuthGuard)
   async markAsRead(@Param('id') id: string, @Res() res: Response) {
     try {
-      const user = (res.req as any).user;
+      const user = res.req.user;
       if (!user || !user._id) {
         return res.status(401).json({ message: 'Usuário não autenticado' });
       }
@@ -185,7 +208,7 @@ export class ProcessController {
     @Res() res: Response,
   ) {
     try {
-      const user = (res.req as any).user;
+      const user = res.req.user;
       const userId = user?._id;
 
       const result = await this.listLawsuitService.execute(query, userId);
@@ -247,6 +270,8 @@ export class ProcessController {
   }
 
   @Get('/metrics')
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
   async getAllProcessMetrics(
     @Query() filters: MetricsFiltersDto,
   ): Promise<ProcessMetricsResponseDto> {
@@ -258,7 +283,7 @@ export class ProcessController {
   @UseGuards(ApiKeyAuthGuard)
   async findProcess(@Param('id') id: string, @Res() res: Response) {
     try {
-      const user = (res.req as any).user;
+      const user = res.req.user;
       const userId = user?._id;
 
       const result = await this.findProcessService.execute(id, userId);
@@ -287,8 +312,10 @@ export class ProcessController {
   }
 
   @Post('run-lawsuit-validation')
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
   async runLawsuitValidation(
-    @Body() body: { number: string; step: string; isAll: boolean },
+    @Body(runValidationSchemaPipe) body: RunValidationSchemaBody,
   ) {
     try {
       return await this.lawsuitValidationService.execute(
@@ -302,7 +329,11 @@ export class ProcessController {
   }
 
   @Post('insert-lawsuit-manual')
-  async lawsuitManual(@Body() body: any[]) {
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
+  async lawsuitManual(
+    @Body(insertLawsuitManualSchemaPipe) body: InsertLawsuitManualDTO,
+  ) {
     try {
       const promises = body.map((item) =>
         this.webhookPipedriveService.execute(item),
@@ -313,9 +344,11 @@ export class ProcessController {
     }
   }
   @Post('webhook-pipedrive/')
-  async webhookPipedrive(@Body() body: any) {
+  async webhookPipedrive(
+    @Body(webhookPipedriveSchemaPipe) body: WebhookPipedriveSchemaBody,
+  ) {
     try {
-      return await this.webhookPipedriveService.execute(body);
+      return await this.webhookPipedriveService.execute(body as unknown as Record<string, unknown>);
     } catch (error) {
       throw error;
     }
@@ -324,7 +357,8 @@ export class ProcessController {
   @UseGuards(ApiKeyAuthGuard)
   @Post('run-documents-insights')
   async runDocumentsInsights(
-    @Body() body: { number: string; documents: string[]; prompt: string },
+    @Body(runDocumentsInsightsSchemaPipe)
+    body: RunDocumentsInsightsSchemaBody,
   ) {
     try {
       await this.findInsightsService.execute(
@@ -340,14 +374,7 @@ export class ProcessController {
   @UseGuards(ApiKeyAuthGuard)
   @Post('run-lawsuits')
   async runLawsuitsList(
-    @Body()
-    body: {
-      lawsuits: string[];
-      documents?: boolean;
-      name?: string;
-      log?: string;
-      errorReason?: string;
-    },
+    @Body(runLawsuitsSchemaPipe) body: RunLawsuitsSchemaBody,
   ) {
     try {
       await this.runListLawsuitsValidationService.execute(
@@ -400,7 +427,7 @@ export class ProcessController {
     @Body(changeStageSchemaPipe) body: ChangeStageSchemaBody,
     @Res() res: Response,
   ) {
-    const user = (res.req as any).user;
+    const user = res.req.user;
 
     try {
       const result = await this.changeStageService.execute(body, user._id);
@@ -454,6 +481,8 @@ export class ProcessController {
   }
 
   @Patch(':number/update')
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
   async updateLawsuit(
     @Param('number') number: string,
     @Body(updateProcessSchemaPipe) body: UpdateProcessSchemaBody,
@@ -469,7 +498,7 @@ export class ProcessController {
     @Res() res: Response,
   ) {
     try {
-      const user = (res.req as any).user;
+      const user = res.req.user;
       if (!user || !user._id) {
         return res.status(401).json({ message: 'Usuário não autenticado' });
       }
@@ -490,7 +519,7 @@ export class ProcessController {
     @Body(createActivitySchemaPipe) dto: CreateActivitySchemaBody,
     @Res() res: Response,
   ) {
-    const user = (res.req as any).user;
+    const user = res.req.user;
 
     const result = await this.createActivityService.execute(user._id, dto);
     return res.status(200).json(result);
@@ -504,7 +533,7 @@ export class ProcessController {
     @Body(completedActivitySchemaPipe) body: CompletedActivityDTO,
     @Res() res: Response,
   ) {
-    const user = (res.req as any).user;
+    const user = res.req.user;
 
     const result = await this.completedActivityService.execute(
       processId,
@@ -535,6 +564,8 @@ export class ProcessController {
   }
 
   @Post('upload-xml')
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   async atualizarSolvencia(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
@@ -563,7 +594,7 @@ export class ProcessController {
 
       return new StreamableFile(response.data);
     } catch (error) {
-      console.error(error);
+      this.logger.error('Erro ao obter arquivo S3:', error);
       throw new BadRequestException('Erro ao obter arquivo.');
     }
   }

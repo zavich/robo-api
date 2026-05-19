@@ -1,15 +1,17 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { PassportStrategy } from '@nestjs/passport';
 import { Model } from 'mongoose';
 import { Strategy } from 'passport-jwt';
 import type { Request } from 'express';
+import Redis from 'ioredis';
 import { User, UserDocument } from 'src/modules/user/schema/user.schema';
 
 export type iJwtPayload = {
   sub: string;
   email: string;
+  jti?: string;
 };
 
 @Injectable()
@@ -18,6 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
     configService: ConfigService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {
     const cookieExtractor = (req: Request): string | null => {
       if (req && req.cookies) {
@@ -34,6 +37,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: iJwtPayload) {
+    if (payload.jti) {
+      const isRevoked = await this.redis.exists(`jwt:revoked:${payload.jti}`);
+      if (isRevoked) {
+        throw new UnauthorizedException('Token revogado');
+      }
+    }
+
     const user = await this.userModel.findOne({
       _id: payload.sub,
     });

@@ -17,14 +17,27 @@ import Redis from 'ioredis';
           maxRetriesPerRequest: null,
           enableReadyCheck: true,
           lazyConnect: false,
+          retryStrategy: (times: number) => {
+            if (times > 20) {
+              console.error('[Redis] Máximo de tentativas atingido. Desistindo.');
+              return null;
+            }
+            const delay = Math.min(times * 200, 5000);
+            console.warn(`[Redis] Tentativa ${times} de reconexão em ${delay}ms`);
+            return delay;
+          },
           reconnectOnError: (err) => {
             console.error('[Redis reconnect error]', err.message);
             return true;
           },
         });
 
-        client.on('connect', () => {
-          console.log('[Redis] connected');
+        client.on('ready', () => {
+          console.log('[Redis] Conexão estabelecida com sucesso');
+        });
+
+        client.on('reconnecting', () => {
+          console.warn('[Redis] Reconectando...');
         });
 
         client.on('error', (err) => {

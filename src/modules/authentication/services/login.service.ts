@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { compare } from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { User } from 'src/modules/user/schema/user.schema';
 import { AuthDto } from '../dto/auth.dto';
 
@@ -31,11 +32,16 @@ export class LoginService {
         throw new BadRequestException('E-mail ou senha inválidos');
       }
 
+      const jti = randomUUID();
+      const accessToken = this.jwtService.sign({
+        identifier: data.email,
+        sub: user._id,
+        jti,
+      });
+
       return {
-        accessToken: this.jwtService.sign({
-          identifier: data.email,
-          sub: user._id,
-        }),
+        accessToken,
+        jti,
         user: {
           email: user.email,
           _id: user._id,

@@ -2,7 +2,8 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  ForbiddenException
+  ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -16,6 +17,8 @@ import { addNoteToPipedrive } from '../../../service/pipedrive/add-note';
 
 @Injectable()
 export class ChangeStageService {
+  private readonly logger = new Logger(ChangeStageService.name);
+
   constructor(
     @InjectModel(Process.name)
     private readonly processModel: Model<ProcessDocument>,
@@ -145,7 +148,7 @@ export class ChangeStageService {
   /**
    * Retorna o stage ID padrão baseado no stage e no contexto do processo
    */
-  private getDefaultStageId(stage: STAGEPROCESS, process?: any): number {
+  private getDefaultStageId(stage: STAGEPROCESS, process?: ProcessDocument | null): number {
     if (process?.dealId) {
       const stageIdMap: Record<STAGEPROCESS, number> = {
         [STAGEPROCESS.PRE_ANALISE]: 802,
@@ -219,7 +222,7 @@ export class ChangeStageService {
    * Atualiza o stage no Pipedrive
    */
   private async updatePipedriveStage(
-    process: any,
+    process: ProcessDocument,
     changeStageData: ChangeStageDTO,
     previousStage: STAGEPROCESS
   ): Promise<void> {
@@ -255,7 +258,7 @@ export class ChangeStageService {
 
     } catch (error) {
       // Log do erro mas não falha o processo principal
-      console.error('Erro ao atualizar Pipedrive:', error);
+      this.logger.error('Erro ao atualizar Pipedrive:', error);
       // Opcional: poderia ser melhor usar um logger apropriado
     }
   }

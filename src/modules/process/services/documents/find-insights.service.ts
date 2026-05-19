@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
@@ -9,6 +9,8 @@ import { AwsServices } from 'src/service/aws/aws.service';
 
 @Injectable()
 export class FindInsightsService {
+  private readonly logger = new Logger(FindInsightsService.name);
+
   constructor(
     @InjectModel(Process.name)
     private readonly lawsuitModel: Model<Process>,
@@ -23,8 +25,8 @@ export class FindInsightsService {
       if (!lawsuit) {
         throw new Error('Lawsuit not found');
       }
-      const documentsLawsuit = lawsuit.documents.filter((doc: any) =>
-        documents.includes((doc._id ?? doc.id).toString()),
+      const documentsLawsuit = lawsuit.documents.filter((doc) =>
+        documents.includes(String(doc._id ?? (doc as any).id)),
       );
       const processParts = lawsuit.processParts || [];
       const context = {
@@ -64,7 +66,7 @@ export class FindInsightsService {
           `;
 
       await Promise.all(
-        documentsLawsuit.map(async (doc: any) => {
+        documentsLawsuit.map(async (doc) => {
           await this.lawsuitModel.findOneAndUpdate(
             {
               number: number,
@@ -89,7 +91,7 @@ export class FindInsightsService {
               signedUrl,
               fullPrompt,
             );
-            console.log('response: ', response);
+            this.logger.log('response: ', response);
 
             doc.data = response;
             await this.lawsuitModel.findOneAndUpdate(
@@ -117,13 +119,13 @@ export class FindInsightsService {
                 },
               },
             );
-            console.error('Erro ao extrair insight do documento:', error);
+            this.logger.error('Erro ao extrair insight do documento:', error);
           }
         }),
       );
       return { documentsLawsuit, promptFind };
     } catch (error) {
-      console.error(error);
+      this.logger.error(error);
       throw new Error('Error executing document insights');
     }
   }

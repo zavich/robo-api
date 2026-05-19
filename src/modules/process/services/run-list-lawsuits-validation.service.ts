@@ -1,6 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, PipelineStage } from 'mongoose';
+
+interface PopulatedProcessStatus {
+  _id: string;
+  step: { slug: string };
+}
+
+type ProcessWithPopulatedStatus = ProcessEntity & {
+  processStatus: PopulatedProcessStatus;
+};
 import { Process as ProcessEntity } from 'src/modules/process/schema/process.schema';
 import { InsertProcessService } from '../queues/process/services/insert-process.service';
 import { ProcessStatus } from '../schema/process-status.schema';
@@ -26,9 +35,9 @@ export class RunListLawsuitsValidationService {
     log?: string,
     errorReason?: string,
   ) {
-    let process: any[] = [];
+    let process: string[] = [];
     if (lawsuits.length === 0) {
-      const filters = [];
+      const filters: Record<string, string>[] = [];
 
       if (name) {
         filters.push({ 'processStatus.name': name });
@@ -42,7 +51,7 @@ export class RunListLawsuitsValidationService {
         filters.push({ 'processStatus.log': log });
       }
 
-      const pipeline: any[] = [
+      const pipeline: PipelineStage[] = [
         {
           $lookup: {
             from: 'processstatuses',
@@ -102,15 +111,15 @@ export class RunListLawsuitsValidationService {
           return;
         }
 
-        const proc: any = await this.processModule
+        const proc = await this.processModule
           .findOne({ number: numberKey })
-          .populate({ path: 'processStatus', populate: ['step'] });
+          .populate({ path: 'processStatus', populate: ['step'] }) as unknown as ProcessWithPopulatedStatus | null;
         if (!proc) {
           this.logger.warn('Process ' + numberKey + ' not found');
           return;
         }
         await this.processModule.findByIdAndUpdate(
-          proc._id,
+          (proc as any)._id,
           {
             $set: {
               synchronizedAt: new Date(),

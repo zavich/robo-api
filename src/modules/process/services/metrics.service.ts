@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { FilterQuery, Model } from 'mongoose';
 import {
   ProcessMetricsResponseDto,
   ActivityTypeMetrics,
@@ -23,7 +23,7 @@ export class MetricsService {
   async execute(
     filters: MetricsFilters = {},
   ): Promise<ProcessMetricsResponseDto> {
-    const matchStage: any = {};
+    const matchStage: FilterQuery<ProcessDocument> = {};
 
     // Filtro por data
     if (filters.startDate || filters.endDate) {
@@ -138,7 +138,7 @@ export class MetricsService {
     };
 
     // Processar métricas por tipo de atividade
-    result.activitiesByTypeAndStatus.forEach((item: any) => {
+    result.activitiesByTypeAndStatus.forEach((item: { _id: { activityType: TypeActivity; isCompleted: boolean; status: ActivityStatus }; count: number }) => {
       const activityType = item._id.activityType;
       const isCompleted = item._id.isCompleted;
       const status = item._id.status;

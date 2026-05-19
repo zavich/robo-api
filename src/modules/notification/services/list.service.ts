@@ -14,7 +14,6 @@ export class ListNotificationsService {
     const page = options?.page ?? 1;
     const limit = options?.limit ?? 20;
     const skip = (page - 1) * limit;
-    console.log('userId', userId);
 
     const aggregation = await this.notificationModel.aggregate([
       { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // filtra pelo usuário

@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Step } from '../schema/step.schema';
 import { Model } from 'mongoose';
 
 @Injectable()
 export class StepService {
+  private readonly logger = new Logger(StepService.name);
+
   constructor(
     @InjectModel(Step.name)
     private readonly stepModule: Model<Step>,
@@ -33,7 +35,7 @@ export class StepService {
       ]);
       return steps;
     } catch (error) {
-      console.log(error);
+      this.logger.log(error);
       return error;
     }
   }

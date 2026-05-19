@@ -1,9 +1,22 @@
 import { normalizeString } from './normalize-string';
 
+interface Moviment {
+  conteudo: string;
+  data: string;
+  [key: string]: unknown;
+}
+
+interface DocumentItem {
+  titulo: string;
+  descricao: string;
+  data: string;
+  [key: string]: unknown;
+}
+
 function getDocumentByContent(
   contentRegex: RegExp,
-  moviments: any[],
-  documents: any[],
+  moviments: Moviment[],
+  documents: DocumentItem[],
   onlyTitle = false,
 ) {
   try {
@@ -16,7 +29,6 @@ function getDocumentByContent(
     }
 
     const splitContent = targetMoviment.conteudo.split('|');
-    console.log('splitContent: ', splitContent);
     if (splitContent.length === 2 && !onlyTitle) {
       const string01 = splitContent[0].trim();
       const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
@@ -30,7 +42,6 @@ function getDocumentByContent(
       );
 
       if (documentSplitFound) {
-        console.log('documentSplitFound: ', documentSplitFound);
         return documentSplitFound;
       }
     }
@@ -46,7 +57,6 @@ function getDocumentByContent(
       );
 
       if (documentSplitFound) {
-        console.log('documentSplitFound: ', documentSplitFound);
         return documentSplitFound;
       }
     }
@@ -59,16 +69,15 @@ function getDocumentByContent(
     );
 
     return documentFound || null;
-  } catch (error) {
-    console.error('Erro ao processar documentos:', error);
+  } catch {
     return null;
   }
 }
 
 function getListDocumentByContent(
   contentRegex: RegExp,
-  moviments: any[],
-  documents: any[],
+  moviments: Moviment[],
+  documents: DocumentItem[],
 ) {
   try {
     const targetMoviments = moviments.filter((moviment) =>
@@ -94,7 +103,6 @@ function getListDocumentByContent(
         );
 
         if (documentSplitFounds?.length) {
-          console.log('documentSplitFound: ', documentSplitFounds);
           return documentSplitFounds;
         }
       }
@@ -110,8 +118,7 @@ function getListDocumentByContent(
     }
 
     return documentFounds || null;
-  } catch (error) {
-    console.error('Erro ao processar documentos:', error);
+  } catch {
     return null;
   }
 }

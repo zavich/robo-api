@@ -28,7 +28,7 @@ export class LawsuitValidationService {
   async execute(number: string, step: string, isAll: boolean) {
     try {
       if (isAll) {
-        console.log('Executing Lawsuit Validation');
+        this.logger.log('Executing Lawsuit Validation');
         const processes = await this.processModule.aggregate([
           {
             $lookup: {
@@ -88,8 +88,8 @@ export class LawsuitValidationService {
                 },
               },
             );
-            console.log(`Processing: ${process.number}`);
-            return this.nextStepsService.execute(step, {
+            this.logger.log(`Processing: ${process.number}`);
+            await this.nextStepsService.execute(step, {
               processNumber: process.number,
               mainProcessId:
                 process.class === 'MAIN' ? process._id : process.processMain,
@@ -97,7 +97,7 @@ export class LawsuitValidationService {
           }),
         );
       } else {
-        const process: any = await this.processModule
+        const process = await this.processModule
           .findOne({ number })
           .populate({ path: 'processStatus', populate: ['step'] });
         await this.processModule.findByIdAndUpdate(
@@ -125,22 +125,22 @@ export class LawsuitValidationService {
         if (!process) {
           throw new Error('Process not found');
         }
-        console.log(`Processing: ${process.number} ${step}`);
-        if (process.processStatus.step.slug === 'step-0') {
+        this.logger.log(`Processing: ${process.number} ${step}`);
+        if ((process.processStatus as any).step?.slug === 'step-0') {
           return this.insertProcessService.fetchProcessExtract(
             process.number,
             process,
           );
         }
         if (step) {
-          return this.nextStepsService.execute(step, {
+          return await this.nextStepsService.execute(step, {
             processNumber: process.number,
             mainProcessId:
               process.class === 'MAIN' ? process._id : process.processMain,
           });
         }
 
-        return this.nextStepsService.execute(process.processStatus.step.slug, {
+        return await this.nextStepsService.execute((process.processStatus as any).step?.slug, {
           processNumber: process.number,
           mainProcessId:
             process.class === 'MAIN' ? process._id : process.processMain,

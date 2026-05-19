@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import mongoose, { Model } from 'mongoose';
-import { BulkUpdateDTO } from '../dtos/bulk-update.dto';
+import mongoose, { FilterQuery, Model } from 'mongoose';
+import { BulkUpdateDTO, BulkUpdateFilters } from '../dtos/bulk-update.dto';
 import { Process } from '../schema/process.schema';
 import { ProcessOwner } from '../schema/process-owner.schema';
 import { LossReasonsService } from './loss-reasons-service';
@@ -47,7 +47,7 @@ export class BulkUpdateService {
     }
 
     const processIds = processes.map((p) => p._id);
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     // Preparar atualizações
     if (updates.stage) {
@@ -107,7 +107,7 @@ export class BulkUpdateService {
   }
 
   private async bulkUpdateOwners(
-    processIds: any[],
+    processIds: mongoose.Types.ObjectId[],
     newOwnerId: string,
     requestingUserId: string,
   ) {
@@ -129,8 +129,8 @@ export class BulkUpdateService {
     await this.processOwnerModel.insertMany(newOwners);
   }
 
-  private async buildQuery(filters: any) {
-    const query: any = {};
+  private async buildQuery(filters: BulkUpdateFilters) {
+    const query: FilterQuery<Process> = {};
 
     // Filtro de busca
     if (filters.search && filters.search.trim() !== '') {
@@ -147,7 +147,7 @@ export class BulkUpdateService {
 
     // Filtro de datas
     if (filters.startDate || filters.endDate) {
-      const dateFilter: any = {};
+      const dateFilter: Record<string, Date> = {};
       if (filters.startDate) dateFilter.$gte = new Date(filters.startDate);
       if (filters.endDate) {
         const endDateTime = new Date(filters.endDate);
