@@ -2,9 +2,11 @@ import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
 import { z } from 'zod';
 
 const runValidationSchema = z.object({
-  number: z.string().min(1, 'Número do processo é obrigatório'),
+  lawsuits: z.array(z.string()).default([]),
   step: z.string().min(1, 'Step é obrigatório'),
   isAll: z.boolean().optional().default(false),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
 });
 
 type RunValidationDTO = z.infer<typeof runValidationSchema>;

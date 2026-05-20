@@ -3,9 +3,19 @@ import { BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Prompt } from 'src/modules/process/schema/prompt.schema';
+import { Storage } from '@google-cloud/storage';
 
 export class VertexAIService {
   private readonly logger = new Logger(VertexAIService.name);
+
+  credentials = {
+    type: 'service_account',
+    project_id: process.env.GOOGLE_PROJECT_ID,
+    private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    client_id: process.env.GOOGLE_CLIENT_ID,
+  };
 
   constructor(
     @InjectModel(Prompt.name)
@@ -124,9 +134,47 @@ export class VertexAIService {
       throw error;
     }
   }
+  async uploadS3ToGCS(s3Url: string, fileName: string) {
+    const storage = new Storage({
+      projectId: process.env.GOOGLE_PROJECT_ID,
+      credentials: this.credentials,
+    });
+
+    const bucket = storage.bucket('robo-raspagem-temp');
+    // baixa do S3
+    const response = await fetch(s3Url);
+
+    if (!response.ok) {
+      throw new Error('Erro ao baixar arquivo do S3');
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+
+    const buffer = Buffer.from(arrayBuffer);
+
+    // upload para GCS
+    const file = bucket.file(fileName);
+
+    await file.save(buffer, {
+      metadata: {
+        contentType: 'application/pdf',
+      },
+    });
+
+    return `gs://robo-raspagem-temp/${fileName}`;
+  }
+  async deleteFileFromGCS(fileName: string) {
+    const storage = new Storage({
+      projectId: process.env.GOOGLE_PROJECT_ID,
+      credentials: this.credentials,
+    });
+
+    const bucket = storage.bucket('robo-raspagem-temp');
+    await bucket.file(fileName).delete();
+  }
 
   public async getPromptProcessoPrincipal(): Promise<string> {
-    return await this.getPromptByType('PeticaoInicial');
+    return await this.getPromptByType('petição de sindicato');
   }
 
   public getPromptExecucaoProvisoria(): string {

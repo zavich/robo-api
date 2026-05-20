@@ -25,11 +25,32 @@ export class LawsuitValidationService {
     private readonly stepService: Model<Step>,
   ) {}
 
-  async execute(number: string, step: string, isAll: boolean) {
+  async execute(
+    lawsuits: string[],
+    step: string,
+    isAll: boolean,
+    startDate: string,
+    endDate: string,
+  ) {
     try {
       if (isAll) {
         this.logger.log('Executing Lawsuit Validation');
+        const start = new Date(`${startDate}T00:00:00.000-03:00`);
+        const end = new Date(`${endDate}T23:59:59.999-03:00`);
+
         const processes = await this.processModule.aggregate([
+          {
+            $match: {
+              documents: {
+                $exists: true,
+                $ne: [],
+              },
+              createdAt: {
+                $gte: start,
+                $lte: end,
+              },
+            },
+          },
           {
             $lookup: {
               from: 'processstatuses',
@@ -49,102 +70,99 @@ export class LawsuitValidationService {
           },
           { $unwind: '$processStatus.step' },
           {
-            $match: {
-              'processStatus.errorReason':
-                'Documento da petição inicial não encontrado ou não acessível',
-              instanciasAutosWithDocs: { $size: 0 },
-            },
+            $limit: 1,
           },
-          { $limit: 2 },
         ]);
         const findStep = await this.stepService.findOne({
           slug: step,
         });
-
-        await Promise.all(
-          processes.map(async (process) => {
-            if (process.instanciasAutosWithDocs.length > 0) {
-              this.logger.warn(
-                `Process ${process.number} already has documents in the autos`,
-              );
-              return;
-            }
-            await this.processModule.findByIdAndUpdate(
-              process._id,
-              {
-                $set: {
-                  situation: Situation.PENDING,
-                },
-              },
-              { new: true },
+        for (const process of processes) {
+          if (process.documents?.length === 0) {
+            this.logger.log(
+              `Process ${process.number} has no documents, skipping...`,
             );
-            await this.processStatusService.findByIdAndUpdate(
-              process.processStatus._id,
-              {
-                $set: {
-                  log: null,
-                  errorReason: null,
-                  step: findStep._id,
-                },
+            continue;
+          }
+          await this.processModule.findByIdAndUpdate(
+            process._id,
+            {
+              $set: {
+                situation: Situation.PENDING,
               },
-            );
-            this.logger.log(`Processing: ${process.number}`);
-            await this.nextStepsService.execute(step, {
-              processNumber: process.number,
-              mainProcessId:
-                process.class === 'MAIN' ? process._id : process.processMain,
-            });
-          }),
-        );
-      } else {
-        const process = await this.processModule
-          .findOne({ number })
-          .populate({ path: 'processStatus', populate: ['step'] });
-        await this.processModule.findByIdAndUpdate(
-          process._id,
-          {
-            $set: {
-              situation: 'IN_PROGRESS',
             },
-          },
-          { new: true },
-        );
-        const findStep = await this.stepService.findOne({
-          slug: step,
-        });
-        await this.processStatusService.findByIdAndUpdate(
-          process.processStatus._id,
-          {
-            $set: {
-              log: null,
-              errorReason: null,
-              step: findStep._id,
-            },
-          },
-        );
-        if (!process) {
-          throw new Error('Process not found');
-        }
-        this.logger.log(`Processing: ${process.number} ${step}`);
-        if ((process.processStatus as any).step?.slug === 'step-0') {
-          return this.insertProcessService.fetchProcessExtract(
-            process.number,
-            process,
+            { new: true },
           );
-        }
-        if (step) {
-          return await this.nextStepsService.execute(step, {
+          await this.processStatusService.findByIdAndUpdate(
+            process.processStatus._id,
+            {
+              $set: {
+                log: null,
+                errorReason: null,
+                step: findStep._id,
+              },
+            },
+          );
+          this.logger.log(`Processing: ${process.number}`);
+          await this.nextStepsService.execute(step, {
             processNumber: process.number,
             mainProcessId:
               process.class === 'MAIN' ? process._id : process.processMain,
           });
         }
-
-        return await this.nextStepsService.execute((process.processStatus as any).step?.slug, {
-          processNumber: process.number,
-          mainProcessId:
-            process.class === 'MAIN' ? process._id : process.processMain,
-        });
+      } else {
+        for (const number of lawsuits) {
+          const process = await this.processModule
+            .findOne({ number })
+            .populate({ path: 'processStatus', populate: ['step'] });
+          if (!process || process.documents?.length === 0) {
+            this.logger.log(
+              `Process ${number} not found or has no documents, skipping...`,
+            );
+            continue;
+          }
+          await this.processModule.findByIdAndUpdate(
+            process._id,
+            {
+              $set: {
+                situation: 'IN_PROGRESS',
+              },
+            },
+            { new: true },
+          );
+          const findStep = await this.stepService.findOne({
+            slug: step,
+          });
+          await this.processStatusService.findByIdAndUpdate(
+            (process.processStatus as { _id: string })._id,
+            {
+              $set: {
+                log: null,
+                errorReason: null,
+                step: findStep._id,
+              },
+            },
+          );
+          this.logger.log(`Processing: ${process.number} ${step}`);
+          const currentStepSlug = (process.processStatus as { step?: { slug?: string } }).step?.slug;
+          if (currentStepSlug === 'step-0') {
+            await this.insertProcessService.fetchProcessExtract(
+              process.number,
+              process,
+            );
+          } else if (step) {
+            await this.nextStepsService.execute(step, {
+              processNumber: process.number,
+              mainProcessId:
+                process.class === 'MAIN' ? process._id : process.processMain,
+            });
+          } else if (currentStepSlug) {
+            await this.nextStepsService.execute(currentStepSlug, {
+              processNumber: process.number,
+              mainProcessId:
+                process.class === 'MAIN' ? process._id : process.processMain,
+            });
+          }
+        }
       }
     } catch (error) {
       this.logger.error(error);

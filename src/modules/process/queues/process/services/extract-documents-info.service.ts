@@ -14,6 +14,7 @@ import { normalizeString } from 'src/utils/normalize-string';
 interface ExtractionResult {
   status: 'COMPLETED' | 'ERROR' | 'SKIPPED';
 }
+
 @Injectable()
 export class ExtractDocumentsInfoService {
   private readonly logger = new Logger(ExtractDocumentsInfoService.name);
@@ -29,6 +30,7 @@ export class ExtractDocumentsInfoService {
     private readonly processStatusModule: Model<ProcessStatus>,
     private readonly awsService: AwsServices,
   ) {}
+
   async execute(lawsuit: string) {
     try {
       const processFound = await this.lawsuitModel.findOne({
@@ -41,6 +43,7 @@ export class ExtractDocumentsInfoService {
           log: 'Extração de documentos finalizada',
         },
       );
+
       const promptPeticaoInicial =
         processFound.class === 'MAIN'
           ? await this.vertexAIService.getPromptProcessoPrincipal()
@@ -48,6 +51,7 @@ export class ExtractDocumentsInfoService {
       const promptPlanilhaCalc = await this.promptModel.findOne({
         type: 'PlanilhaCalculo',
       });
+
       const [resultPeticao, resultPlanilha] = await Promise.all([
         this.extractDocument(
           processFound?.documents,
@@ -59,7 +63,7 @@ export class ExtractDocumentsInfoService {
           processFound?.documents,
           lawsuit,
           /.*planilha.*de.*calculo.*/i,
-          promptPlanilhaCalc.text,
+          promptPlanilhaCalc?.text ?? '',
         ),
       ]);
 
@@ -87,12 +91,18 @@ export class ExtractDocumentsInfoService {
       this.logger.error('Erro ao extrair dados do vertex: ', error);
     }
   }
+
   async extractDocument(
     documents: RestrictedDocument[],
     lawsuit: string,
     type: RegExp,
     prompt: string,
   ): Promise<ExtractionResult> {
+    if (!documents) {
+      this.logger.log('Nenhum documento encontrado no processo.');
+      return { status: 'SKIPPED' };
+    }
+
     const documentFound = documents.filter((doc) =>
       type.test(normalizeString(doc.title)),
     );
@@ -114,12 +124,18 @@ export class ExtractDocumentsInfoService {
           { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
         );
 
+        const gsKey = `${lawsuit}_${document.temp_link}_${Date.now()}`;
+
         try {
           const signedUrl = await this.awsService.getSignedUrlS3(
             document.temp_link,
           );
-          const response = await this.vertexAIService.executeWithRetry(
+          const gsUri = await this.vertexAIService.uploadS3ToGCS(
             signedUrl,
+            gsKey,
+          );
+          const response = await this.vertexAIService.executeWithRetry(
+            gsUri,
             prompt,
           );
 
@@ -140,6 +156,12 @@ export class ExtractDocumentsInfoService {
           );
           this.logger.error('Erro ao extrair dados do vertex: ', error);
           return false;
+        } finally {
+          await this.vertexAIService.deleteFileFromGCS(gsKey).catch((err) =>
+            this.logger.warn(
+              `Falha ao deletar ${gsKey} do GCS: ${err?.message ?? err}`,
+            ),
+          );
         }
       }),
     );

@@ -321,9 +321,11 @@ export class ProcessController {
   ) {
     try {
       return await this.lawsuitValidationService.execute(
-        body.number,
+        body.lawsuits,
         body.step,
         body.isAll,
+        body.startDate,
+        body.endDate,
       );
     } catch (error) {
       throw error;

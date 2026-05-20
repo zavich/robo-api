@@ -198,21 +198,6 @@ export class SolvencyValidationService {
         },
       );
       this.logger.debug('AGUARDANDO EXTRAÇÃO DE DOCUMENTOS');
-      // if (findProcess.processStatus.name) {
-      // } else {
-      //   this.logger.log('Processo já possui documentos');
-      //   const step = await this.stepModule.findOne({
-      //     slug: 'step-4',
-      //   });
-      //   await this.processStatusModule.findByIdAndUpdate(
-      //     findProcess.processStatus,
-      //     {
-      //       step: step?._id,
-      //       name: 'Extração finalizada',
-      //       log: '',
-      //     },
-      //   );
-      // }
     } catch (error) {
       this.logger.error(`Erro ao validar processo ${processNumber}`, error);
       throw error; // Mantemos o throw para o Bull capturar o erro no job
