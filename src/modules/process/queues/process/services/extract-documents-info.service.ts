@@ -51,16 +51,6 @@ export class ExtractDocumentsInfoService {
         prompt: promptPeticaoInicial,
       });
 
-      // const promptPlanilhaCalc = await this.promptModel.findOne({
-      //   type: 'PlanilhaCalculo',
-      // });
-      // if (promptPlanilhaCalc) {
-      //   documentsToProcess.push({
-      //     type: /.*planilha.*de.*calculo.*/i,
-      //     prompt: promptPlanilhaCalc.text,
-      //   });
-      // }
-
       // Usando for...of para garantir processamento sequencial com sleep
       for (const docInfo of documentsToProcess) {
         await this.extractDocument(
@@ -71,8 +61,6 @@ export class ExtractDocumentsInfoService {
         );
         await sleep(5000); // Adiciona um intervalo de 5 segundos entre as chamadas
       }
-
-      this.logger.log('START EXTRACT DOCUMENT JOB: ' + lawsuit);
       this.nextStepsService.execute('step-4', { processNumber: lawsuit });
     } catch (error) {
       console.log('Error ao extrair dados do vertex: ', error);
@@ -89,8 +77,8 @@ export class ExtractDocumentsInfoService {
       return;
     }
     // Garantir que apenas o primeiro documento correspondente seja processado
-    const document = documents.find(
-      (doc) => type.test(normalizeString(doc.title)) && doc.data === undefined,
+    const document = documents.find((doc) =>
+      type.test(normalizeString(doc.title)),
     );
 
     if (!document) {

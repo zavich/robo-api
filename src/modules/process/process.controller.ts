@@ -290,7 +290,7 @@ export class ProcessController {
   async runLawsuitValidation(
     @Body()
     body: {
-      number: string;
+      lawsuits: string[];
       step: string;
       isAll: boolean;
       startDate: string;
@@ -299,7 +299,7 @@ export class ProcessController {
   ) {
     try {
       return await this.lawsuitValidationService.execute(
-        body.number,
+        body.lawsuits,
         body.step,
         body.isAll,
         body.startDate,

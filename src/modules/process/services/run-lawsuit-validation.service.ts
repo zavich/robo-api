@@ -26,7 +26,7 @@ export class LawsuitValidationService {
   ) {}
 
   async execute(
-    number: string,
+    lawsuits: string[],
     step: string,
     isAll: boolean,
     startDate: string,
@@ -69,6 +69,9 @@ export class LawsuitValidationService {
             },
           },
           { $unwind: '$processStatus.step' },
+          {
+            $limit: 1,
+          },
         ]);
         const findStep = await this.stepService.findOne({
           slug: step,
@@ -107,60 +110,62 @@ export class LawsuitValidationService {
           });
         }
       } else {
-        const process: any = await this.processModule
-          .findOne({ number })
-          .populate({ path: 'processStatus', populate: ['step'] });
-        if (process.documents?.length === 0) {
-          console.log(
-            `Process ${process.number} has no documents, skipping...`,
-          );
-          return;
-        }
-        await this.processModule.findByIdAndUpdate(
-          process._id,
-          {
-            $set: {
-              situation: 'IN_PROGRESS',
+        for (const number of lawsuits) {
+          const process: any = await this.processModule
+            .findOne({ number })
+            .populate({ path: 'processStatus', populate: ['step'] });
+          if (!process || process.documents?.length === 0) {
+            console.log(
+              `Process ${number} not found or has no documents, skipping...`,
+            );
+            continue;
+          }
+          await this.processModule.findByIdAndUpdate(
+            process._id,
+            {
+              $set: {
+                situation: 'IN_PROGRESS',
+              },
             },
-          },
-          { new: true },
-        );
-        const findStep = await this.stepService.findOne({
-          slug: step,
-        });
-        await this.processStatusService.findByIdAndUpdate(
-          process.processStatus._id,
-          {
-            $set: {
-              log: null,
-              errorReason: null,
-              step: findStep._id,
-            },
-          },
-        );
-        if (!process) {
-          throw new Error('Process not found');
-        }
-        console.log(`Processing: ${process.number} ${step}`);
-        if (process.processStatus.step.slug === 'step-0') {
-          return this.insertProcessService.fetchProcessExtract(
-            process.number,
-            process,
+            { new: true },
           );
-        }
-        if (step) {
-          return this.nextStepsService.execute(step, {
-            processNumber: process.number,
-            mainProcessId:
-              process.class === 'MAIN' ? process._id : process.processMain,
+          const findStep = await this.stepService.findOne({
+            slug: step,
           });
-        }
+          await this.processStatusService.findByIdAndUpdate(
+            process.processStatus._id,
+            {
+              $set: {
+                log: null,
+                errorReason: null,
+                step: findStep._id,
+              },
+            },
+          );
 
-        return this.nextStepsService.execute(process.processStatus.step.slug, {
-          processNumber: process.number,
-          mainProcessId:
-            process.class === 'MAIN' ? process._id : process.processMain,
-        });
+          console.log(`Processing: ${process.number} ${step}`);
+          if (process.processStatus.step.slug === 'step-0') {
+            await this.insertProcessService.fetchProcessExtract(
+              process.number,
+              process,
+            );
+          } else if (step) {
+            await this.nextStepsService.execute(step, {
+              processNumber: process.number,
+              mainProcessId:
+                process.class === 'MAIN' ? process._id : process.processMain,
+            });
+          } else {
+            await this.nextStepsService.execute(
+              process.processStatus.step.slug,
+              {
+                processNumber: process.number,
+                mainProcessId:
+                  process.class === 'MAIN' ? process._id : process.processMain,
+              },
+            );
+          }
+        }
       }
     } catch (error) {
       this.logger.error(error);

@@ -171,7 +171,7 @@ export class VertexAIService {
   }
 
   public async getPromptProcessoPrincipal(): Promise<string> {
-    return await this.getPromptByType('PeticaoInicial');
+    return await this.getPromptByType('petição de sindicato');
   }
 
   public getPromptExecucaoProvisoria(): string {
