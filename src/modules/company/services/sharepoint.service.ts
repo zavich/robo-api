@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import Redis from 'ioredis';
 
 @Injectable()
 export class SharePointService {
   private readonly logger = new Logger(SharePointService.name);
+  private readonly tokenCacheKey = 'sharepoint:token';
 
   private readonly siteId = process.env.MICROSOFT_SITE_ID;
 
@@ -11,14 +13,12 @@ export class SharePointService {
 
   private readonly itemId = process.env.MICROSOFT_ITEM_ID;
 
-  private cachedToken: string | null = null;
-  private tokenExpiresAt = 0;
+  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
 
   async getAccessToken(): Promise<string> {
-    const now = Date.now();
-    // Reutiliza token enquanto tiver mais de 60s de validade
-    if (this.cachedToken && now < this.tokenExpiresAt - 60_000) {
-      return this.cachedToken;
+    const cachedToken = await this.redis.get(this.tokenCacheKey);
+    if (cachedToken) {
+      return cachedToken;
     }
 
     const params = new URLSearchParams();
@@ -32,11 +32,13 @@ export class SharePointService {
       params,
     );
 
-    this.cachedToken = response.data.access_token as string;
-    const expiresIn: number = (response.data.expires_in ?? 3600) * 1000;
-    this.tokenExpiresAt = now + expiresIn;
+    const accessToken = response.data.access_token as string;
+    const expiresInSeconds = Number(response.data.expires_in ?? 3600);
+    const ttl = Math.max(60, expiresInSeconds - 300);
 
-    return this.cachedToken;
+    await this.redis.set(this.tokenCacheKey, accessToken, 'EX', ttl);
+
+    return accessToken;
   }
 
   async downloadSolvenciaXLSX(): Promise<Buffer> {

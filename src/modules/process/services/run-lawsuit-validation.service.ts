@@ -9,6 +9,7 @@ import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Step } from '../schema/step.schema';
 import { InsertProcessService } from '../queues/process/services/insert-process.service';
+import { ProcessStateMachineService } from './process-state-machine.service';
 
 @Injectable()
 export class LawsuitValidationService {
@@ -23,6 +24,7 @@ export class LawsuitValidationService {
     private readonly processStatusService: Model<ProcessStatus>,
     @InjectModel(Step.name)
     private readonly stepService: Model<Step>,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
   async execute(
@@ -92,14 +94,13 @@ export class LawsuitValidationService {
             },
             { new: true },
           );
-          await this.processStatusService.findByIdAndUpdate(
+          await this.processStateMachine.transition(
+            this.processStatusService,
             process.processStatus._id,
             {
-              $set: {
-                log: null,
-                errorReason: null,
-                step: findStep._id,
-              },
+              log: null,
+              errorReason: null,
+              step: findStep._id,
             },
           );
           this.logger.log(`Processing: ${process.number}`);
@@ -132,14 +133,13 @@ export class LawsuitValidationService {
           const findStep = await this.stepService.findOne({
             slug: step,
           });
-          await this.processStatusService.findByIdAndUpdate(
-            (process.processStatus as { _id: string })._id,
+          await this.processStateMachine.transition(
+            this.processStatusService,
+            ((process.processStatus as unknown) as { _id: string })._id,
             {
-              $set: {
-                log: null,
-                errorReason: null,
-                step: findStep._id,
-              },
+              log: null,
+              errorReason: null,
+              step: findStep._id,
             },
           );
           this.logger.log(`Processing: ${process.number} ${step}`);

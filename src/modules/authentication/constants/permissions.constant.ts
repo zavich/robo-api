@@ -19,8 +19,8 @@ export const ROLE_PERMISSIONS: Record<string, Record<Permission, boolean>> = {
     view_all_processes: true,
   },
   advogado: {
-    change_stage: false,
-    create_activity: false,
+    change_stage: true,
+    create_activity: true,
     user_management: false,
     mass_edit: false,
     process_insertion: false,

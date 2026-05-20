@@ -55,7 +55,7 @@
 - **Auth**: `ApiKeyAuthGuard`
 - **Body (Zod)**: `{ processes: string[] }` — array de numeros CNJ
 - **Response**: `{ message: 'Processes added to queue for processing.' }` ou `{ message: 'All processes already exist in database.' }`
-- **Side effect**: enfileira jobs `insert-process` em `process-queue`
+- **Side effect**: enfileira jobs `insert-process` em `insert-process-queue`
 
 ### GET /v1/process
 
@@ -91,13 +91,13 @@
 
 ### POST /v1/process/webhook
 
-- **Auth**: nenhuma
+- **Auth**: `ServiceWebhookGuard` via header `x-service-key` (ou bearer/query key legado)
 - **Body**: `Root` interface (callback do scraping-fetch-robo — ver `specs/inter-service.md`)
 - **Response**: 200 OK
 
 ### POST /v1/process/webhook-pipedrive/
 
-- **Auth**: nenhuma
+- **Auth**: `ServiceWebhookGuard` via `PIPEDRIVE_WEBHOOK_KEY` (fallback para `WEBHOOK_SERVICE_KEY`)
 - **Body**: `{ num_processo: string, deal_id: number, stage_id: number }`
 - **Side effect**: enfileira job `insert-process`
 

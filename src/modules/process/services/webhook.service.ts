@@ -29,21 +29,22 @@ export class WebhookService {
     private readonly trtHandler: WebhookTrtHandler,
   ) {}
 
-  async execute(body: Root) {
-    this.logger.log(`Recebendo requisição de ${body.numero_processo}`);
+  async execute(body: Root, correlationId?: string) {
+    this.logger.log(
+      `Recebendo webhook de ${body.numero_processo} (correlationId=${correlationId ?? 'n/a'})`,
+    );
 
-    // Idempotência: ignora webhooks duplicados recebidos em menos de 30s (BUG-009)
-    const idempotencyKey = `webhook:idempotency:${body.numero_processo}:${body.status}`;
+    const idempotencyKey = this.buildIdempotencyKey(body);
     const alreadyProcessing = await this.redis.set(
       idempotencyKey,
       '1',
       'EX',
-      30,
+      60 * 60 * 24,
       'NX',
     );
     if (!alreadyProcessing) {
       this.logger.warn(
-        `Webhook duplicado ignorado para ${body.numero_processo} (status: ${body.status})`,
+        `Webhook duplicado ignorado para ${body.numero_processo} (status: ${body.status}, key=${idempotencyKey})`,
       );
       return;
     }
@@ -57,6 +58,7 @@ export class WebhookService {
         this.logger.error(
           `Processo de número ${body.numero_processo} não encontrado!`,
         );
+        await this.redis.del(idempotencyKey).catch(() => undefined);
         return;
       }
 
@@ -65,19 +67,59 @@ export class WebhookService {
       );
 
       if (body.status === 'NAO_ENCONTRADO') {
-        await this.naoEncontradoHandler.handle(body, findProcess as unknown as ProcessEntity & { _id: string; processStatus: { _id: string } }, step);
+        await this.naoEncontradoHandler.handle(
+          body,
+          findProcess as unknown as ProcessEntity & {
+            _id: string;
+            processStatus: { _id: string };
+          },
+          step,
+          correlationId,
+        );
       } else if (body.status === 'ERRO') {
-        await this.erroHandler.handle(body, findProcess as unknown as ProcessEntity & { _id: string; processStatus: { _id: string } });
+        await this.erroHandler.handle(
+          body,
+          findProcess as unknown as ProcessEntity & {
+            _id: string;
+            processStatus: { _id: string };
+          },
+          correlationId,
+        );
       } else {
         const origem = body.tribunal.sigla.toLowerCase();
         if (origem.includes('tst')) {
-          await this.tstHandler.handle(body, findProcess as unknown as ProcessEntity & { _id: string });
+          await this.tstHandler.handle(
+            body,
+            findProcess as unknown as ProcessEntity & { _id: string },
+          );
         } else if (origem.includes('trt')) {
-          await this.trtHandler.handle(body, findProcess as unknown as ProcessEntity & { _id: Types.ObjectId; processStatus: { _id: string } }, step);
+          await this.trtHandler.handle(
+            body,
+            findProcess as unknown as ProcessEntity & {
+              _id: Types.ObjectId;
+              processStatus: { _id: string };
+            },
+            step,
+            correlationId,
+          );
         }
       }
     } catch (error) {
       this.logger.error(`Erro ao processar a requisição: ${error.message}`);
+      await this.redis.del(idempotencyKey).catch(() => undefined);
+      throw error;
     }
+  }
+
+  private buildIdempotencyKey(body: Root): string {
+    if (body.webhookId) {
+      return `webhook:${body.webhookId}`;
+    }
+
+    this.logger.warn(
+      `Webhook ${body.numero_processo} chegou sem webhookId; usando fallback legado.`,
+    );
+
+    return `webhook:fallback:${body.numero_processo}:${body.status}`;
   }
 }

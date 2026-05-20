@@ -87,7 +87,7 @@ export class InitialPetitionService {
           })
           .populate({ path: 'companyId' });
         const company = claimed?.companyId as Company;
-        this.pipedriveService.updateApprovedLawsuit(
+        await this.pipedriveService.updateApprovedLawsuit(
           complainant.name,
           company.name,
           processFound.dealId,

@@ -7,6 +7,7 @@ import { Root } from '../../interfaces/process.interface';
 import { ProcessStatus } from '../../schema/process-status.schema';
 import { Process as ProcessEntity, Situation } from '../../schema/process.schema';
 import { Step } from '../../schema/step.schema';
+import { ProcessStateMachineService } from '../process-state-machine.service';
 
 interface PopulatedProcessStatus {
   _id: string;
@@ -28,12 +29,14 @@ export class WebhookNaoEncontradoHandler {
     @InjectModel(ProcessStatus.name)
     private readonly processStatusModel: Model<ProcessStatus>,
     private readonly nextStepsService: NextStepsService,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
   async handle(
     body: Root,
     findProcess: ProcessEntity & { _id: string; processStatus: { _id: string } },
     step: Step,
+    correlationId?: string,
   ): Promise<void> {
     if (findProcess.sentToRecords === 'SENT') {
       await this.processModel.updateOne(
@@ -55,7 +58,10 @@ export class WebhookNaoEncontradoHandler {
       if (findLawsuitProvisional?.processStatus) {
         await this.nextStepsService.execute(
           findLawsuitProvisional.processStatus.step.slug,
-          { processNumber: findLawsuitProvisional.number },
+          {
+            processNumber: findLawsuitProvisional.number,
+            correlationId,
+          },
         );
       }
     }
@@ -68,7 +74,10 @@ export class WebhookNaoEncontradoHandler {
       if (mainProcess?.processStatus?.step.slug === 'step-3') {
         await this.nextStepsService.execute(
           mainProcess.processStatus.step.slug,
-          { processNumber: mainProcess.number },
+          {
+            processNumber: mainProcess.number,
+            correlationId,
+          },
         );
         this.logger.log(
           'Processo provisorio não encontrado, seguindo com principal',
@@ -77,7 +86,8 @@ export class WebhookNaoEncontradoHandler {
       return;
     }
 
-    await this.processStatusModel.findByIdAndUpdate(
+    await this.processStateMachine.transition(
+      this.processStatusModel,
       findProcess.processStatus._id,
       {
         name: PROCESSSTATUSENUM.ERROR,

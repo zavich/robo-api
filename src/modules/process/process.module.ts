@@ -75,6 +75,8 @@ import { SolvencyValidationWorker } from './queues/workers/solvency-validation.w
 import { ExtractDocumentWorker } from './queues/workers/extract-document.worker';
 import { InitialPetitionWorker } from './queues/workers/initial-petition.worker';
 import { BullModule } from '@nestjs/bullmq';
+import { ServiceWebhookGuard } from './guards/service-webhook.guard';
+import { ProcessStateMachineService } from './services/process-state-machine.service';
 
 @Module({
   imports: [
@@ -175,6 +177,8 @@ import { BullModule } from '@nestjs/bullmq';
     WebhookErroHandler,
     WebhookTstHandler,
     WebhookTrtHandler,
+    ServiceWebhookGuard,
+    ProcessStateMachineService,
     InsertProcessWorker,
     ProcessValidationWorker,
     SolvencyValidationWorker,

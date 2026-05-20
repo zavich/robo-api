@@ -9,8 +9,10 @@ import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
-    origin: process.env.FRONTEND_URL
-      ? process.env.FRONTEND_URL.split(',')
+    origin: (process.env.CORS_ORIGINS || process.env.FRONTEND_URL)
+      ? (process.env.CORS_ORIGINS || process.env.FRONTEND_URL)!
+          .split(',')
+          .map((origin) => origin.trim())
       : ['http://localhost:3000'],
     credentials: true,
   },

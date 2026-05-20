@@ -23,9 +23,10 @@ Use este mapa quando a task envolver autenticacao, JWT, API Key, usuarios ou rol
 
 - JwtStrategy: estrategia Passport para validar JWT.
 - ApiKeyAuthGuard: guard para autenticacao por API Key (header Authorization).
+- ServiceWebhookGuard: guard dedicado para webhooks internos entre servicos.
 - User schema: email, password (hashed), role, isActive.
 
 ## Riscos e cuidados
 
 - Mudanca no JWT secret invalida todos os tokens ativos.
-- ApiKeyAuthGuard e usado para webhooks e integracao entre servicos.
+- Webhooks internos nao passam por JWT: dependem de `WEBHOOK_SERVICE_KEY` / `PIPEDRIVE_WEBHOOK_KEY`.

@@ -15,6 +15,7 @@ import { InsertProcessService } from '../queues/process/services/insert-process.
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Step } from '../schema/step.schema';
 import { PROCESSSTATUSENUM } from '../enums/process-status.enum';
+import { ProcessStateMachineService } from './process-state-machine.service';
 
 @Injectable()
 export class RunListLawsuitsValidationService {
@@ -28,6 +29,7 @@ export class RunListLawsuitsValidationService {
     private readonly processStatusService: Model<ProcessStatus>,
     @InjectModel(Step.name)
     private readonly stepService: Model<Step>,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
   async execute(
     lawsuits: string[],
@@ -129,18 +131,16 @@ export class RunListLawsuitsValidationService {
           { new: true },
         );
         const findStep = await this.stepService.findOne({ slug: 'step-1' });
-        await this.processStatusService.findByIdAndUpdate(
+        await this.processStateMachine.transition(
+          this.processStatusService,
           proc.processStatus._id,
           {
-            $set: {
-              name: documents
-                ? PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
-                : PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
-              step: findStep._id,
-              errorReason: '',
-            },
+            name: documents
+              ? PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
+              : PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
+            step: findStep._id,
+            errorReason: '',
           },
-          { new: true },
         );
         return this.insertProcessService.fetchProcessExtract(
           proc.number,

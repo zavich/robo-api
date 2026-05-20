@@ -7,6 +7,7 @@ import {
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import Redis from 'ioredis';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller()
 export class AppController {
@@ -16,6 +17,7 @@ export class AppController {
   ) {}
 
   @Get('health')
+  @SkipThrottle()
   async health() {
     const checks: Record<string, string> = {};
     let healthy = true;
@@ -30,7 +32,12 @@ export class AppController {
 
     // Redis check
     try {
-      await this.redis.ping();
+      await Promise.race([
+        this.redis.ping(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Redis ping timeout')), 3000),
+        ),
+      ]);
       checks.redis = 'ok';
     } catch {
       checks.redis = 'degraded';

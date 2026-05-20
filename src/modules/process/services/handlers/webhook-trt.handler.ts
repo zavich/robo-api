@@ -31,6 +31,7 @@ export class WebhookTrtHandler {
     body: Root,
     findProcess: ProcessEntity & { _id: Types.ObjectId; processStatus: { _id: string } },
     step: Step,
+    correlationId?: string,
   ): Promise<void> {
     const oldMoviments = {
       primeiroGrau:
@@ -73,9 +74,24 @@ export class WebhookTrtHandler {
       ) || [];
 
     if (!(body?.opcoes as Record<string, unknown> | undefined)?.autos) {
-      await this.handleWithoutAutos(body, findProcess, step, oldMoviments, definedClass, moviments);
+      await this.handleWithoutAutos(
+        body,
+        findProcess,
+        step,
+        oldMoviments,
+        definedClass,
+        moviments,
+        correlationId,
+      );
     } else {
-      await this.handleWithAutos(body, findProcess, step, definedClass, moviments);
+      await this.handleWithAutos(
+        body,
+        findProcess,
+        step,
+        definedClass,
+        moviments,
+        correlationId,
+      );
     }
   }
 
@@ -86,6 +102,7 @@ export class WebhookTrtHandler {
     oldMoviments: OldMoviments,
     definedClass: string,
     moviments: MovimentWithInstancia[],
+    correlationId?: string,
   ): Promise<void> {
     await this.processModel.findByIdAndUpdate(findProcess._id, {
       instancias: body?.resposta?.instancias,
@@ -102,6 +119,7 @@ export class WebhookTrtHandler {
     this.logger.log('Body:', body.numero_processo);
     await this.nextStepsService.execute(step.slug, {
       processNumber: body.numero_processo,
+      correlationId,
     });
   }
 
@@ -111,6 +129,7 @@ export class WebhookTrtHandler {
     step: Step,
     definedClass: string,
     moviments: MovimentWithInstancia[],
+    correlationId?: string,
   ): Promise<void> {
     this.logger.log('Processo com autos encontrado');
     const docs = body.resposta?.instancias[0].documentos;
@@ -140,7 +159,10 @@ export class WebhookTrtHandler {
         this.logger.log(
           `Processo de execução provisória encontrado na base para processo principal ${findProcess.number}`,
         );
-        await this.nextStepsService.execute(step.slug, body);
+        await this.nextStepsService.execute(step.slug, {
+          ...body,
+          correlationId,
+        });
         return;
       }
     }
@@ -156,11 +178,12 @@ export class WebhookTrtHandler {
         if (populatedMainProcess?.processStatus?.step.slug === 'step-3') {
           await this.nextStepsService.execute(
             populatedMainProcess.processStatus.step.slug,
-            { processNumber: mainProcess.number },
+            { processNumber: mainProcess.number, correlationId },
           );
         } else {
           await this.nextStepsService.execute(step.slug, {
             processNumber: findProcess.number,
+            correlationId,
           });
         }
         return;
@@ -170,7 +193,10 @@ export class WebhookTrtHandler {
     this.logger.log(
       `Seguindo com processo ${body?.resposta?.numero_unico}`,
     );
-    await this.nextStepsService.execute(step.slug, body);
+    await this.nextStepsService.execute(step.slug, {
+      ...body,
+      correlationId,
+    });
   }
 
   isProvisionalExecution(classProcess?: string): boolean {

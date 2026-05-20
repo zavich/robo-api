@@ -18,9 +18,10 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request as ExpressRequest, Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
 import { CheckPermissions } from '../authentication/decorators/check-permissions.decorator';
+import { ServiceWebhookGuard } from './guards/service-webhook.guard';
 import {
   ChangeStageSchemaBody,
   changeStageSchemaPipe,
@@ -176,9 +177,13 @@ export class ProcessController {
   }
   @Post('webhook')
   @HttpCode(200)
-  async webhook(@Body() body: Root) {
+  @UseGuards(ServiceWebhookGuard)
+  async webhook(
+    @Body() body: Root,
+    @Request() req: ExpressRequest & { correlationId?: string },
+  ) {
     try {
-      await this.webhookService.execute(body);
+      await this.webhookService.execute(body, req.correlationId);
     } catch (error) {
       throw error;
     }
@@ -349,6 +354,7 @@ export class ProcessController {
     }
   }
   @Post('webhook-pipedrive/')
+  @UseGuards(ServiceWebhookGuard)
   async webhookPipedrive(
     @Body(webhookPipedriveSchemaPipe) body: WebhookPipedriveSchemaBody,
   ) {

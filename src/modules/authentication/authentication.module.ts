@@ -8,6 +8,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LoginService } from './services/login.service';
 import { AuthenticationController } from './authentication.controller';
 import { SignUpService } from './services/sign-up.service';
+import type { StringValue } from 'ms';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -23,7 +24,8 @@ import { SignUpService } from './services/sign-up.service';
         return {
           secret: config.get<string>('JWT_SECRET_KEY'),
           signOptions: {
-            expiresIn: config.get<string | number>('JWT_EXPIRES_IN'),
+            expiresIn:
+              (config.get<string>('JWT_EXPIRES_IN') as StringValue) ?? '1d',
           },
         };
       },

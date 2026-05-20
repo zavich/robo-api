@@ -9,6 +9,7 @@ import { Step } from 'src/modules/process/schema/step.schema';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { normalizeString } from 'src/utils/normalize-string';
 import { Process as ProcessEntity } from '../../../schema/process.schema';
+import { ProcessStateMachineService } from 'src/modules/process/services/process-state-machine.service';
 
 @Injectable()
 export class ProcessValidationService {
@@ -20,6 +21,7 @@ export class ProcessValidationService {
     @InjectModel(ProcessEntity.name)
     private readonly processModule: Model<ProcessEntity>,
     private readonly nextStepsService: NextStepsService,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
   async execute(number) {
@@ -74,7 +76,8 @@ export class ProcessValidationService {
   private async createOrUpdateProcessStatus(step: Step, process: ProcessEntity) {
     const findNextStep = await this.stepModule.findOne({ slug: step.next });
 
-    return await this.processStatusModule.findByIdAndUpdate(
+    return await this.processStateMachine.transition(
+      this.processStatusModule,
       process?.processStatus?._id,
       {
         step: findNextStep?._id,

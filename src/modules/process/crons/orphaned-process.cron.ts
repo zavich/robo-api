@@ -7,6 +7,7 @@ import { Model } from 'mongoose';
 import { PROCESSSTATUSENUM } from '../enums/process-status.enum';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Process as ProcessEntity } from '../schema/process.schema';
+import { ProcessStateMachineService } from '../services/process-state-machine.service';
 
 // Processos presos em estados intermediários por mais de 2 horas (BUG-010)
 const ORPHAN_THRESHOLD_MS = 2 * 60 * 60 * 1000;
@@ -29,6 +30,7 @@ export class OrphanedProcessCron {
     private readonly processStatusModel: Model<ProcessStatus>,
     @InjectQueue('insert-process-queue')
     private readonly processQueue: Queue,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
   @Cron('0 */30 * * * *') // A cada 30 minutos
@@ -63,10 +65,14 @@ export class OrphanedProcessCron {
           );
 
           // Atualiza o processStatus para indicar re-processamento
-          await this.processStatusModel.findByIdAndUpdate(proc.processStatus, {
-            name: PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
-            log: 'Reprocessando processo órfão',
-          });
+          await this.processStateMachine.transition(
+            this.processStatusModel,
+            proc.processStatus,
+            {
+              name: PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
+              log: 'Reprocessando processo órfão',
+            },
+          );
 
           // Re-adiciona à fila com o job 'insert-process'
           await this.processQueue.add('insert-process', {

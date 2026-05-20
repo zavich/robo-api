@@ -1,5 +1,9 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Queue } from 'bullmq';
 
 @Injectable()
@@ -20,15 +24,15 @@ export class NextStepsService {
   ) {}
 
   private async checkBackpressure(queue: Queue, queueName: string): Promise<void> {
-    const { waiting, delayed } = await queue.getJobCounts();
-    const pending = waiting + delayed;
+    const { waiting, delayed, active } = await queue.getJobCounts();
+    const pending = waiting + delayed + active;
     const threshold = Number(process.env.MAX_QUEUE_PENDING ?? 500);
 
     if (pending >= threshold) {
       this.logger.warn(
         `Backpressure: fila '${queueName}' tem ${pending} jobs pendentes (max ${threshold}). Job rejeitado.`,
       );
-      throw new Error(
+      throw new ServiceUnavailableException(
         `Backpressure: fila '${queueName}' tem ${pending} jobs pendentes (max ${threshold}). Job rejeitado.`,
       );
     }

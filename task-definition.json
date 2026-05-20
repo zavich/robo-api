@@ -101,6 +101,14 @@
           "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod-0d7y3k:SCRAPING_BASE_URL::"
         },
         {
+          "name": "WEBHOOK_SERVICE_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod-0d7y3k:WEBHOOK_SERVICE_KEY::"
+        },
+        {
+          "name": "PIPEDRIVE_WEBHOOK_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod-0d7y3k:PIPEDRIVE_WEBHOOK_KEY::"
+        },
+        {
           "name": "REDIS_URL",
           "valueFrom": "arn:aws:secretsmanager:us-east-2:339340413604:secret:robo-api/prod-0d7y3k:REDIS_URL::"
         },

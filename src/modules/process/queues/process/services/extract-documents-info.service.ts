@@ -10,6 +10,7 @@ import { AwsServices } from 'src/service/aws/aws.service';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
 import { normalizeString } from 'src/utils/normalize-string';
+import { ProcessStateMachineService } from '../../../services/process-state-machine.service';
 
 interface ExtractionResult {
   status: 'COMPLETED' | 'ERROR' | 'SKIPPED';
@@ -29,6 +30,7 @@ export class ExtractDocumentsInfoService {
     @InjectModel(ProcessStatus.name)
     private readonly processStatusModule: Model<ProcessStatus>,
     private readonly awsService: AwsServices,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
   async execute(lawsuit: string) {
@@ -36,7 +38,8 @@ export class ExtractDocumentsInfoService {
       const processFound = await this.lawsuitModel.findOne({
         number: lawsuit,
       });
-      await this.processStatusModule.findByIdAndUpdate(
+      await this.processStateMachine.transition(
+        this.processStatusModule,
         processFound.processStatus,
         {
           name: PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED,
@@ -68,17 +71,18 @@ export class ExtractDocumentsInfoService {
       ]);
 
       const results = [resultPeticao, resultPlanilha];
-      const allFailed = results.every((r) => r.status === 'ERROR');
+      const hasSuccess = results.some((r) => r.status === 'COMPLETED');
 
-      if (allFailed) {
+      if (!hasSuccess) {
         this.logger.error(
-          `Todos os documentos falharam na extração para ${lawsuit}. Pipeline não avança.`,
+          `Nenhum documento foi extraído com sucesso para ${lawsuit}. Pipeline não avança.`,
         );
-        await this.processStatusModule.findByIdAndUpdate(
+        await this.processStateMachine.transition(
+          this.processStatusModule,
           processFound.processStatus,
           {
             name: PROCESSSTATUSENUM.ERROR,
-            log: 'Todos os documentos falharam na extração',
+            log: 'Nenhum documento foi extraído com sucesso',
             errorReason: 'Falha na extração de documentos via Vertex AI',
           },
         );
@@ -112,59 +116,59 @@ export class ExtractDocumentsInfoService {
       return { status: 'SKIPPED' };
     }
 
-    const results = await Promise.all(
-      documentFound.map(async (document) => {
-        if (document.data) {
-          return true;
-        }
+    const results: boolean[] = [];
+    for (const document of documentFound) {
+      if (document.data) {
+        results.push(true);
+        continue;
+      }
 
-        // Marcar documento como PROCESSING
-        await this.lawsuitModel.updateOne(
-          { number: lawsuit, 'documents._id': document._id },
-          { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
+      // Evita bursts de requests no Vertex sob alta carga.
+      await this.lawsuitModel.updateOne(
+        { number: lawsuit, 'documents._id': document._id },
+        { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
+      );
+
+      const gsKey = `${lawsuit}_${document.temp_link}_${Date.now()}`;
+
+      try {
+        const signedUrl = await this.awsService.getSignedUrlS3(
+          document.temp_link,
+        );
+        const gsUri = await this.vertexAIService.uploadS3ToGCS(
+          signedUrl,
+          gsKey,
+        );
+        const response = await this.vertexAIService.executeWithRetry(
+          gsUri,
+          prompt,
         );
 
-        const gsKey = `${lawsuit}_${document.temp_link}_${Date.now()}`;
-
-        try {
-          const signedUrl = await this.awsService.getSignedUrlS3(
-            document.temp_link,
-          );
-          const gsUri = await this.vertexAIService.uploadS3ToGCS(
-            signedUrl,
-            gsKey,
-          );
-          const response = await this.vertexAIService.executeWithRetry(
-            gsUri,
-            prompt,
-          );
-
-          await this.lawsuitModel.updateOne(
-            { number: lawsuit, 'documents._id': document._id },
-            {
-              $set: {
-                'documents.$.data': response,
-                'documents.$.status': StatusExtractionInsight.COMPLETED,
-              },
+        await this.lawsuitModel.updateOne(
+          { number: lawsuit, 'documents._id': document._id },
+          {
+            $set: {
+              'documents.$.data': response,
+              'documents.$.status': StatusExtractionInsight.COMPLETED,
             },
-          );
-          return true;
-        } catch (error) {
-          await this.lawsuitModel.updateOne(
-            { number: lawsuit, 'documents._id': document._id },
-            { $set: { 'documents.$.status': StatusExtractionInsight.ERROR } },
-          );
-          this.logger.error('Erro ao extrair dados do vertex: ', error);
-          return false;
-        } finally {
-          await this.vertexAIService.deleteFileFromGCS(gsKey).catch((err) =>
-            this.logger.warn(
-              `Falha ao deletar ${gsKey} do GCS: ${err?.message ?? err}`,
-            ),
-          );
-        }
-      }),
-    );
+          },
+        );
+        results.push(true);
+      } catch (error) {
+        await this.lawsuitModel.updateOne(
+          { number: lawsuit, 'documents._id': document._id },
+          { $set: { 'documents.$.status': StatusExtractionInsight.ERROR } },
+        );
+        this.logger.error('Erro ao extrair dados do vertex: ', error);
+        results.push(false);
+      } finally {
+        await this.vertexAIService.deleteFileFromGCS(gsKey).catch((err) =>
+          this.logger.warn(
+            `Falha ao deletar ${gsKey} do GCS: ${err?.message ?? err}`,
+          ),
+        );
+      }
+    }
 
     const hasSuccess = results.some((r) => r === true);
     return { status: hasSuccess ? 'COMPLETED' : 'ERROR' };

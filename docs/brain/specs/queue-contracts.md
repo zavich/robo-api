@@ -1,8 +1,8 @@
 # Queue Contracts
 
-## Fila unica: `process-queue`
+## Fila principal: `insert-process-queue`
 
-Todos os jobs de processamento passam por uma unica fila BullMQ com jobs nomeados.
+Todos os jobs de processamento do `robo-api` passam pela fila `insert-process-queue` com jobs nomeados por step.
 
 ---
 
@@ -110,13 +110,13 @@ insert-process
                   → step-9: simple-calc
 ```
 
-Cada step e um job separado na mesma fila `process-queue`. A progressao e gerenciada pelo `NextStepsService` que le o campo `step.next` da collection Steps para determinar o proximo job.
+Cada step e um job separado na mesma fila `insert-process-queue`. A progressao e gerenciada pelo `NextStepsService` que le o campo `step.next` da collection Steps para determinar o proximo job.
 
 ### NextStepsService — detalhes internos
 
 **Arquivo**: `src/service/next-steps/next-steps.service.ts`
-**Modulo**: `NextStepsModule` (registra `process-queue` via BullModule, exporta o service)
-**Injecao**: `@InjectQueue('process-queue') Queue`
+**Modulo**: `NextStepsModule` (registra `insert-process-queue` via BullModule, exporta o service)
+**Injecao**: `@InjectQueue('insert-process-queue') Queue`
 
 **Metodo `execute(step: string, data: any)`**:
 

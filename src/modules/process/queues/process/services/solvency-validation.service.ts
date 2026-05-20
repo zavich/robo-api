@@ -24,6 +24,7 @@ import { Company } from 'src/modules/process/schema/company.schema';
 import { ProcessStatus } from 'src/modules/process/schema/process-status.schema';
 import { Process as ProcessEntity } from 'src/modules/process/schema/process.schema';
 import { Step } from 'src/modules/process/schema/step.schema';
+import { ProcessStateMachineService } from 'src/modules/process/services/process-state-machine.service';
 import { sleep } from 'src/utils/sleep';
 
 @Injectable()
@@ -39,6 +40,7 @@ export class SolvencyValidationService {
     private readonly claimedProcessesModule: Model<ClaimedProcesses>,
     @InjectModel(ProcessEntity.name)
     private readonly processModule: Model<ProcessEntity>,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
   async execute(processNumber) {
     try {
@@ -190,7 +192,8 @@ export class SolvencyValidationService {
       const step = await this.stepModule.findOne({
         slug: nextStep,
       });
-      await this.processStatusModule.findByIdAndUpdate(
+      await this.processStateMachine.transition(
+        this.processStatusModule,
         findProcess.processStatus,
         {
           step: step?._id,
