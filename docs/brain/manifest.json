@@ -1,0 +1,108 @@
+{
+  "version": 2,
+  "entrypoint": "docs/brain/INDEX.md",
+  "adapters": [],
+  "core": {
+    "project": "docs/brain/project.md",
+    "architecture": "docs/brain/architecture.md",
+    "applicationMap": "docs/brain/application-map.md",
+    "coverage": "docs/brain/coverage.md",
+    "debugIndex": "docs/brain/debug-index.md",
+    "riskMap": "docs/brain/risk-map.md",
+    "taskRouter": "docs/brain/task-router.md",
+    "testMatrix": "docs/brain/test-matrix.md"
+  },
+  "features": {
+    "process-management": {
+      "docs": ["docs/brain/features/process-management.md"],
+      "entrypoints": [
+        "src/modules/process/process.controller.ts",
+        "src/modules/process/process.module.ts"
+      ]
+    },
+    "process-queue": {
+      "docs": ["docs/brain/features/process-queue.md"],
+      "workflows": ["docs/brain/workflows/debug-process-queue.md"],
+      "entrypoints": [
+        "src/modules/process/queues/process/index.ts"
+      ]
+    },
+    "document-insights": {
+      "docs": ["docs/brain/features/document-insights.md"],
+      "entrypoints": [
+        "src/modules/process/services/documents/",
+        "src/service/vertex/vertex-AI.service.ts"
+      ]
+    },
+    "pipedrive-integration": {
+      "docs": ["docs/brain/features/pipedrive-integration.md"],
+      "entrypoints": [
+        "src/modules/pipedrive/pipedrive.controller.ts",
+        "src/service/pipedrive/"
+      ]
+    },
+    "auth-users": {
+      "docs": ["docs/brain/features/auth-users.md"],
+      "entrypoints": [
+        "src/modules/authentication/authentication.controller.ts",
+        "src/modules/user/user.controller.ts"
+      ]
+    },
+    "notifications": {
+      "docs": ["docs/brain/features/notifications.md"],
+      "entrypoints": [
+        "src/modules/notification/notification.controller.ts",
+        "src/gateway/notifications.gateway.ts"
+      ]
+    },
+    "company-module": {
+      "docs": ["docs/brain/features/company-module.md"],
+      "entrypoints": [
+        "src/modules/company/company.controller.ts",
+        "src/modules/company/services/sharepoint.service.ts",
+        "src/modules/company/services/document.service.ts"
+      ]
+    }
+  },
+  "specs": {
+    "apiContracts": "docs/brain/specs/api-contracts.md",
+    "dataSchemas": "docs/brain/specs/data-schemas.md",
+    "queueContracts": "docs/brain/specs/queue-contracts.md",
+    "envVars": "docs/brain/specs/env-vars.md",
+    "interService": "docs/brain/specs/inter-service.md",
+    "authSystem": "docs/brain/specs/auth-system.md"
+  },
+  "engineering": {
+    "conventions": "docs/brain/engineering/conventions.md",
+    "testing": "docs/brain/engineering/testing.md",
+    "infrastructure": "docs/brain/engineering/infrastructure.md",
+    "dataModel": "docs/brain/engineering/data-model.md"
+  },
+  "runtimeDocs": {
+    "redis": "docs/brain/runtime/redis.md",
+    "websocket": "docs/brain/runtime/websocket.md"
+  },
+  "generatedDocs": {
+    "readme": "docs/brain/generated/README.md"
+  },
+  "incidents": {
+    "readme": "docs/brain/incidents/README.md",
+    "template": "docs/brain/templates/incident.md"
+  },
+  "runbooks": [
+    "docs/brain/runbooks/README.md"
+  ],
+  "decisions": [
+    "docs/brain/decisions/README.md",
+    "docs/brain/decisions/ADR-0001-brain-progressivo.md"
+  ],
+  "templates": [
+    "docs/brain/templates/runbook.md",
+    "docs/brain/templates/decision.md",
+    "docs/brain/templates/incident.md"
+  ],
+  "globalWorkflows": [
+    "docs/brain/workflows/investigacao-progressiva.md",
+    "docs/brain/workflows/debug-process-queue.md"
+  ]
+}
