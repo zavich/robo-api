@@ -14,13 +14,13 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      AWS_REGION: sa-east-1
-      ECR_REGISTRY: 339340413604.dkr.ecr.sa-east-1.amazonaws.com
-      ECR_REPOSITORY: robo-api
-      ECS_CLUSTER: robo-cluster
-      ECS_SERVICE: robo-api-service
-      TASK_FAMILY: robo-api
-      CONTAINER_NAME: robo-api
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+      TASK_FAMILY: ${{ secrets.TASK_FAMILY }}
+      CONTAINER_NAME: ${{ secrets.CONTAINER_NAME }}
 
     steps:
       - name: Checkout
@@ -61,8 +61,8 @@ jobs:
             --arg APP_ENV "production" \
             --arg NODE_ENV "production" \
             --arg API_URL "${{ secrets.API_URL }}" \
-            --arg TASK_ROLE "arn:aws:iam::339340413604:role/robo-task-role" \
-            --arg EXEC_ROLE "arn:aws:iam::339340413604:role/ecsTaskExecutionRole" \
+            --arg TASK_ROLE "${{ secrets.TASK_ROLE_ARN }}" \
+            --arg EXEC_ROLE "${{ secrets.EXECUTION_ROLE_ARN }}" \
             '
             .taskRoleArn = $TASK_ROLE
             | .executionRoleArn = $EXEC_ROLE

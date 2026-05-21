@@ -2,13 +2,16 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { ServiceWebhookGuard } from './service-webhook.guard';
 
 describe('ServiceWebhookGuard', () => {
   let guard: ServiceWebhookGuard;
+  let reflector: Reflector;
 
   beforeEach(() => {
-    guard = new ServiceWebhookGuard();
+    reflector = new Reflector();
+    guard = new ServiceWebhookGuard(reflector);
     process.env.WEBHOOK_SERVICE_KEY = 'service-secret';
     process.env.PIPEDRIVE_WEBHOOK_KEY = 'pipedrive-secret';
   });
@@ -16,13 +19,22 @@ describe('ServiceWebhookGuard', () => {
   afterEach(() => {
     delete process.env.WEBHOOK_SERVICE_KEY;
     delete process.env.PIPEDRIVE_WEBHOOK_KEY;
+    jest.restoreAllMocks();
   });
 
-  function makeContext(request: Record<string, unknown>) {
+  function makeContext(
+    request: Record<string, unknown>,
+    metadata?: 'service' | 'pipedrive',
+  ) {
+    if (metadata) {
+      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(metadata);
+    }
     return {
       switchToHttp: () => ({
         getRequest: () => request,
       }),
+      getHandler: () => () => undefined,
+      getClass: () => class {},
     } as any;
   }
 
@@ -57,6 +69,21 @@ describe('ServiceWebhookGuard', () => {
         path: '/v1/process/webhook-pipedrive/',
         query: {},
       }),
+    );
+
+    expect(canActivate).toBe(true);
+  });
+
+  it('uses metadata when present to pick the secret bucket', () => {
+    const canActivate = guard.canActivate(
+      makeContext(
+        {
+          headers: { authorization: 'Bearer pipedrive-secret' },
+          path: '/v1/process/webhook',
+          query: {},
+        },
+        'pipedrive',
+      ),
     );
 
     expect(canActivate).toBe(true);

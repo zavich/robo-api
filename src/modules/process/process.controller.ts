@@ -22,6 +22,7 @@ import { Request as ExpressRequest, Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
 import { CheckPermissions } from '../authentication/decorators/check-permissions.decorator';
 import { ServiceWebhookGuard } from './guards/service-webhook.guard';
+import { WebhookSourceMetadata } from './decorators/webhook-source.decorator';
 import {
   ChangeStageSchemaBody,
   changeStageSchemaPipe,
@@ -178,6 +179,7 @@ export class ProcessController {
   @Post('webhook')
   @HttpCode(200)
   @UseGuards(ServiceWebhookGuard)
+  @WebhookSourceMetadata('service')
   async webhook(
     @Body() body: Root,
     @Request() req: ExpressRequest & { correlationId?: string },
@@ -306,6 +308,7 @@ export class ProcessController {
   @Post(':id/insert-execution')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   async insertExecution(
     @Param('id') id: string,
     @Body(insertExecutionSchemaPipe) body: InsertExecutionSchemaBody,
@@ -321,6 +324,7 @@ export class ProcessController {
   @Post('run-lawsuit-validation')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   async runLawsuitValidation(
     @Body(runValidationSchemaPipe) body: RunValidationSchemaBody,
   ) {
@@ -355,6 +359,7 @@ export class ProcessController {
   }
   @Post('webhook-pipedrive/')
   @UseGuards(ServiceWebhookGuard)
+  @WebhookSourceMetadata('pipedrive')
   async webhookPipedrive(
     @Body(webhookPipedriveSchemaPipe) body: WebhookPipedriveSchemaBody,
   ) {
@@ -366,6 +371,7 @@ export class ProcessController {
   }
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   @Post('run-documents-insights')
   async runDocumentsInsights(
     @Body(runDocumentsInsightsSchemaPipe)
@@ -383,6 +389,7 @@ export class ProcessController {
     }
   }
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   @Post('run-lawsuits')
   async runLawsuitsList(
     @Body(runLawsuitsSchemaPipe) body: RunLawsuitsSchemaBody,
@@ -417,6 +424,7 @@ export class ProcessController {
   @Delete(':number/documents/:documentId')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   async deleteDocumentInsights(
     @Param('number') number: string,
     @Param('documentId') documentId: number,
@@ -495,6 +503,7 @@ export class ProcessController {
   @Patch(':number/update')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
   async updateLawsuit(
     @Param('number') number: string,
     @Body(updateProcessSchemaPipe) body: UpdateProcessSchemaBody,
@@ -580,6 +589,7 @@ export class ProcessController {
   @Post('upload-xml')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('mass_edit')
   @UseInterceptors(FileInterceptor('file'))
   async atualizarSolvencia(@UploadedFile() file: Express.Multer.File) {
     if (!file) {

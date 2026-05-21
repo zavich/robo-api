@@ -12,6 +12,22 @@ import { WebhookNaoEncontradoHandler } from './handlers/webhook-nao-encontrado.h
 import { WebhookTrtHandler } from './handlers/webhook-trt.handler';
 import { WebhookTstHandler } from './handlers/webhook-tst.handler';
 
+type IdempotencyAcquisition =
+  | { acquired: true; previousState: 'NEW' | 'FAILED' | 'FAILED_PROCESS_NOT_FOUND' }
+  | { acquired: false; currentState: string };
+
+const ACQUIRE_IDEMPOTENCY_SCRIPT = `
+local key = KEYS[1]
+local ttl = ARGV[1]
+local current = redis.call("GET", key)
+if not current or current == "FAILED" or current == "FAILED_PROCESS_NOT_FOUND" then
+  redis.call("SET", key, "PROCESSING", "EX", ttl)
+  if current then return current end
+  return "NEW"
+end
+return current
+`;
+
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
@@ -35,19 +51,19 @@ export class WebhookService {
     );
 
     const idempotencyKey = this.buildIdempotencyKey(body);
-    const alreadyProcessing = await this.redis.set(
-      idempotencyKey,
-      'PROCESSING',
-      'EX',
-      60 * 60 * 24,
-      'NX',
-    );
-    if (!alreadyProcessing) {
-      const currentState = await this.redis.get(idempotencyKey);
+    const acquisition = await this.acquireIdempotencyLock(idempotencyKey);
+
+    if (acquisition.acquired === false) {
       this.logger.warn(
-        `Webhook duplicado ignorado para ${body.numero_processo} (status: ${body.status}, key=${idempotencyKey}, state=${currentState ?? 'unknown'})`,
+        `Webhook duplicado ignorado para ${body.numero_processo} (status: ${body.status}, key=${idempotencyKey}, state=${acquisition.currentState})`,
       );
       return;
+    }
+
+    if (acquisition.previousState !== 'NEW') {
+      this.logger.warn(
+        `Retentando webhook ${body.numero_processo} apos estado ${acquisition.previousState}`,
+      );
     }
 
     try {
@@ -124,5 +140,27 @@ export class WebhookService {
     }
 
     return `webhook:${body.webhookId}`;
+  }
+
+  private async acquireIdempotencyLock(
+    idempotencyKey: string,
+  ): Promise<IdempotencyAcquisition> {
+    const ttlSeconds = 60 * 60 * 24;
+    const result = (await this.redis.eval(
+      ACQUIRE_IDEMPOTENCY_SCRIPT,
+      1,
+      idempotencyKey,
+      ttlSeconds.toString(),
+    )) as string;
+
+    if (
+      result === 'NEW' ||
+      result === 'FAILED' ||
+      result === 'FAILED_PROCESS_NOT_FOUND'
+    ) {
+      return { acquired: true, previousState: result };
+    }
+
+    return { acquired: false, currentState: result };
   }
 }

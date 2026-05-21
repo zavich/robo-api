@@ -75,7 +75,10 @@ describe('WebhookErroHandler', () => {
     expect(processModel.findOneAndUpdate).toHaveBeenCalledWith(
       {
         _id: 'proc-id',
-        scraperRetryCount: { $lt: 3 },
+        $or: [
+          { scraperRetryCount: { $exists: false } },
+          { scraperRetryCount: { $lt: 3 } },
+        ],
       },
       { $inc: { scraperRetryCount: 1 } },
       { new: true },

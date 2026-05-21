@@ -35,7 +35,10 @@ export class WebhookErroHandler {
     const updatedProcess = await this.processModel.findOneAndUpdate(
       {
         _id: findProcess._id,
-        scraperRetryCount: { $lt: MAX_SCRAPER_RETRIES },
+        $or: [
+          { scraperRetryCount: { $exists: false } },
+          { scraperRetryCount: { $lt: MAX_SCRAPER_RETRIES } },
+        ],
       },
       {
         $inc: { scraperRetryCount: 1 },

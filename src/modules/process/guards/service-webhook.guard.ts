@@ -5,8 +5,13 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { timingSafeEqual } from 'crypto';
 import { Request } from 'express';
+import {
+  WEBHOOK_SOURCE_KEY,
+  WebhookSource,
+} from '../decorators/webhook-source.decorator';
 
 function safeEquals(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left);
@@ -21,10 +26,13 @@ function safeEquals(left: string, right: string): boolean {
 
 @Injectable()
 export class ServiceWebhookGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
+
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
+    const source = this.resolveSource(context, request);
     const providedSecret = this.extractSecret(request);
-    const expectedSecrets = this.getExpectedSecrets(request);
+    const expectedSecrets = this.getExpectedSecrets(source);
 
     if (expectedSecrets.length === 0) {
       throw new ServiceUnavailableException(
@@ -47,6 +55,24 @@ export class ServiceWebhookGuard implements CanActivate {
     return true;
   }
 
+  private resolveSource(
+    context: ExecutionContext,
+    request: Request,
+  ): WebhookSource {
+    const annotated = this.reflector.getAllAndOverride<WebhookSource>(
+      WEBHOOK_SOURCE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (annotated) {
+      return annotated;
+    }
+
+    const routePath = this.normalizePath(
+      request.path ?? request.originalUrl ?? '',
+    );
+    return routePath.endsWith('/webhook-pipedrive') ? 'pipedrive' : 'service';
+  }
+
   private extractSecret(request: Request): string | null {
     const headerSecret = request.headers['x-service-key'];
     if (typeof headerSecret === 'string' && headerSecret.length > 0) {
@@ -66,10 +92,9 @@ export class ServiceWebhookGuard implements CanActivate {
     return null;
   }
 
-  private getExpectedSecrets(request: Request): string[] {
-    const routePath = this.normalizePath(request.path ?? request.originalUrl ?? '');
+  private getExpectedSecrets(source: WebhookSource): string[] {
     const secrets =
-      routePath.endsWith('/webhook-pipedrive')
+      source === 'pipedrive'
         ? [process.env.PIPEDRIVE_WEBHOOK_KEY, process.env.WEBHOOK_SERVICE_KEY]
         : [process.env.WEBHOOK_SERVICE_KEY];
 

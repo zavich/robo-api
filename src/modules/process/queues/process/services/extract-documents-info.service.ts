@@ -82,6 +82,9 @@ export class ExtractDocumentsInfoService {
         return;
       }
 
+      this.logger.log('START EXTRACT DOCUMENT JOB: ' + lawsuit);
+      await this.nextStepsService.execute('step-4', { processNumber: lawsuit });
+
       await this.processStateMachine.transition(
         this.processStatusModule,
         processFound.processStatus,
@@ -90,9 +93,6 @@ export class ExtractDocumentsInfoService {
           log: 'Extração de documentos finalizada',
         },
       );
-
-      this.logger.log('START EXTRACT DOCUMENT JOB: ' + lawsuit);
-      await this.nextStepsService.execute('step-4', { processNumber: lawsuit });
     } catch (error) {
       this.logger.error('Erro ao extrair dados do vertex: ', error);
       throw error;
