@@ -74,4 +74,29 @@ describe('RoleAuditService', () => {
       'Roles nao mapeadas encontradas na base: consultor',
     );
   });
+
+  it('ignora a auditoria quando AUTH_AUDIT_SKIP=true', async () => {
+    const userModel = makeUserModel();
+    userModel.distinct.mockResolvedValue(['consultor']);
+    const configService = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') {
+          return 'staging';
+        }
+        if (key === 'AUTH_AUDIT_SKIP') {
+          return 'true';
+        }
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+    const service = new RoleAuditService(userModel as any, configService);
+    const warnSpy = jest
+      .spyOn<any, any>(service['logger'], 'warn')
+      .mockImplementation(() => undefined);
+
+    await service.onModuleInit();
+
+    expect(userModel.distinct).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
 });

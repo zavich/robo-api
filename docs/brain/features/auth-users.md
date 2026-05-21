@@ -18,8 +18,9 @@ Use este mapa quando a task envolver autenticacao, JWT, API Key, usuarios ou rol
 3. JWT gerado com `JWT_SECRET_KEY` e `JWT_EXPIRES_IN`.
 4. Rotas protegidas por `JwtAuthGuard` ou `ApiKeyAuthGuard`.
 5. Roles: ADMIN (acesso total), ADVOGADO (acesso restrito).
-6. Roles desconhecidas falham em modo fechado (`permissions: []`) e geram warning via `Logger` no login, no `JwtStrategy` e no `/auth/me`.
+6. Roles desconhecidas falham em modo fechado (`permissions: []`) e geram warning na validacao JWT.
 7. `RoleAuditService` roda no bootstrap, consulta `distinct('role')` na base e alerta sobre roles fora do mapa conhecido. Com `AUTH_STRICT_ROLE_AUDIT=true`, o bootstrap falha.
+8. `AUTH_AUDIT_SKIP=true` permite desabilitar explicitamente a auditoria de bootstrap em ambientes de staging/migracao.
 
 ## Conceitos
 
@@ -33,3 +34,4 @@ Use este mapa quando a task envolver autenticacao, JWT, API Key, usuarios ou rol
 - Mudanca no JWT secret invalida todos os tokens ativos.
 - Webhooks internos nao passam por JWT: dependem de `WEBHOOK_SERVICE_KEY` / `PIPEDRIVE_WEBHOOK_KEY`.
 - Roles fora do mapa conhecido nao ganham fallback permissivo; o bootstrap agora alerta automaticamente e pode falhar em modo estrito.
+- `AUTH_STRICT_ROLE_AUDIT=true` sem saneamento previo da base impede o servico de subir.

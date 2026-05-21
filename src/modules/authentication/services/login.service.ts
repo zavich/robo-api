@@ -4,7 +4,6 @@ import {
   HttpStatus,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -15,15 +14,13 @@ import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { User } from 'src/modules/user/schema/user.schema';
 import { AuthDto } from '../dto/auth.dto';
-import { getPermissionsForRole, isKnownRole } from '../constants/permissions.constant';
+import { getPermissionsForRole } from '../constants/permissions.constant';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 15 * 60; // 15 minutos
 
 @Injectable()
 export class LoginService {
-  private readonly logger = new Logger(LoginService.name);
-
   constructor(
     @InjectModel(User.name)
     private userModel: Model<User>,
@@ -63,11 +60,6 @@ export class LoginService {
       await this.redis.del(attemptsKey);
 
       const jti = randomUUID();
-      if (!isKnownRole(user.role)) {
-        this.logger.warn(
-          `Login de usuario com role nao mapeada: ${user.email} (${user.role})`,
-        );
-      }
       const permissions = getPermissionsForRole(user.role);
       const accessToken = this.jwtService.sign({
         identifier: data.email,

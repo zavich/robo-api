@@ -16,7 +16,10 @@ export class RoleAuditService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    if (this.configService.get<string>('NODE_ENV') === 'test') {
+    if (
+      this.configService.get<string>('NODE_ENV') === 'test' ||
+      this.configService.get<string>('AUTH_AUDIT_SKIP') === 'true'
+    ) {
       return;
     }
 
