@@ -38,14 +38,9 @@ export class ExtractDocumentsInfoService {
       const processFound = await this.lawsuitModel.findOne({
         number: lawsuit,
       });
-      await this.processStateMachine.transition(
-        this.processStatusModule,
-        processFound.processStatus,
-        {
-          name: PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED,
-          log: 'Extração de documentos finalizada',
-        },
-      );
+      if (!processFound) {
+        throw new Error(`Processo ${lawsuit} não encontrado para extração`);
+      }
 
       const promptPeticaoInicial =
         processFound.class === 'MAIN'
@@ -55,20 +50,18 @@ export class ExtractDocumentsInfoService {
         type: 'PlanilhaCalculo',
       });
 
-      const [resultPeticao, resultPlanilha] = await Promise.all([
-        this.extractDocument(
-          processFound?.documents,
-          lawsuit,
-          /.*peticao.*inicial.*/i,
-          promptPeticaoInicial,
-        ),
-        this.extractDocument(
-          processFound?.documents,
-          lawsuit,
-          /.*planilha.*de.*calculo.*/i,
-          promptPlanilhaCalc?.text ?? '',
-        ),
-      ]);
+      const resultPeticao = await this.extractDocument(
+        processFound.documents,
+        lawsuit,
+        /.*peticao.*inicial.*/i,
+        promptPeticaoInicial,
+      );
+      const resultPlanilha = await this.extractDocument(
+        processFound.documents,
+        lawsuit,
+        /.*planilha.*de.*calculo.*/i,
+        promptPlanilhaCalc?.text ?? '',
+      );
 
       const results = [resultPeticao, resultPlanilha];
       const hasSuccess = results.some((r) => r.status === 'COMPLETED');
@@ -89,10 +82,20 @@ export class ExtractDocumentsInfoService {
         return;
       }
 
+      await this.processStateMachine.transition(
+        this.processStatusModule,
+        processFound.processStatus,
+        {
+          name: PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED,
+          log: 'Extração de documentos finalizada',
+        },
+      );
+
       this.logger.log('START EXTRACT DOCUMENT JOB: ' + lawsuit);
       await this.nextStepsService.execute('step-4', { processNumber: lawsuit });
     } catch (error) {
       this.logger.error('Erro ao extrair dados do vertex: ', error);
+      throw error;
     }
   }
 
@@ -123,13 +126,13 @@ export class ExtractDocumentsInfoService {
         continue;
       }
 
-      // Evita bursts de requests no Vertex sob alta carga.
       await this.lawsuitModel.updateOne(
         { number: lawsuit, 'documents._id': document._id },
         { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
       );
 
-      const gsKey = `${lawsuit}_${document.temp_link}_${Date.now()}`;
+      const gsKey = `${lawsuit}_${String(document._id)}`;
+      let uploadedToGcs = false;
 
       try {
         const signedUrl = await this.awsService.getSignedUrlS3(
@@ -139,6 +142,7 @@ export class ExtractDocumentsInfoService {
           signedUrl,
           gsKey,
         );
+        uploadedToGcs = true;
         const response = await this.vertexAIService.executeWithRetry(
           gsUri,
           prompt,
@@ -162,11 +166,13 @@ export class ExtractDocumentsInfoService {
         this.logger.error('Erro ao extrair dados do vertex: ', error);
         results.push(false);
       } finally {
-        await this.vertexAIService.deleteFileFromGCS(gsKey).catch((err) =>
-          this.logger.warn(
-            `Falha ao deletar ${gsKey} do GCS: ${err?.message ?? err}`,
-          ),
-        );
+        if (uploadedToGcs) {
+          await this.vertexAIService.deleteFileFromGCS(gsKey).catch((err) =>
+            this.logger.warn(
+              `Falha ao deletar ${gsKey} do GCS: ${err?.message ?? err}`,
+            ),
+          );
+        }
       }
     }
 

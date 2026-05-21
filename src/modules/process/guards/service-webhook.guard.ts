@@ -67,9 +67,9 @@ export class ServiceWebhookGuard implements CanActivate {
   }
 
   private getExpectedSecrets(request: Request): string[] {
-    const routePath = request.route?.path ?? request.path ?? '';
+    const routePath = request.path ?? request.originalUrl ?? '';
     const secrets =
-      routePath.includes('webhook-pipedrive')
+      routePath.endsWith('/webhook-pipedrive')
         ? [process.env.PIPEDRIVE_WEBHOOK_KEY, process.env.WEBHOOK_SERVICE_KEY]
         : [process.env.WEBHOOK_SERVICE_KEY];
 

@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
-import { Queue } from 'bullmq';
 import { Model } from 'mongoose';
 import { PROCESSSTATUSENUM } from '../enums/process-status.enum';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Process as ProcessEntity } from '../schema/process.schema';
+import { InsertProcessService } from '../queues/process/services/insert-process.service';
 import { ProcessStateMachineService } from '../services/process-state-machine.service';
+import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 
 // Processos presos em estados intermediários por mais de 2 horas (BUG-010)
 const ORPHAN_THRESHOLD_MS = 2 * 60 * 60 * 1000;
@@ -28,8 +28,8 @@ export class OrphanedProcessCron {
     private readonly processModel: Model<ProcessEntity>,
     @InjectModel(ProcessStatus.name)
     private readonly processStatusModel: Model<ProcessStatus>,
-    @InjectQueue('insert-process-queue')
-    private readonly processQueue: Queue,
+    private readonly insertProcessService: InsertProcessService,
+    private readonly nextStepsService: NextStepsService,
     private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
@@ -51,6 +51,9 @@ export class OrphanedProcessCron {
       );
 
       const statusIds = stuckStatuses.map((s) => s._id);
+      const statusNameById = new Map(
+        stuckStatuses.map((status) => [String(status._id), status.name]),
+      );
       const orphanedProcesses = await this.processModel.find({
         processStatus: { $in: statusIds },
       });
@@ -60,6 +63,13 @@ export class OrphanedProcessCron {
 
       for (const proc of orphanedProcesses) {
         try {
+          const currentStatusName = statusNameById.get(String(proc.processStatus));
+          if (!currentStatusName) {
+            throw new Error(
+              `Status atual não encontrado para processo órfão ${proc.number}`,
+            );
+          }
+
           this.logger.warn(
             `[OrphanedProcess] Re-enfileirando processo orfão ${proc.number}`,
           );
@@ -69,15 +79,41 @@ export class OrphanedProcessCron {
             this.processStatusModel,
             proc.processStatus,
             {
-              name: PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
               log: 'Reprocessando processo órfão',
             },
           );
 
-          // Re-adiciona à fila com o job 'insert-process'
-          await this.processQueue.add('insert-process', {
-            processNumber: proc.number,
-          });
+          if (
+            currentStatusName === PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS
+          ) {
+            await this.insertProcessService.fetchProcessExtract(
+              proc.number,
+              proc,
+              false,
+            );
+          } else if (
+            currentStatusName === PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
+          ) {
+            await this.insertProcessService.fetchProcessExtract(
+              proc.number,
+              proc,
+              true,
+            );
+          } else if (
+            currentStatusName ===
+              PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS
+          ) {
+            await this.nextStepsService.execute('step-3', {
+              processNumber: proc.number,
+            });
+          } else if (
+            currentStatusName ===
+              PROCESSSTATUSENUM.EXTRACTION_MOVIMENTS_FINISHED
+          ) {
+            await this.nextStepsService.execute('step-4', {
+              processNumber: proc.number,
+            });
+          }
 
           retried++;
         } catch (err: unknown) {

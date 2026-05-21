@@ -1,8 +1,8 @@
 # Queue Contracts
 
-## Fila principal: `insert-process-queue`
+## Filas de processamento
 
-Todos os jobs de processamento do `robo-api` passam pela fila `insert-process-queue` com jobs nomeados por step.
+O `robo-api` usa filas BullMQ separadas por etapa. O `NextStepsService` roteia cada step para sua fila dedicada.
 
 ---
 
@@ -35,10 +35,10 @@ Todos os jobs de processamento do `robo-api` passam pela fila `insert-process-qu
 
 ## Job: `process-validation` (step-1)
 
-**Producer**: `NextStepsService`
+**Producer**: `NextStepsService`, `WebhookErroHandler` (retry transitório)
 **Consumer**: `ProcessQueue.processValidationJob()`
 
-**Payload**: `{ processNumber: string }`
+**Payload**: `{ processNumber: string, correlationId?: string }`
 
 **Fluxo**: valida dados do processo, envia para TST se aplicavel.
 
@@ -98,48 +98,37 @@ Os seguintes jobs sao enfileirados por `NextStepsService` mas NAO tem consumers 
 Fluxo sequencial de processamento:
 
 ```
-insert-process
-  → step-1: process-validation
-    → step-2: solvency-validation
-      → step-3: extract-document
-        → step-4: initial-petition
-          → step-5: filter-value
-            → step-6: liberation
-              → step-7: parameters
-                → step-8: resources
-                  → step-9: simple-calc
+insert-process-queue / insert-process
+  → process-validation-queue / step-1: process-validation
+    → solvency-validation-queue / step-2: solvency-validation
+      → extract-document-queue / step-3: extract-document
+        → initial-petition-queue / step-4: initial-petition
 ```
 
-Cada step e um job separado na mesma fila `insert-process-queue`. A progressao e gerenciada pelo `NextStepsService` que le o campo `step.next` da collection Steps para determinar o proximo job.
+Cada step e um job separado em sua propria fila. A progressao e gerenciada pelo `NextStepsService` que le o campo `step.next` da collection Steps para determinar o proximo job.
 
 ### NextStepsService — detalhes internos
 
 **Arquivo**: `src/service/next-steps/next-steps.service.ts`
-**Modulo**: `NextStepsModule` (registra `insert-process-queue` via BullModule, exporta o service)
-**Injecao**: `@InjectQueue('insert-process-queue') Queue`
+**Modulo**: `NextStepsModule` (registra `process-validation-queue`, `solvency-validation-queue`, `extract-document-queue`, `initial-petition-queue`)
 
 **Metodo `execute(step: string, data: any)`**:
 
-Roteamento via `switch(true)` no slug do step:
+Roteamento via `switch(step)`:
 
-| step.includes | Job adicionado a fila |
-|--------------|----------------------|
-| `'step-1'` | `process-validation` |
-| `'step-2'` | `solvency-validation` |
-| `'step-3'` | `extract-document` |
-| `'step-4'` | `initial-petition` |
-| `'step-5'` | `filter-value` |
-| `'step-6'` | `liberation` |
-| `'step-7'` | `parameters` |
-| `'step-8'` | `resources` |
-| `'step-9'` | `simple-calc` |
+| step | Job/Fila |
+|------|----------|
+| `step-1` | `process-validation` em `process-validation-queue` |
+| `step-2` | `solvency-validation` em `solvency-validation-queue` |
+| `step-3` | `extract-document` em `extract-document-queue` |
+| `step-4` | `initial-petition` em `initial-petition-queue` |
 | outro | no-op (default branch) |
 
 **Payload padrao passado para jobs**:
 ```typescript
 {
   processNumber: string,
-  mainProcessId: string    // process._id se MAIN, senao process.processMain
+  correlationId?: string
 }
 ```
 
@@ -152,8 +141,20 @@ Roteamento via `switch(true)` no slug do step:
 | Arquivo | Quando |
 |---------|--------|
 | `process-validation.service.ts:59` | Apos step-1, passa `step.next` |
-| `extract-documents-info.service.ts:61` | Apos extracao de docs, hardcodes `'step-4'` |
+| `extract-documents-info.service.ts` | Apos extracao de docs, hardcodes `'step-4'` |
 | `run-lawsuit-validation.service.ts:92,136,143` | Re-trigger manual de processos |
+| `webhook-erro.handler.ts` | Retry de erro transitorio para `process-validation-queue` |
+
+## Retry de órfãos
+
+O `OrphanedProcessCron` nao reenfileira mais cegamente em `insert-process-queue`. O retry depende do estado encontrado:
+
+| Status preso | Reacao |
+|-------------|--------|
+| `PROCESSING_WITH_MOVIMENTS` | reenvia scraping sem documentos via `fetchProcessExtract(..., false)` |
+| `PROCESSING_WITH_DOCUMENTS` | reenvia scraping com documentos via `fetchProcessExtract(..., true)` |
+| `PROCESS_WAITING_EXTRACTION_DOCUMENTS` | reenfileira `step-3` |
+| `EXTRACTION_MOVIMENTS_FINISHED` | reenfileira `step-4` |
 
 ---
 

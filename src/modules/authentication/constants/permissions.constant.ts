@@ -19,8 +19,8 @@ export const ROLE_PERMISSIONS: Record<string, Record<Permission, boolean>> = {
     view_all_processes: true,
   },
   advogado: {
-    change_stage: true,
-    create_activity: true,
+    change_stage: false,
+    create_activity: false,
     user_management: false,
     mass_edit: false,
     process_insertion: false,
@@ -29,6 +29,10 @@ export const ROLE_PERMISSIONS: Record<string, Record<Permission, boolean>> = {
 };
 
 export function getPermissionsForRole(role: string): Permission[] {
-  const map = ROLE_PERMISSIONS[role] ?? ROLE_PERMISSIONS.advogado;
+  const map = ROLE_PERMISSIONS[role];
+  if (!map) {
+    return [];
+  }
+
   return (Object.keys(map) as Permission[]).filter((k) => map[k]);
 }

@@ -24,6 +24,7 @@ const ALLOWED_TRANSITIONS: Record<string, Set<PROCESSSTATUSENUM>> = {
   [PROCESSSTATUSENUM.EXTRACTION_MOVIMENTS_FINISHED]: new Set([
     PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
     PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS,
+    PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED,
     PROCESSSTATUSENUM.SUCCESS,
     PROCESSSTATUSENUM.ERROR,
   ]),
@@ -98,7 +99,26 @@ export class ProcessStateMachineService {
       );
     }
 
-    return model.findByIdAndUpdate(processStatusRef, patch, { new: true });
+    if (!patch.name || currentStatus.name === patch.name) {
+      return model.findByIdAndUpdate(processStatusRef, patch, { new: true });
+    }
+
+    const updatedStatus = await model.findOneAndUpdate(
+      {
+        _id: processStatusRef,
+        name: currentStatus.name,
+      },
+      patch,
+      { new: true },
+    );
+
+    if (!updatedStatus) {
+      throw new Error(
+        `Race detectada ao transicionar status ${processStatusRef}: estado mudou durante a atualização`,
+      );
+    }
+
+    return updatedStatus;
   }
 
   private extractId(
