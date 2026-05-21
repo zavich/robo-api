@@ -52,7 +52,7 @@ Documento inicial de scan geral. Mapas detalhados de feature ficam em `features/
 `src/modules/user/` - gestao de usuarios.
 
 - Controller: listagem, update.
-- Schema: User (email, password, role, isActive).
+- Schema: User (email, password legado, role, isActive, name).
 
 ### Prompts
 

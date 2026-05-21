@@ -30,7 +30,7 @@ export class AuthenticationController {
 
   @Post('login')
   @HttpCode(200)
-  @Throttle({ auth: { ttl: 60000, limit: 10 } })
+  @Throttle({ auth: { ttl: 60000, limit: 5 } })
   async login(
     @Body() loginUserDto: AuthDto,
     @Res({ passthrough: true }) res: Response,
@@ -39,8 +39,8 @@ export class AuthenticationController {
 
     res.cookie('prosolutti_accessToken', accessToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: 'none',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       path: '/',
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });

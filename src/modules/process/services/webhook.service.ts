@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import Redis from 'ioredis';
@@ -29,8 +34,9 @@ return current
 `;
 
 @Injectable()
-export class WebhookService {
+export class WebhookService implements OnModuleInit {
   private readonly logger = new Logger(WebhookService.name);
+  private idempotencyScriptSha: string | null = null;
 
   constructor(
     @InjectModel(ProcessEntity.name)
@@ -44,6 +50,14 @@ export class WebhookService {
     private readonly tstHandler: WebhookTstHandler,
     private readonly trtHandler: WebhookTrtHandler,
   ) {}
+
+  async onModuleInit() {
+    await this.loadIdempotencyScript().catch((error: unknown) => {
+      this.logger.warn(
+        `Falha ao pre-carregar script de idempotencia: ${String((error as Error)?.message ?? error)}`,
+      );
+    });
+  }
 
   async execute(body: Root, correlationId?: string) {
     this.logger.log(
@@ -146,9 +160,7 @@ export class WebhookService {
     idempotencyKey: string,
   ): Promise<IdempotencyAcquisition> {
     const ttlSeconds = 60 * 60 * 24;
-    const result = (await this.redis.eval(
-      ACQUIRE_IDEMPOTENCY_SCRIPT,
-      1,
+    const result = (await this.executeIdempotencyScript(
       idempotencyKey,
       ttlSeconds.toString(),
     )) as string;
@@ -162,5 +174,41 @@ export class WebhookService {
     }
 
     return { acquired: false, currentState: result };
+  }
+
+  private async loadIdempotencyScript(force = false) {
+    if (this.idempotencyScriptSha && !force) {
+      return this.idempotencyScriptSha;
+    }
+
+    this.idempotencyScriptSha = (await this.redis.script(
+      'LOAD',
+      ACQUIRE_IDEMPOTENCY_SCRIPT,
+    )) as string;
+
+    return this.idempotencyScriptSha;
+  }
+
+  private async executeIdempotencyScript(
+    idempotencyKey: string,
+    ttlSeconds: string,
+  ) {
+    const sha = await this.loadIdempotencyScript();
+
+    try {
+      return await this.redis.evalsha(
+        sha,
+        1,
+        idempotencyKey,
+        ttlSeconds,
+      );
+    } catch (error: unknown) {
+      if (!String((error as Error)?.message ?? error).includes('NOSCRIPT')) {
+        throw error;
+      }
+
+      const reloadedSha = await this.loadIdempotencyScript(true);
+      return this.redis.evalsha(reloadedSha, 1, idempotencyKey, ttlSeconds);
+    }
   }
 }

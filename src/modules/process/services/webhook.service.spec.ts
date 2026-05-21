@@ -11,9 +11,9 @@ const makeStepModel = () => ({
 });
 
 const makeRedis = () => ({
-  get: jest.fn(),
+  evalsha: jest.fn(),
   set: jest.fn(),
-  eval: jest.fn(),
+  script: jest.fn(),
 });
 
 const makeHandler = () => ({
@@ -75,20 +75,22 @@ describe('WebhookService', () => {
     await expect(
       service.execute(makeBody({ webhookId: undefined })),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(redis.eval).not.toHaveBeenCalled();
+    expect(redis.evalsha).not.toHaveBeenCalled();
   });
 
   it('ignores duplicate webhook when state is DONE', async () => {
-    redis.eval.mockResolvedValue('DONE');
+    redis.script.mockResolvedValue('sha-1');
+    redis.evalsha.mockResolvedValue('DONE');
 
     await service.execute(makeBody(), 'corr-1');
 
-    expect(redis.eval).toHaveBeenCalled();
+    expect(redis.evalsha).toHaveBeenCalled();
     expect(processModel.findOne).not.toHaveBeenCalled();
   });
 
   it('ignores duplicate webhook when state is PROCESSING (in-flight)', async () => {
-    redis.eval.mockResolvedValue('PROCESSING');
+    redis.script.mockResolvedValue('sha-1');
+    redis.evalsha.mockResolvedValue('PROCESSING');
 
     await service.execute(makeBody(), 'corr-1');
 
@@ -96,7 +98,8 @@ describe('WebhookService', () => {
   });
 
   it('reacquires lock when previous state is FAILED and reprocesses', async () => {
-    redis.eval.mockResolvedValue('FAILED');
+    redis.script.mockResolvedValue('sha-1');
+    redis.evalsha.mockResolvedValue('FAILED');
     redis.set.mockResolvedValue('OK');
     const process = {
       _id: 'proc-id',
@@ -117,7 +120,8 @@ describe('WebhookService', () => {
   });
 
   it('stores FAILED_PROCESS_NOT_FOUND when process does not exist', async () => {
-    redis.eval.mockResolvedValue('NEW');
+    redis.script.mockResolvedValue('sha-1');
+    redis.evalsha.mockResolvedValue('NEW');
     redis.set.mockResolvedValue('OK');
     processModel.populate.mockResolvedValue(null);
 
@@ -138,7 +142,8 @@ describe('WebhookService', () => {
     };
     const step = { slug: 'step-3' };
 
-    redis.eval.mockResolvedValue('NEW');
+    redis.script.mockResolvedValue('sha-1');
+    redis.evalsha.mockResolvedValue('NEW');
     redis.set.mockResolvedValue('OK');
     processModel.populate.mockResolvedValue(process);
     stepModel.findById.mockResolvedValue(step);
@@ -165,7 +170,8 @@ describe('WebhookService', () => {
       processStatus: { step: 'step-id' },
     };
 
-    redis.eval.mockResolvedValue('NEW');
+    redis.script.mockResolvedValue('sha-1');
+    redis.evalsha.mockResolvedValue('NEW');
     redis.set.mockResolvedValue('OK');
     processModel.populate.mockResolvedValue(process);
     stepModel.findById.mockResolvedValue({ slug: 'step-3' });
@@ -179,5 +185,19 @@ describe('WebhookService', () => {
       'EX',
       60 * 60,
     );
+  });
+
+  it('recarrega o script quando o redis retorna NOSCRIPT', async () => {
+    redis.script
+      .mockResolvedValueOnce('sha-1')
+      .mockResolvedValueOnce('sha-2');
+    redis.evalsha
+      .mockRejectedValueOnce(new Error('NOSCRIPT No matching script.'))
+      .mockResolvedValueOnce('DONE');
+
+    await service.execute(makeBody(), 'corr-noscript');
+
+    expect(redis.script).toHaveBeenCalledTimes(2);
+    expect(redis.evalsha).toHaveBeenCalledTimes(2);
   });
 });

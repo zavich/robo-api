@@ -46,8 +46,7 @@ jobs:
           IMAGE_LATEST=${ECR_REGISTRY}/${ECR_REPOSITORY}:latest
 
           docker build -t $IMAGE_URI -t $IMAGE_LATEST .
-          docker push $IMAGE_URI
-          docker push $IMAGE_LATEST
+          docker push --all-tags ${ECR_REGISTRY}/${ECR_REPOSITORY}
 
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 

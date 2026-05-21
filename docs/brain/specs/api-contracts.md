@@ -34,9 +34,11 @@
 ### POST /v1/auth/login
 
 - **Auth**: nenhuma
-- **Body**: `{ email: string (IsEmail), password: string (IsNotEmpty) }`
+- **Body**: `{ email: string (IsEmail) }`
 - **Response**: `{ message: 'Login successful' }`
-- **Side effect**: Set-Cookie `prosolutti_accessToken` (httpOnly, secure, sameSite=none, maxAge=7 dias). Valor = JWT
+- **Throttle**: 5 req/min por IP
+- **Lockout**: 5 falhas por email bloqueiam a conta por 30 min
+- **Side effect**: Set-Cookie `prosolutti_accessToken` (httpOnly, secure apenas em production, sameSite=lax, maxAge=7 dias). Valor = JWT com `jti` e `permissions`
 
 ### POST /v1/auth/signup
 
@@ -47,7 +49,7 @@
 ### POST /v1/auth/logout
 
 - **Auth**: nenhuma
-- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie
+- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie (`sameSite=lax`) + registro de `jti` revogado em Redis quando presente
 
 ### GET /v1/auth/me
 

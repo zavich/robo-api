@@ -36,7 +36,7 @@ A auditoria revelou 58 achados (13 bugs, 8 estabilidade, 14 seguranca, 14 perfor
 | BUG-004 | Webhook `NAO_ENCONTRADO`/`ERRO` sem retry — processos viravam erro permanente sem nova tentativa | `schema/process.schema.ts` (campo `scraperRetryCount`), `handlers/webhook-erro.handler.ts`, `handlers/webhook-nao-encontrado.handler.ts` |
 | BUG-005 | `fetchCompany` recursivo infinito em HTTP 429 | `solvency-validation.service.ts` (assinatura virou `(cnpj, attempt=0, maxAttempts=5)` com backoff exponencial) |
 | BUG-008 | `extract-document` avancava pipeline mesmo quando todos os documentos falhavam | `extract-documents-info.service.ts` (`hasSuccess` check antes de `nextStepsService.execute('step-4')`) |
-| BUG-009 | Webhook sem idempotencia — retries causavam dupla execucao destrutiva | `webhook.service.ts` (Lua script atomico que aceita re-acquire de estados `FAILED`/`FAILED_PROCESS_NOT_FOUND`) |
+| BUG-009 | Webhook sem idempotencia — retries causavam dupla execucao destrutiva | `webhook.service.ts` (Lua script atomico com preload via `SCRIPT LOAD` + `EVALSHA`, fallback `NOSCRIPT` e re-acquire de estados `FAILED`/`FAILED_PROCESS_NOT_FOUND`) |
 | BUG-010 | Sem mecanismo de deteccao de processos orfaos | `crons/orphaned-process.cron.ts` (NOVO, cron a cada 30min em estados intermediarios por >2h) |
 
 ### Estabilidade
@@ -56,7 +56,7 @@ A auditoria revelou 58 achados (13 bugs, 8 estabilidade, 14 seguranca, 14 perfor
 | Pipedrive webhook | `POST /process/webhook-pipedrive/` aceitava qualquer chave | `guards/service-webhook.guard.ts` + `decorators/webhook-source.decorator.ts` (NOVO, decorator-based em vez de path-matching) |
 | RBAC | Permissoes definidas client-side no painel | `constants/permissions.constant.ts` (server-side source of truth) + `services/role-audit.service.ts` (NOVO, audita roles em DB no bootstrap) + `AUTH_STRICT_ROLE_AUDIT`/`AUTH_AUDIT_SKIP` envs |
 | JWT revocation | Sem mecanismo de revogar JWT em logout | `authentication.controller.ts:60-89` (registra `jti` em Redis com TTL = expiracao do token) |
-| Login passwordless | Auth agora aceita so email (decisao explicita do produto) | `dto/auth.dto.ts`, `services/login.service.ts` (sem bcrypt; mantem Redis lockout para rate limit) |
+| Login email-only | Auth agora aceita so email (decisao explicita do produto) | `dto/auth.dto.ts`, `services/login.service.ts` (sem senha/bcrypt; throttle 5/min e lockout Redis apos 5 falhas por 30min) |
 
 ### Performance
 
@@ -82,8 +82,9 @@ A auditoria revelou 58 achados (13 bugs, 8 estabilidade, 14 seguranca, 14 perfor
 ### Infra e deploy
 
 - `task-definition.json` sanitizado: todos os ARNs/account IDs/secret names substituidos por placeholders `<AWS_*>`
-- `scripts/render-task-definition.mjs` (NOVO) renderiza template usando `process.env`, com `fileURLToPath` (compativel com Node 18 do Dockerfile)
+- `scripts/render-task-definition.mjs` (NOVO) renderiza o template a partir de `process.env`, falha se faltar placeholder obrigatorio e usa `fileURLToPath` (compativel com Node 18 do Dockerfile)
 - `.github/workflows/deploy-robo-api.yml` agora le account ID, regiao, cluster, service, family, container, role ARNs e API URL todos de `secrets.*`
+- O workflow publica `${GITHUB_SHA}` e `latest` de forma atomica com `docker push --all-tags`
 
 ### Brain docs (`docs/brain/`)
 
@@ -123,7 +124,7 @@ Por causa do tamanho, sugiro revisao por dominio:
 - **ARQ-008** Structured logging (`nestjs-pino`) — decisao explicita de skip; ficamos com `Logger` + `correlationId`.
 - **PERF-002** Concorrencia de filas por TRT — equipe decidiu manter configuracao atual.
 - **Migration mass-update de `scraperRetryCount`** — codigo tolera `undefined` via `$or: [{$exists: false}, ...]`; backfill e opcional.
-- **SSO com painel principal** — investigacao mostrou JWTs incompativeis entre `juri-api` e `robo-api`; auth foi simplificada para passwordless email-only no proprio `robo-api`.
+- **SSO com painel principal** — investigacao mostrou JWTs incompativeis entre `juri-api` e `robo-api`; auth foi simplificada para email-only no proprio `robo-api`.
 
 ---
 

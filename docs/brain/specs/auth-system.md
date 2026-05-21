@@ -5,7 +5,7 @@
 ### Estrutura do payload
 
 ```typescript
-{ identifier: string (email), sub: string (user ObjectId) }
+{ identifier: string (email), sub: string (user ObjectId), jti: string, permissions: string[] }
 ```
 
 ### Configuracao
@@ -22,7 +22,8 @@ Arquivo: `src/modules/authentication/guards/jwt-strategy.guard.ts`
 1. Extrai JWT do cookie `prosolutti_accessToken`
 2. `userModel.findOne({ _id: payload.sub })`
 3. Se nao encontrado: `UnauthorizedException`
-4. Seta `req.user` = User document completo (incluindo password hash)
+4. Verifica se o `jti` nao esta revogado em Redis
+5. Seta `req.user` = User document com `permissions` resolvidas no backend
 
 ---
 
@@ -35,7 +36,7 @@ Arquivo: `src/modules/authentication/guards/apikey-auth.guard.ts`
 
 ---
 
-## Roles
+## Roles e permissoes
 
 | Role | Valor | Descricao |
 |------|-------|-----------|
@@ -44,23 +45,25 @@ Arquivo: `src/modules/authentication/guards/apikey-auth.guard.ts`
 
 ### Enforcement
 
-- **NAO existe decorator de roles**. Verificacao e manual no service layer:
-  - `CreateActivityService`: `if (user.role !== 'admin')` → `BadRequestException`
-  - `ChangeStageService`: `if (user.role !== UserRole.ADMIN)` → `ForbiddenException`
-- Rotas admin sao acessiveis por URL para nao-admins — a protecao e na camada de servico, nao de rota
+- A autorizacao principal e por permissao, nao por comparacao manual de `role` em cada service.
+- `PermissionsGuard` roda globalmente e consome `@CheckPermissions(...)`.
+- `getPermissionsForRole(role)` e o source of truth server-side.
+- `RoleAuditService` audita roles desconhecidas no bootstrap. `AUTH_STRICT_ROLE_AUDIT=true` pode transformar o achado em fail-fast; `AUTH_AUDIT_SKIP=true` pula a auditoria explicitamente.
 
 ---
 
 ## Fluxo de login
 
-1. `POST /v1/auth/login` com `{ email, password }`
-2. bcrypt.compare com hash do DB (rounds=10)
-3. JWT gerado com `{ identifier: email, sub: user._id }`
-4. Set-Cookie `prosolutti_accessToken` (httpOnly, secure, sameSite=none, maxAge=7d)
-5. Response: `{ message: 'Login successful' }`
+1. `POST /v1/auth/login` com `{ email }`
+2. `LoginService` valida se o email existe e esta ativo
+3. Redis aplica throttle/lockout por conta: 5 falhas -> bloqueio de 30 minutos
+4. JWT gerado com `{ identifier: email, sub: user._id, jti, permissions }`
+5. Set-Cookie `prosolutti_accessToken` (httpOnly, secure em production, sameSite=lax, maxAge=7d)
+6. Response: `{ message: 'Login successful' }`
 
 ## Fluxo de logout
 
 1. `POST /v1/auth/logout`
-2. Clear cookie `prosolutti_accessToken`
-3. Response: `{ message: 'Logout realizado com sucesso' }`
+2. Registra `jwt:revoked:<jti>` em Redis com TTL ate a expiracao do token
+3. Clear cookie `prosolutti_accessToken` com `sameSite=lax`
+4. Response: `{ message: 'Logout realizado com sucesso' }`

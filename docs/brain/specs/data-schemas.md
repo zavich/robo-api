@@ -4,7 +4,7 @@
 
 ```
 email:     String, required, unique
-password:  String, required (bcrypt hashed, rounds=10)
+password:  String, required (bcrypt hashed, legado; login atual e email-only)
 isActive:  Boolean, required, default: true
 role:      String, enum: ['admin', 'advogado'], required, default: 'advogado'
 name:      String, required
