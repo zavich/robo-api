@@ -51,9 +51,9 @@
 ## ECS (AWS)
 
 - Deployment via GitHub Actions.
-- ECR: `339340413604.dkr.ecr.sa-east-1.amazonaws.com`.
-- Cluster: `robo-cluster`, Service: `robo-api-service`.
-- Region: sa-east-1.
+- `task-definition.json` e mantido como template anonimo com placeholders.
+- Renderizacao do template: `yarn render:task-definition [arquivo-destino]`.
+- Placeholders obrigatorios atuais: `TASK_FAMILY`, `AWS_ACCOUNT_ID`, `AWS_REGION`, `IMAGE_NAME`, `IMAGE_TAG`, `EXECUTION_ROLE`, `TASK_ROLE`, `SECRET_NAME`, `SERVICE_NAME`.
 
 ## Swagger
 

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   HttpCode,
   Inject,
   Post,
@@ -18,10 +19,12 @@ import { LoginService } from './services/login.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
 import { CheckPermissions } from './decorators/check-permissions.decorator';
-import { getPermissionsForRole } from './constants/permissions.constant';
+import { getPermissionsForRole, isKnownRole } from './constants/permissions.constant';
 
 @Controller('auth')
 export class AuthenticationController {
+  private readonly logger = new Logger(AuthenticationController.name);
+
   constructor(
     private readonly loginService: LoginService,
     private readonly signUpService: SignUpService,
@@ -95,6 +98,11 @@ export class AuthenticationController {
   @UseGuards(ApiKeyAuthGuard)
   getProfile(@Req() req: Request) {
     const user = (req as any).user;
+    if (user?.role && !isKnownRole(user.role)) {
+      this.logger.warn(
+        `Usuario ${user.email ?? user._id ?? 'unknown'} autenticado com role nao mapeada: ${user.role}`,
+      );
+    }
     const permissions = user?.permissions ?? getPermissionsForRole(user?.role);
     return { ...user, permissions };
   }

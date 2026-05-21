@@ -17,6 +17,7 @@ const STUCK_STATUS_NAMES = [
   PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS,
   PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS,
   PROCESSSTATUSENUM.EXTRACTION_MOVIMENTS_FINISHED,
+  PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED,
 ];
 
 @Injectable()
@@ -109,6 +110,13 @@ export class OrphanedProcessCron {
           } else if (
             currentStatusName ===
               PROCESSSTATUSENUM.EXTRACTION_MOVIMENTS_FINISHED
+          ) {
+            await this.nextStepsService.execute('step-4', {
+              processNumber: proc.number,
+            });
+          } else if (
+            currentStatusName ===
+              PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED
           ) {
             await this.nextStepsService.execute('step-4', {
               processNumber: proc.number,

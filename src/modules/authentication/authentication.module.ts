@@ -8,6 +8,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LoginService } from './services/login.service';
 import { AuthenticationController } from './authentication.controller';
 import { SignUpService } from './services/sign-up.service';
+import { RoleAuditService } from './services/role-audit.service';
 import type { StringValue } from 'ms';
 @Module({
   imports: [
@@ -33,6 +34,6 @@ import type { StringValue } from 'ms';
   ],
   controllers: [AuthenticationController],
   exports: [JwtStrategy, PassportModule],
-  providers: [JwtStrategy, LoginService, SignUpService],
+  providers: [JwtStrategy, LoginService, SignUpService, RoleAuditService],
 })
 export class AuthenticationModule {}

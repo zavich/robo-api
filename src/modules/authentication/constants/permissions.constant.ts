@@ -28,6 +28,10 @@ export const ROLE_PERMISSIONS: Record<string, Record<Permission, boolean>> = {
   },
 };
 
+export function isKnownRole(role: string): boolean {
+  return Object.prototype.hasOwnProperty.call(ROLE_PERMISSIONS, role);
+}
+
 export function getPermissionsForRole(role: string): Permission[] {
   const map = ROLE_PERMISSIONS[role];
   if (!map) {

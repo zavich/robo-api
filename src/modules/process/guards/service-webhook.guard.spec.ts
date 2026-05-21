@@ -50,6 +50,18 @@ describe('ServiceWebhookGuard', () => {
     expect(canActivate).toBe(true);
   });
 
+  it('accepts the dedicated pipedrive secret when the path has a trailing slash', () => {
+    const canActivate = guard.canActivate(
+      makeContext({
+        headers: { authorization: 'Bearer pipedrive-secret' },
+        path: '/v1/process/webhook-pipedrive/',
+        query: {},
+      }),
+    );
+
+    expect(canActivate).toBe(true);
+  });
+
   it('rejects missing secret', () => {
     expect(() =>
       guard.canActivate(

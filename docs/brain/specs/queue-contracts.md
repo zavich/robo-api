@@ -155,6 +155,7 @@ O `OrphanedProcessCron` nao reenfileira mais cegamente em `insert-process-queue`
 | `PROCESSING_WITH_DOCUMENTS` | reenvia scraping com documentos via `fetchProcessExtract(..., true)` |
 | `PROCESS_WAITING_EXTRACTION_DOCUMENTS` | reenfileira `step-3` |
 | `EXTRACTION_MOVIMENTS_FINISHED` | reenfileira `step-4` |
+| `EXTRACTION_DOCUMENTS_FINISHED` | reenfileira `step-4` |
 
 ---
 

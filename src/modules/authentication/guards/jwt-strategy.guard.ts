@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { PassportStrategy } from '@nestjs/passport';
@@ -7,7 +7,11 @@ import { Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import Redis from 'ioredis';
 import { User, UserDocument } from 'src/modules/user/schema/user.schema';
-import { getPermissionsForRole, Permission } from '../constants/permissions.constant';
+import {
+  getPermissionsForRole,
+  isKnownRole,
+  Permission,
+} from '../constants/permissions.constant';
 
 export type iJwtPayload = {
   sub: string;
@@ -18,6 +22,8 @@ export type iJwtPayload = {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
@@ -51,6 +57,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
     if (!user) {
       throw new UnauthorizedException();
+    }
+
+    if (!isKnownRole(user.role)) {
+      this.logger.warn(
+        `Token validado para usuario com role nao mapeada: ${user.email} (${user.role})`,
+      );
     }
 
     const permissions = payload.permissions ?? getPermissionsForRole(user.role);

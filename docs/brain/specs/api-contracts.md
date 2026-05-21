@@ -17,7 +17,15 @@
 ### GET /health
 
 - **Auth**: nenhuma (sem prefixo `/v1`)
-- **Response**: `{ status: 'ok' }`
+- **Throttle**: `@SkipThrottle()`
+- **Response**:
+  ```typescript
+  {
+    status: 'ok',
+    checks: { mongodb: 'ok', redis: 'ok' },
+    memory: { rssMB: number, heapUsedMB: number }
+  }
+  ```
 
 ---
 
@@ -98,6 +106,7 @@
 ### POST /v1/process/webhook-pipedrive/
 
 - **Auth**: `ServiceWebhookGuard` via `PIPEDRIVE_WEBHOOK_KEY` (fallback para `WEBHOOK_SERVICE_KEY`)
+- **Path matching do guard**: a validacao normaliza barra final, entao `/webhook-pipedrive` e `/webhook-pipedrive/` sao tratados como equivalentes
 - **Body**: `{ num_processo: string, deal_id: number, stage_id: number }`
 - **Side effect**: enfileira job `insert-process`
 
