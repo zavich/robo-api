@@ -12,6 +12,7 @@ import { Root } from '../interfaces/process.interface';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Process as ProcessEntity } from '../schema/process.schema';
 import { Step } from '../schema/step.schema';
+import { NotificationsGateway } from 'src/gateway/notifications.gateway';
 import { WebhookErroHandler } from './handlers/webhook-erro.handler';
 import { WebhookNaoEncontradoHandler } from './handlers/webhook-nao-encontrado.handler';
 import { WebhookTrtHandler } from './handlers/webhook-trt.handler';
@@ -49,6 +50,7 @@ export class WebhookService implements OnModuleInit {
     private readonly erroHandler: WebhookErroHandler,
     private readonly tstHandler: WebhookTstHandler,
     private readonly trtHandler: WebhookTrtHandler,
+    private readonly gateway: NotificationsGateway,
   ) {}
 
   async onModuleInit() {
@@ -139,6 +141,7 @@ export class WebhookService implements OnModuleInit {
       }
 
       await this.redis.set(idempotencyKey, 'DONE', 'EX', 60 * 60 * 24);
+      this.gateway.processUpdated(body.numero_processo);
     } catch (error) {
       this.logger.error(`Erro ao processar a requisição: ${error.message}`);
       await this.redis.set(idempotencyKey, 'FAILED', 'EX', 60 * 60).catch(() => undefined);

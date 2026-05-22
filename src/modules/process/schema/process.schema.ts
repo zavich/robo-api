@@ -273,6 +273,11 @@ class Process {
 
 type ProcessDocument = Process & Document;
 const ProcessSchema = SchemaFactory.createForClass(Process);
+
+// Índices para as queries mais frequentes
+ProcessSchema.index({ createdAt: -1 });
+ProcessSchema.index({ 'activities.assignedTo': 1, createdAt: -1 });
+
 export {
   Process,
   ProcessDocument,

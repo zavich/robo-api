@@ -2,19 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, PipelineStage } from 'mongoose';
 import { Process as ProcessEntity } from '../../schema/process.schema';
-import { User } from 'src/modules/user/schema/user.schema';
 import { ListProcessFiltersDto } from '../../dtos/list-process-filters.dto';
+
+interface RequestUser {
+  _id?: string;
+  role?: string;
+}
 
 @Injectable()
 export class ListLawsuitService {
   constructor(
     @InjectModel(ProcessEntity.name)
     private readonly lawsuitModule: Model<ProcessEntity>,
-    @InjectModel(User.name)
-    private readonly userModule: Model<User>,
   ) {}
 
-  async execute(query: ListProcessFiltersDto, userId?: string) {
+  async execute(query: ListProcessFiltersDto, user?: RequestUser) {
     const {
       page = 1,
       limit = 10,
@@ -33,9 +35,9 @@ export class ListLawsuitService {
     const skip = (page - 1) * Number(limit);
     const limitNum = Number(limit);
 
-    const user = await this.userModule.findById(userId);
     const isAdvogado = user?.role === 'advogado';
     const isAdmin = user?.role === 'admin';
+    const userId = user?._id?.toString();
 
     const match: FilterQuery<ProcessEntity> = {};
 

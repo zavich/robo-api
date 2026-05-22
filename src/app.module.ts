@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { RedisModule } from './connection/redis.module';
+import { ApiKeyAuthGuard } from './modules/authentication/guards/apikey-auth.guard';
 import { PermissionsGuard } from './modules/authentication/guards/permissions.guard';
 import { DatabaseModule } from './database/database.module';
 import { AuthenticationModule } from './modules/authentication/authentication.module';
@@ -67,6 +68,7 @@ import { RedisHealthService } from './service/redis-health.service';
   providers: [
     RedisHealthService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ApiKeyAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

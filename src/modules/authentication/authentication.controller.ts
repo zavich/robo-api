@@ -18,6 +18,7 @@ import { LoginService } from './services/login.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
 import { CheckPermissions } from './decorators/check-permissions.decorator';
+import { Public } from './decorators/public.decorator';
 import { getPermissionsForRole } from './constants/permissions.constant';
 
 @Controller('auth')
@@ -30,6 +31,7 @@ export class AuthenticationController {
 
   @Post('login')
   @HttpCode(200)
+  @Public()
   @Throttle({ auth: { ttl: 60000, limit: 5 } })
   async login(
     @Body() loginUserDto: AuthDto,
@@ -57,6 +59,7 @@ export class AuthenticationController {
 
   @Post('logout')
   @HttpCode(200)
+  @Public()
   async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,

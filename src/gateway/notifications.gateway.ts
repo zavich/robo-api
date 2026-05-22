@@ -35,6 +35,12 @@ export class NotificationsGateway
     this.server.to(userId).emit('notification', notification);
   }
 
+  // Notifica todos os clientes sobre atualização de processo
+  processUpdated(processNumber: string) {
+    this.server.emit('process:updated', { number: processNumber });
+    this.logger.debug(`Emitido process:updated para ${processNumber}`);
+  }
+
   handleConnection(client: Socket) {
     const userId = client.handshake.auth.userId as string | undefined;
     if (userId) {

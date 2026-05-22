@@ -123,17 +123,28 @@ export class ProcessStateMachineService {
   private extractId(
     processStatusId: string | { _id?: string } | unknown,
   ): string | null {
+    if (!processStatusId) return null;
+
     if (typeof processStatusId === 'string') {
       return processStatusId;
     }
 
-    if (
-      processStatusId &&
-      typeof processStatusId === 'object' &&
-      '_id' in processStatusId &&
-      typeof processStatusId._id === 'string'
-    ) {
-      return processStatusId._id;
+    if (typeof processStatusId === 'object') {
+      // Mongoose Types.ObjectId serializes to a 24-char hex string via toString()
+      const str = String(processStatusId);
+      if (/^[0-9a-f]{24}$/i.test(str)) {
+        return str;
+      }
+
+      // Handle { _id: string | ObjectId }
+      if ('_id' in processStatusId) {
+        const id = (processStatusId as Record<string, unknown>)._id;
+        if (typeof id === 'string') return id;
+        if (id && typeof id === 'object') {
+          const idStr = String(id);
+          if (/^[0-9a-f]{24}$/i.test(idStr)) return idStr;
+        }
+      }
     }
 
     return null;

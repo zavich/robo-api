@@ -33,8 +33,6 @@ async function bootstrap() {
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
       transform: true,
     }),
   );
@@ -114,3 +112,4 @@ async function bootstrap() {
   await app.listen(finalPort, '0.0.0.0');
 }
 bootstrap();
+

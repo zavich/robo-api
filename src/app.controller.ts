@@ -4,6 +4,7 @@ import {
   Inject,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { Public } from './modules/authentication/decorators/public.decorator';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import Redis from 'ioredis';
@@ -18,6 +19,7 @@ export class AppController {
 
   @Get('health')
   @SkipThrottle()
+  @Public()
   async health() {
     const checks: Record<string, string> = {};
     let healthy = true;

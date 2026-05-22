@@ -121,44 +121,27 @@ export class ProcessCountersService {
 
       // Filtro de movimentações novas
       ...(hasNewMovements !== undefined
-        ? [
-            {
-              $match: {
-                hasNewMovements: hasNewMovements,
-              },
-            },
-          ]
+        ? [{ $match: { hasNewMovements: hasNewMovements } }]
         : []),
 
-      {
-        $lookup: {
-          from: 'processstatuses',
-          localField: 'processStatus',
-          foreignField: '_id',
-          as: 'processStatus',
-        },
-      },
-      {
-        $addFields: {
-          processStatus: { $arrayElemAt: ['$processStatus', 0] },
-        },
-      },
-      {
-        $lookup: {
-          from: 'processdecisions',
-          localField: '_id',
-          foreignField: 'process_id',
-          as: 'processDecisions',
-        },
-      },
-      {
-        $addFields: {
-          processDecisions: { $arrayElemAt: ['$processDecisions', 0] },
-        },
-      },
-      // Adicionar campo com o último item do histórico (se necessário)
+      // processdecisions lookup: apenas quando lossReason está ativo
       ...(needsLatestHistoryField
         ? [
+            {
+              $lookup: {
+                from: 'processdecisions',
+                localField: '_id',
+                foreignField: 'process_id',
+                as: 'processDecisions',
+              },
+            },
+            {
+              $addFields: {
+                processDecisions: {
+                  $arrayElemAt: ['$processDecisions', 0],
+                },
+              },
+            },
             {
               $addFields: {
                 'processDecisions.latestHistory': {
@@ -166,10 +149,8 @@ export class ProcessCountersService {
                 },
               },
             },
+            { $match: lossReasonFilter },
           ]
-        : []),
-      ...(Object.keys(lossReasonFilter).length > 0
-        ? [{ $match: lossReasonFilter }]
         : []),
     ];
 

@@ -112,6 +112,11 @@ export class InsertProcessService {
           documents,
           priority: true,
         },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.SCRAPING_API_KEY}`,
+          },
+        },
       );
       const logMessage = documents
         ? 'Processo enviado para o extração com documentos'

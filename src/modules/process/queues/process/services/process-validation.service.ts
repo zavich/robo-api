@@ -43,9 +43,15 @@ export class ProcessValidationService {
         });
         this.logger.log('Processo foi enviado para o TST.');
         try {
-          await axios.post(`${url}/processos/${number}`, {
-            origem: 'TST',
-          });
+          await axios.post(
+            `${url}/processos/${number}`,
+            { origem: 'TST' },
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.SCRAPING_API_KEY}`,
+              },
+            },
+          );
         } catch (error) {
           const AxiosError = error as AxiosError;
           if (AxiosError.response?.status === 402) {

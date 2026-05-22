@@ -21,6 +21,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Request as ExpressRequest, Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
 import { CheckPermissions } from '../authentication/decorators/check-permissions.decorator';
+import { Public } from '../authentication/decorators/public.decorator';
 import { ServiceWebhookGuard } from './guards/service-webhook.guard';
 import { WebhookSourceMetadata } from './decorators/webhook-source.decorator';
 import {
@@ -178,6 +179,7 @@ export class ProcessController {
   }
   @Post('webhook')
   @HttpCode(200)
+  @Public()
   @UseGuards(ServiceWebhookGuard)
   @WebhookSourceMetadata('service')
   async webhook(
@@ -218,9 +220,8 @@ export class ProcessController {
   ) {
     try {
       const user = res.req.user;
-      const userId = user?._id;
 
-      const result = await this.listLawsuitService.execute(query, userId);
+      const result = await this.listLawsuitService.execute(query, user);
       return res.json(result);
     } catch (error) {
       return res.status(500).json({
@@ -231,6 +232,7 @@ export class ProcessController {
   }
 
   @Get('reasons-loss')
+  @Public()
   async getLossRejectionReasons(
     @Query() filters?: LossReasonsFiltersDto,
   ): Promise<RejectionReasonOption[]> {
@@ -245,6 +247,7 @@ export class ProcessController {
   }
 
   @Get('reasons-loss/categories')
+  @Public()
   async getLossReasonsByCategory(
     @Query() filters?: LossReasonsFiltersDto,
   ): Promise<LossReasonCategory[]> {
@@ -358,6 +361,7 @@ export class ProcessController {
     }
   }
   @Post('webhook-pipedrive/')
+  @Public()
   @UseGuards(ServiceWebhookGuard)
   @WebhookSourceMetadata('pipedrive')
   async webhookPipedrive(

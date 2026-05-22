@@ -68,6 +68,7 @@ describe('WebhookService', () => {
       erroHandler as any,
       tstHandler as any,
       trtHandler as any,
+      { processUpdated: jest.fn() } as any,
     );
   });
 
