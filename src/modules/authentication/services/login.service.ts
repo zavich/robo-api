@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -19,33 +15,37 @@ export class LoginService {
   ) {}
 
   async execute(data: AuthDto) {
-    try {
-      const user = await this.userModel.findOne({ email: data.email });
+    const email = data.email.trim().toLowerCase();
+    const user = await this.userModel.findOne({ email });
 
-      if (!user) {
-        throw new BadRequestException('Usuário não encontrado!');
-      }
-
-      const passwordMatch = await compare(data.password, user?.password || '');
-      if (!passwordMatch) {
-        throw new BadRequestException('E-mail ou senha inválidos');
-      }
-
-      return {
-        accessToken: this.jwtService.sign({
-          identifier: data.email,
-          sub: user._id,
-        }),
-        user: {
-          email: user.email,
-          _id: user._id,
-        },
-      };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      throw error;
+    if (!user) {
+      throw new BadRequestException('Usuário não encontrado!');
     }
+
+    const passwordMatch = await compare(data.password, user?.password || '');
+    if (!passwordMatch) {
+      throw new BadRequestException('E-mail ou senha inválidos');
+    }
+
+    // Payload no formato do contrato de SSO (ver jwt.constants / handoff).
+    // `algorithm`, `issuer` e `expiresIn` vêm do JwtModule (assinatura RS256).
+    const accessToken = this.jwtService.sign({
+      user: {
+        email: user.email,
+        nome: user.name,
+        sobreNome: '', // robo-api não modela sobrenome; mantido por consistência
+        cargo: user.role,
+        permissoes: [], // robo-api autoriza por `role`, não por lista de permissões
+      },
+      sub: String(user._id),
+    });
+
+    return {
+      accessToken,
+      user: {
+        email: user.email,
+        _id: user._id,
+      },
+    };
   }
 }

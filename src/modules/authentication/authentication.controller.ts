@@ -14,6 +14,8 @@ import { ApiKeyAuthGuard } from './guards/apikey-auth.guard';
 import { LoginService } from './services/login.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
+import { AUTH_COOKIE_NAME } from './jwt/jwt.constants';
+import { authCookieBaseOptions, authCookieSetOptions } from './jwt/auth-cookie';
 
 @Controller('auth')
 export class AuthenticationController {
@@ -30,13 +32,8 @@ export class AuthenticationController {
   ) {
     const { accessToken } = await this.loginService.execute(loginUserDto);
 
-    res.cookie('prosolutti_accessToken', accessToken, {
-      httpOnly: true,
-      secure: true, // Railway = HTTPS sempre
-      sameSite: 'none', // obrigatório porque é cross-site
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dias em milissegundos
-    });
+    // cookie compartilhado do SSO (.juri.capital em produção)
+    res.cookie(AUTH_COOKIE_NAME, accessToken, authCookieSetOptions());
     return { message: 'Login successful' };
   }
 
@@ -48,14 +45,10 @@ export class AuthenticationController {
   @Post('logout')
   @HttpCode(200)
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('prosolutti_accessToken', {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-    });
+    // mesmas opções do set (sem maxAge), senão o browser não casa o cookie
+    // e ele fica órfão no domínio .juri.capital
+    res.clearCookie(AUTH_COOKIE_NAME, authCookieBaseOptions());
 
-    // você ainda pode invalidar o refreshToken no banco, se usar
     return { message: 'Logout realizado com sucesso' };
   }
   @Get('me')

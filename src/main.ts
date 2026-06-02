@@ -27,12 +27,19 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1');
   patchNestJsSwagger();
+  // Origens de produção (fronts que consomem esta API com cookie/credenciais).
+  const corsOrigins = [
+    'https://scraping-api.juri.capital',
+    'https://painel-robo.juri.capital',
+    'https://app.juri.capital', // front da juri-api (SSO cross-origin)
+  ];
+  // Origens extras de dev/local via env (comma-separated). Não definir em produção.
+  const extraOrigins = (process.env.CORS_EXTRA_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'https://scraping-api.juri.capital',
-      'https://painel-robo.juri.capital',
-    ],
+    origin: [...corsOrigins, ...extraOrigins],
     credentials: true,
   });
 

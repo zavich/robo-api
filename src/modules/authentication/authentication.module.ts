@@ -8,6 +8,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LoginService } from './services/login.service';
 import { AuthenticationController } from './authentication.controller';
 import { SignUpService } from './services/sign-up.service';
+import { JWT_ALGORITHM, SELF_ISSUER, TOKEN_TTL_SECONDS } from './jwt/jwt.constants';
+import { normalizePem } from './jwt/jwt-keys';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -21,9 +23,11 @@ import { SignUpService } from './services/sign-up.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         return {
-          secret: config.get<string>('JWT_SECRET_KEY'),
+          privateKey: normalizePem(config.get<string>('JWT_PRIVATE_KEY')),
           signOptions: {
-            expiresIn: config.get<string | number>('JWT_EXPIRES_IN'),
+            algorithm: JWT_ALGORITHM,
+            issuer: SELF_ISSUER,
+            expiresIn: TOKEN_TTL_SECONDS,
           },
         };
       },
