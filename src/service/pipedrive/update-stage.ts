@@ -39,7 +39,7 @@ export async function updateStageToPipedrive({
   } catch (error: unknown) {
     const axiosError = error as { response?: { data?: { error?: string } }; message?: string };
     throw new Error(
-      `Failed to add note to Pipedrive: ${axiosError.response?.data?.error || axiosError.message}`,
+      `Failed to update stage in Pipedrive: ${axiosError.response?.data?.error || axiosError.message}`,
     );
   }
 }

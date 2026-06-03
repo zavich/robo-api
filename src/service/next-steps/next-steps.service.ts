@@ -24,7 +24,8 @@ export class NextStepsService {
   private async checkBackpressure(queue: Queue, queueName: string): Promise<void> {
     const { waiting, delayed, active } = await queue.getJobCounts();
     const pending = waiting + delayed + active;
-    const threshold = Number(process.env.MAX_QUEUE_PENDING ?? 500);
+    const rawThreshold = Number(process.env.MAX_QUEUE_PENDING ?? 500);
+    const threshold = Number.isNaN(rawThreshold) ? 500 : rawThreshold;
 
     if (pending >= threshold) {
       this.logger.warn(

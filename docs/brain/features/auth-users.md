@@ -13,7 +13,7 @@ Use este mapa quando a task envolver autenticacao, JWT, API Key, usuarios ou rol
 
 ## Fluxo resumido
 
-1. Login via POST `/v1/auth/login` com email apenas.
+1. Login via POST `/v1/auth/login` com email e senha.
 2. `LoginService` valida se o email existe e esta ativo.
 3. O login usa throttle de 5 req/min por IP e lockout Redis por conta apos 5 falhas por 30 minutos.
 4. JWT gerado com `JWT_SECRET_KEY`, `jti` e `permissions`.

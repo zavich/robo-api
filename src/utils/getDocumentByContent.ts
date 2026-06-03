@@ -102,7 +102,7 @@ function getListDocumentByContent(
             doc.data === targetMoviment.data,
         );
 
-        if (documentSplitFounds?.length) {
+        if (documentSplitFounds) {
           return documentSplitFounds;
         }
       }

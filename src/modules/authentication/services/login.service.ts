@@ -28,8 +28,9 @@ export class LoginService {
   ) {}
 
   async execute(data: AuthDto) {
-    const lockKey = `login:lock:${data.email}`;
-    const attemptsKey = `login:failed:${data.email}`;
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const lockKey = `login:lock:${normalizedEmail}`;
+    const attemptsKey = `login:failed:${normalizedEmail}`;
 
     const isLocked = await this.redis.exists(lockKey);
     if (isLocked) {
@@ -40,7 +41,7 @@ export class LoginService {
       );
     }
 
-    const user = await this.userModel.findOne({ email: data.email });
+    const user = await this.userModel.findOne({ email: normalizedEmail });
 
     if (!user) {
       await this.recordFailedAttempt(attemptsKey, lockKey);
@@ -62,7 +63,7 @@ export class LoginService {
     const jti = randomUUID();
     const permissions = getPermissionsForRole(user.role);
     const accessToken = this.jwtService.sign({
-      identifier: data.email,
+      identifier: normalizedEmail,
       sub: user._id,
       jti,
       permissions,
