@@ -72,6 +72,7 @@ export class OrphanedProcessCron {
       });
 
       let retried = 0;
+      let errored = 0;
       let failed = 0;
 
       for (const proc of orphanedProcesses) {
@@ -99,7 +100,7 @@ export class OrphanedProcessCron {
                   errorReason: AnaliseStatus.TRT_INACESSIVEL,
                 },
               );
-              retried++;
+              errored++;
               continue;
             }
             // Incrementa contador antes de re-disparar ao scraper
@@ -179,7 +180,7 @@ export class OrphanedProcessCron {
       }
 
       this.logger.log(
-        `[OrphanedProcess] Concluído: ${retried} reenfileirados, ${failed} falhas`,
+        `[OrphanedProcess] Concluído: ${retried} reenfileirados, ${errored} encerrados com erro, ${failed} falhas`,
       );
     } catch (err: unknown) {
       this.logger.error(

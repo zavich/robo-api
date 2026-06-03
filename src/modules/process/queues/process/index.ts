@@ -1,4 +1,4 @@
-import { Logger, Inject } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -9,7 +9,6 @@ import {
 import { Complainant } from '../../schema/complainant.schema';
 import { Process as ProcessSchema } from '../../schema/process.schema';
 
-import { Redis } from 'ioredis';
 import { ExtractDocumentsInfoService } from './services/extract-documents-info.service';
 import { InitialPetitionService } from './services/initial-petition.service';
 import { InsertProcessService } from './services/insert-process.service';
@@ -29,7 +28,6 @@ export class ProcessQueue {
     private readonly extractDocumentsInfoService: ExtractDocumentsInfoService,
     private readonly insertProcessService: InsertProcessService,
     private readonly initialPetitionService: InitialPetitionService,
-    @Inject('REDIS_CLIENT') private readonly redisClient: Redis,
   ) {}
 
   async insertProcess(data: InsertProceess) {
