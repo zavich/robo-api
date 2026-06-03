@@ -21,6 +21,9 @@ export class InitialPetitionWorker extends WorkerHost {
   async process(job: Job<InitialPetitionJobData>): Promise<void> {
     const { processNumber, resposta } = job.data;
     const number = processNumber || resposta?.numero_unico;
+    if (!number) {
+      throw new Error('Número do processo ausente no payload do job (initial-petition)');
+    }
     this.logger.log(`Processando petição inicial do processo #${number}`);
     try {
       await this.initialPetitionService.execute(number);

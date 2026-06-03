@@ -66,6 +66,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     const permissions = payload.permissions ?? getPermissionsForRole(user.role);
-    return { ...user.toObject(), permissions };
+    const { password: _pw, ...userObj } = user.toObject();
+    return { ...userObj, id: String(userObj._id), permissions };
   }
 }

@@ -23,15 +23,15 @@ export class ExtractDocumentWorker extends WorkerHost {
     const body = job.data;
     this.logger.log('Iniciando extração de documentos');
     try {
-      let processFound: ProcessSchema;
-      if ('resposta' in body) {
-        processFound = await this.processModule
-          .findOne({ number: body?.resposta?.numero_unico })
-          .populate(['processStatus']);
-      } else {
-        processFound = await this.processModule
-          .findOne({ number: body?.processNumber })
-          .populate(['processStatus']);
+      const processNumber = 'resposta' in body ? body?.resposta?.numero_unico : body?.processNumber;
+      if (!processNumber) {
+        throw new Error('Número do processo ausente no payload do job');
+      }
+      const processFound = await this.processModule
+        .findOne({ number: processNumber })
+        .populate(['processStatus']);
+      if (!processFound) {
+        throw new Error(`Processo não encontrado: ${processNumber}`);
       }
       await this.extractDocumentsInfoService.execute(processFound.number);
       this.logger.log('Extração de documentos concluída');

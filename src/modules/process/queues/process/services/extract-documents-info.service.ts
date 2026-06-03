@@ -121,7 +121,7 @@ export class ExtractDocumentsInfoService {
 
     const results: boolean[] = [];
     for (const document of documentFound) {
-      if (document.data) {
+      if (document.status === StatusExtractionInsight.COMPLETED) {
         results.push(true);
         continue;
       }

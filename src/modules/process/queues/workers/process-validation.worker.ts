@@ -32,6 +32,9 @@ export class ProcessValidationWorker extends WorkerHost {
       const findProcess = await this.processModule.findOne({
         number: processNumber,
       });
+      if (!findProcess) {
+        throw new Error(`Processo não encontrado: ${processNumber}`);
+      }
       await this.createOrUpdateComplainant(findProcess);
       await this.processValidationService.execute(findProcess.number);
     } catch (error) {

@@ -68,15 +68,20 @@ export class AuthenticationController {
 
     if (token) {
       try {
-        const payloadBase64 = token.split('.')[1];
-        const payload = JSON.parse(
-          Buffer.from(payloadBase64, 'base64').toString('utf8'),
-        ) as { jti?: string; exp?: number };
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(
+            Buffer.from(parts[1], 'base64').toString('utf8'),
+          ) as { jti?: string; exp?: number };
 
-        if (payload.jti && payload.exp) {
-          const ttl = payload.exp - Math.floor(Date.now() / 1000);
-          if (ttl > 0) {
-            await this.redis.set(`jwt:revoked:${payload.jti}`, '1', 'EX', ttl);
+          // Validate jti format (UUID-like) to prevent Redis key pollution
+          const jtiValid = typeof payload.jti === 'string' && /^[\w-]{8,128}$/.test(payload.jti);
+          if (jtiValid && payload.exp) {
+            const MAX_JWT_TTL = 24 * 60 * 60; // cap at 24h regardless of token claim
+            const ttl = Math.min(payload.exp - Math.floor(Date.now() / 1000), MAX_JWT_TTL);
+            if (ttl > 0) {
+              await this.redis.set(`jwt:revoked:${payload.jti}`, '1', 'EX', ttl);
+            }
           }
         }
       } catch {
