@@ -96,7 +96,7 @@ export class UpdateLawsuitService {
       // Adiciona formPipedrive ao updateData se houver campos para atualizar
       if (Object.keys(finalFormPipedrive).length > 0) {
         updateData.formPipedrive = finalFormPipedrive;
-        this.logger.log('[UpdateLawsuitService] Salvando formPipedrive:', JSON.stringify(finalFormPipedrive, null, 2));
+        this.logger.log(`[UpdateLawsuitService] Salvando formPipedrive: ${JSON.stringify(finalFormPipedrive, null, 2)}`);
       } else {
         this.logger.log('[UpdateLawsuitService] Nenhum campo formPipedrive para salvar');
       }

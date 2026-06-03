@@ -54,7 +54,7 @@ export class InitialPetitionService {
 
         if (
           !findProcessMain &&
-          peticaoInicialDoc.data?.numero_processo_principal
+          peticaoInicialDoc?.data?.numero_processo_principal
         ) {
           const called = await this.callToGetMainLawsuit(
             peticaoInicialDoc.data.numero_processo_principal as string,

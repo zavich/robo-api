@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcryptjs';
 import Redis from 'ioredis';
 import { User } from 'src/modules/user/schema/user.schema';
 import { AuthDto } from '../dto/auth.dto';
@@ -43,7 +44,13 @@ export class LoginService {
 
     if (!user) {
       await this.recordFailedAttempt(attemptsKey, lockKey);
-      throw new UnauthorizedException('E-mail não autorizado');
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    const passwordValid = await bcrypt.compare(data.password, user.password);
+    if (!passwordValid) {
+      await this.recordFailedAttempt(attemptsKey, lockKey);
+      throw new UnauthorizedException('Credenciais inválidas');
     }
 
     if (user.isActive === false) {

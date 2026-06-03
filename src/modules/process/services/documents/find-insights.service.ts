@@ -96,7 +96,7 @@ export class FindInsightsService {
               gsUri,
               fullPrompt,
             );
-            this.logger.log('response: ', response);
+            this.logger.log(`response: ${JSON.stringify(response)}`);
 
             doc.data = response;
             await this.lawsuitModel.findOneAndUpdate(
@@ -124,7 +124,7 @@ export class FindInsightsService {
                 },
               },
             );
-            this.logger.error('Erro ao extrair insight do documento:', error);
+            this.logger.error(`Erro ao extrair insight do documento: ${error instanceof Error ? error.stack : String(error)}`);
           } finally {
             await this.vertexAIService.deleteFileFromGCS(gsKey);
           }

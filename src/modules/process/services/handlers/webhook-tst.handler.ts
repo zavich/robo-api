@@ -111,7 +111,7 @@ export class WebhookTstHandler {
       await this.processModel.updateOne({ number: processNumber }, { autosData });
       this.logger.log('Finished extracting record data');
     } catch (error) {
-      this.logger.error(`Erro ao extrair dados do processo: ${error.message}`);
+      this.logger.error(`Erro ao extrair dados do processo: ${error instanceof Error ? error.stack : String(error)}`);
     }
   }
 }

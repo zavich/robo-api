@@ -11,8 +11,6 @@ export class NextStepsService {
   private readonly logger = new Logger(NextStepsService.name);
 
   constructor(
-    @InjectQueue('insert-process-queue')
-    private readonly insertProcessQueue: Queue,
     @InjectQueue('process-validation-queue')
     private readonly processValidationQueue: Queue,
     @InjectQueue('solvency-validation-queue')

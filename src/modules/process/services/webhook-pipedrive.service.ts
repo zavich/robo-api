@@ -19,9 +19,7 @@ export class WebhookPipedriveService {
     try {
       const { num_processo, deal_id, stage_id } = body as { num_processo: string; deal_id: number; stage_id: number };
 
-      this.logger.log('Lawsuit: ', num_processo);
-      this.logger.log('deal id: ', deal_id);
-      this.logger.log('stage id: ', stage_id);
+      this.logger.log(`Lawsuit: ${num_processo} | deal_id: ${deal_id} | stage_id: ${stage_id}`);
       const findProcess = await this.processModule.findOne({
         number: num_processo,
       });
@@ -43,7 +41,7 @@ export class WebhookPipedriveService {
         `Lawsuit ${num_processo} inserted in the queue by pipedrive webhook`,
       );
     } catch (error) {
-      this.logger.error('Error on WebhookPipedriveService: ', error);
+      this.logger.error(`Error on WebhookPipedriveService: ${error instanceof Error ? error.stack : String(error)}`);
     }
   }
 }
