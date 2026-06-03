@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { HydratedDocument, Model, Types } from 'mongoose';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { StatusExtractionInsight } from '../../enums/status-extraction-insight.enum';
 import { Movimentacoes, Root } from '../../interfaces/process.interface';
@@ -37,23 +37,23 @@ export class WebhookTrtHandler {
       primeiroGrau:
         (findProcess?.instancias?.find(
           (instancia) => instancia?.instancia === 'PRIMEIRO_GRAU',
-        )?.movimentacoes as unknown[] | undefined)?.length === 0
+        )?.movimentacoes as Record<string, unknown>[] | undefined)?.length === 0
           ? body.resposta?.instancias?.find(
               (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
             )?.movimentacoes?.length
           : (findProcess?.instancias?.find(
               (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-            )?.movimentacoes as unknown[] | undefined)?.length,
+            )?.movimentacoes as Record<string, unknown>[] | undefined)?.length,
       segundoGrau:
         (findProcess?.instancias?.find(
           (instancia) => instancia.instancia === 'SEGUNDO_GRAU',
-        )?.movimentacoes as unknown[] | undefined)?.length === 0
+        )?.movimentacoes as Record<string, unknown>[] | undefined)?.length === 0
           ? body.resposta?.instancias?.find(
               (instancia) => instancia.instancia === 'SEGUNDO_GRAU',
             )?.movimentacoes?.length
           : (findProcess?.instancias?.find(
               (instancia) => instancia.instancia === 'SEGUNDO_GRAU',
-            )?.movimentacoes as unknown[] | undefined)?.length,
+            )?.movimentacoes as Record<string, unknown>[] | undefined)?.length,
     };
     this.logger.log(`Old moviments: ${JSON.stringify(oldMoviments)}`);
 
@@ -174,7 +174,7 @@ export class WebhookTrtHandler {
         .populate({ path: 'processStatus', populate: ['step'] });
 
       if (mainProcess) {
-        const populatedMainProcess = mainProcess as unknown as ProcessEntity & { processStatus: { step: { slug: string } } };
+        const populatedMainProcess = mainProcess as HydratedDocument<ProcessEntity> & { processStatus: { step: { slug: string } } };
         if (populatedMainProcess?.processStatus?.step.slug === 'step-3') {
           await this.nextStepsService.execute(
             populatedMainProcess.processStatus.step.slug,

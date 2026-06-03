@@ -266,10 +266,10 @@ export class ProcessController {
               (reason) =>
                 reason.key
                   .toLowerCase()
-                  .includes(filters.search!.toLowerCase()) ||
+                  .includes(filters.search.toLowerCase()) ||
                 reason.label
                   .toLowerCase()
-                  .includes(filters.search!.toLowerCase()),
+                  .includes(filters.search.toLowerCase()),
             ),
           }))
           .filter((category) => category.reasons.length > 0);
@@ -368,7 +368,7 @@ export class ProcessController {
     @Body(webhookPipedriveSchemaPipe) body: WebhookPipedriveSchemaBody,
   ) {
     try {
-      return await this.webhookPipedriveService.execute(body as unknown as Record<string, unknown>);
+      return await this.webhookPipedriveService.execute(body as Record<string, unknown>);
     } catch (error) {
       throw error;
     }

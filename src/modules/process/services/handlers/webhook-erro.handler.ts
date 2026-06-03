@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { Queue } from 'bullmq';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { AnaliseStatus } from 'src/utils/enum';
 import { PROCESSSTATUSENUM } from '../../enums/process-status.enum';
 import { Root } from '../../interfaces/process.interface';
@@ -29,7 +29,7 @@ export class WebhookErroHandler {
 
   async handle(
     body: Root,
-    findProcess: ProcessEntity & { _id: string; processStatus: { _id: string } },
+    findProcess: ProcessEntity & { _id: string | Types.ObjectId; processStatus: { _id: string | Types.ObjectId } },
     correlationId?: string,
   ): Promise<void> {
     const updatedProcess = await this.processModel.findOneAndUpdate(

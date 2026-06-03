@@ -102,7 +102,7 @@ export class AuthenticationController {
   @Get('me')
   @UseGuards(ApiKeyAuthGuard)
   getProfile(@Req() req: Request) {
-    const user = (req as any).user;
+    const user = req.user;
     const permissions = user?.permissions ?? getPermissionsForRole(user?.role);
     return { ...user, permissions };
   }

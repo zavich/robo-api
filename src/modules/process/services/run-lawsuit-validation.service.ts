@@ -135,7 +135,7 @@ export class LawsuitValidationService {
           });
           await this.processStateMachine.transition(
             this.processStatusService,
-            ((process.processStatus as unknown) as { _id: string })._id,
+            process.processStatus,
             {
               log: null,
               errorReason: null,

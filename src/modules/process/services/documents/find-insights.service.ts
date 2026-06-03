@@ -26,7 +26,7 @@ export class FindInsightsService {
         throw new Error('Lawsuit not found');
       }
       const documentsLawsuit = lawsuit.documents.filter((doc) =>
-        documents.includes(String(doc._id ?? (doc as any).id)),
+        documents.includes(String(doc._id)),
       );
       const processParts = lawsuit.processParts || [];
       const context = {

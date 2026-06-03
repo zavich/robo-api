@@ -17,7 +17,7 @@ interface EmpresaQuiData {
   [key: string]: unknown;
 }
 import axios from 'axios';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { PROCESSSTATUSENUM } from 'src/modules/process/enums/process-status.enum';
 import { ClaimedProcesses } from 'src/modules/process/schema/claimed-processes.schema';
 import { Company } from 'src/modules/process/schema/company.schema';
@@ -26,6 +26,8 @@ import { Process as ProcessEntity } from 'src/modules/process/schema/process.sch
 import { Step } from 'src/modules/process/schema/step.schema';
 import { ProcessStateMachineService } from 'src/modules/process/services/process-state-machine.service';
 import { sleep } from 'src/utils/sleep';
+
+type CompanyWithId = Company & { _id: Types.ObjectId };
 
 @Injectable()
 export class SolvencyValidationService {
@@ -134,7 +136,7 @@ export class SolvencyValidationService {
         ]);
 
         const companyByCnpj = new Map(
-          existingCompanies.map((c) => [c.cnpj, c]),
+          existingCompanies.map((c) => [c.cnpj, c as CompanyWithId]),
         );
         const claimedCompanyIds = new Set(
           existingClaimed.map((cp) => String(cp.companyId)),
@@ -157,7 +159,7 @@ export class SolvencyValidationService {
           await this.createOrUpdateCompanyDataBatch(
             companyData,
             findProcess._id,
-            companyByCnpj as Map<string, Company>,
+            companyByCnpj as Map<string, CompanyWithId>,
             claimedCompanyIds,
           );
 
@@ -235,7 +237,7 @@ export class SolvencyValidationService {
   private async createOrUpdateCompanyDataBatch(
     companyData: EmpresaQuiData,
     processId: string,
-    companyByCnpj: Map<string, Company>,
+    companyByCnpj: Map<string, CompanyWithId>,
     claimedCompanyIds: Set<string>,
   ) {
     const existingCompany = companyByCnpj.get(companyData.cnpj);
@@ -252,15 +254,15 @@ export class SolvencyValidationService {
     };
 
     if (existingCompany) {
-      if (!claimedCompanyIds.has(String((existingCompany as any)._id))) {
+      if (!claimedCompanyIds.has(String(existingCompany._id))) {
         await this.claimedProcessesModule.create({
-          companyId: (existingCompany as any)._id,
+          companyId: existingCompany._id,
           processId,
         });
-        claimedCompanyIds.add(String((existingCompany as any)._id));
+        claimedCompanyIds.add(String(existingCompany._id));
       }
       return this.companyModule.findByIdAndUpdate(
-        (existingCompany as any)._id,
+        existingCompany._id,
         updateFields,
         { new: true, timestamps: false },
       );

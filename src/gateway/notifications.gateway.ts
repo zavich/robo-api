@@ -10,7 +10,7 @@ import { Server, Socket } from 'socket.io';
 @WebSocketGateway({
   cors: {
     origin: (process.env.CORS_ORIGINS || process.env.FRONTEND_URL)
-      ? (process.env.CORS_ORIGINS || process.env.FRONTEND_URL)!
+      ? (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '')
           .split(',')
           .map((origin) => origin.trim())
       : ['http://localhost:3000'],
@@ -26,12 +26,12 @@ export class NotificationsGateway
   private readonly logger = new Logger(NotificationsGateway.name);
 
   // Broadcast geral
-  broadcast(notification: Record<string, unknown>) {
+  broadcast(notification: object) {
     this.server.emit('notification', notification);
   }
 
   // Broadcast para usuário específico
-  notificationUser(notification: Record<string, unknown>, userId: string) {
+  notificationUser(notification: object, userId: string) {
     this.server.to(userId).emit('notification', notification);
   }
 

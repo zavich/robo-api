@@ -3,6 +3,7 @@
 // dotenv.config();
 
 import { createBullBoard } from '@bull-board/api';
+import { BaseAdapter } from '@bull-board/api/dist/src/queueAdapters/base';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { Logger, ValidationPipe } from '@nestjs/common';
@@ -82,11 +83,11 @@ async function bootstrap() {
 
     createBullBoard({
       queues: [
-        new BullMQAdapter(insertProcessQueue) as any,
-        new BullMQAdapter(processValidationQueue) as any,
-        new BullMQAdapter(solvencyValidationQueue) as any,
-        new BullMQAdapter(extractDocumentQueue) as any,
-        new BullMQAdapter(initialPetitionQueue) as any,
+        new BullMQAdapter(insertProcessQueue) as BaseAdapter,
+        new BullMQAdapter(processValidationQueue) as BaseAdapter,
+        new BullMQAdapter(solvencyValidationQueue) as BaseAdapter,
+        new BullMQAdapter(extractDocumentQueue) as BaseAdapter,
+        new BullMQAdapter(initialPetitionQueue) as BaseAdapter,
       ],
       serverAdapter,
     });

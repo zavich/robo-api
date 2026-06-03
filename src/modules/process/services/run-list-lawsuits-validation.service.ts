@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, PipelineStage } from 'mongoose';
+import { HydratedDocument, Model, PipelineStage, Types } from 'mongoose';
 
 interface PopulatedProcessStatus {
   _id: string;
   step: { slug: string };
 }
 
-type ProcessWithPopulatedStatus = ProcessEntity & {
+type ProcessWithPopulatedStatus = HydratedDocument<ProcessEntity> & {
   processStatus: PopulatedProcessStatus;
 };
 import { Process as ProcessEntity } from 'src/modules/process/schema/process.schema';
@@ -116,13 +116,13 @@ export class RunListLawsuitsValidationService {
 
         const proc = await this.processModule
           .findOne({ number: numberKey })
-          .populate({ path: 'processStatus', populate: ['step'] }) as unknown as ProcessWithPopulatedStatus | null;
+          .populate({ path: 'processStatus', populate: ['step'] }) as ProcessWithPopulatedStatus | null;
         if (!proc) {
           this.logger.warn('Process ' + numberKey + ' not found');
           return;
         }
         await this.processModule.findByIdAndUpdate(
-          (proc as any)._id,
+          proc._id,
           {
             $set: {
               synchronizedAt: new Date(),

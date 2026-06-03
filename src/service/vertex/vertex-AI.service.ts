@@ -1,4 +1,4 @@
-import { GenerateContentRequest, Part, VertexAI } from '@google-cloud/vertexai';
+import { FileDataPart, GenerateContentRequest, Part, VertexAI } from '@google-cloud/vertexai';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -38,7 +38,7 @@ export class VertexAIService {
     retries = 3,
     delayMs = 3000,
     cooldownAfterSuccessMs = 3000,
-  ): Promise<any> {
+  ): Promise<Record<string, unknown>> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const result = await this.execute(file_url, prompt, fileMimeType);
@@ -76,7 +76,7 @@ export class VertexAIService {
     file_url: string,
     prompt: string,
     fileMimeType = 'application/pdf',
-  ): Promise<any> {
+  ): Promise<Record<string, unknown>> {
     try {
       const vertexAI = new VertexAI({
         project: process.env.GOOGLE_PROJECT_ID,
@@ -97,13 +97,13 @@ export class VertexAIService {
           responseMimeType: 'application/json',
         },
       });
-      const filePart = {
-        file_data: {
-          mime_type: fileMimeType,
-          file_uri: file_url,
+      const filePart: FileDataPart = {
+        fileData: {
+          mimeType: fileMimeType,
+          fileUri: file_url,
         },
       };
-      const textPart = {
+      const textPart: Part = {
         text: prompt,
       };
 
@@ -117,7 +117,7 @@ export class VertexAIService {
         contents: [
           {
             role: 'user',
-            parts: [filePart as unknown as Part, textPart as Part],
+            parts: [filePart, textPart],
           },
         ],
       };

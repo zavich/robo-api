@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { HydratedDocument, Model, Types } from 'mongoose';
 import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { PROCESSSTATUSENUM } from '../../enums/process-status.enum';
 import { Root } from '../../interfaces/process.interface';
@@ -15,7 +15,7 @@ interface PopulatedProcessStatus {
   name?: string;
 }
 
-type ProcessWithPopulatedStatus = ProcessEntity & {
+type ProcessWithPopulatedStatus = HydratedDocument<ProcessEntity> & {
   processStatus: PopulatedProcessStatus;
 };
 
@@ -34,7 +34,7 @@ export class WebhookNaoEncontradoHandler {
 
   async handle(
     body: Root,
-    findProcess: ProcessEntity & { _id: string; processStatus: { _id: string } },
+    findProcess: ProcessEntity & { _id: string | Types.ObjectId; processStatus: { _id: string | Types.ObjectId } },
     step: Step,
     correlationId?: string,
   ): Promise<void> {
@@ -53,7 +53,7 @@ export class WebhookNaoEncontradoHandler {
     ) {
       const findLawsuitProvisional = await this.processModel
         .findOne({ number: findProcess.calledByProvisionalLawsuitNumber })
-        .populate({ path: 'processStatus', populate: ['step'] }) as unknown as ProcessWithPopulatedStatus | null;
+        .populate({ path: 'processStatus', populate: ['step'] }) as ProcessWithPopulatedStatus | null;
 
       if (findLawsuitProvisional?.processStatus) {
         await this.nextStepsService.execute(
@@ -69,7 +69,7 @@ export class WebhookNaoEncontradoHandler {
     if (findProcess?.processMain) {
       const mainProcess = await this.processModel
         .findOne({ _id: findProcess.processMain })
-        .populate({ path: 'processStatus', populate: ['step'] }) as unknown as ProcessWithPopulatedStatus | null;
+        .populate({ path: 'processStatus', populate: ['step'] }) as ProcessWithPopulatedStatus | null;
 
       if (mainProcess?.processStatus?.step.slug === 'step-3') {
         await this.nextStepsService.execute(

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { normalizeString } from 'src/utils/normalize-string';
 import { Instancia, Root } from '../../interfaces/process.interface';
 import { Process as ProcessEntity } from '../../schema/process.schema';
@@ -16,15 +16,15 @@ export class WebhookTstHandler {
 
   async handle(
     body: Root,
-    findProcess: ProcessEntity & { _id: string },
+    findProcess: ProcessEntity & { _id: string | Types.ObjectId },
   ): Promise<void> {
     const oldMoviments = {
       tst:
-        (findProcess?.instanciasAutos[0]?.movimentacoes as unknown[] | undefined)?.length === 0
+        (findProcess?.instanciasAutos[0]?.movimentacoes as Record<string, unknown>[] | undefined)?.length === 0
           ? body.resposta?.instancias?.find(
               (instancia) => instancia.instancia === 'TST',
             )?.movimentacoes?.length
-          : (findProcess?.instanciasAutos[0]?.movimentacoes as unknown[] | undefined)?.length,
+          : (findProcess?.instanciasAutos[0]?.movimentacoes as Record<string, unknown>[] | undefined)?.length,
     };
 
     await this.processModel.updateOne(

@@ -141,7 +141,7 @@ export class InitialPetitionService {
       return [];
     }
     return docs.reduce((latest, current) => {
-      return new Date(current.data as unknown as string) > new Date(latest.data as unknown as string) ? current : latest;
+      return new Date(current.date ?? '') > new Date(latest.date ?? '') ? current : latest;
     });
   }
 }

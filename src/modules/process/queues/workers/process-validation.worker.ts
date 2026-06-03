@@ -11,6 +11,22 @@ interface ProcessValidationJobData {
   processNumber: string;
 }
 
+interface PartePrincipal {
+  tipo: string;
+  principal: boolean;
+  nome?: string;
+  documento?: { tipo?: string; numero?: string };
+  [key: string]: unknown;
+}
+
+interface InstanciaItem {
+  instancia: string;
+  movimentacoes: Record<string, unknown>[];
+  partes: PartePrincipal[];
+  classe?: string;
+  [key: string]: unknown;
+}
+
 @Processor('process-validation-queue')
 export class ProcessValidationWorker extends WorkerHost {
   private readonly logger = new Logger(ProcessValidationWorker.name);
@@ -46,8 +62,8 @@ export class ProcessValidationWorker extends WorkerHost {
   private async createOrUpdateComplainant(process: ProcessSchema): Promise<void> {
     const moviments =
       process.instancias?.flatMap((instancia) =>
-        (instancia.movimentacoes as unknown[]).map((moviment) => ({
-          ...(moviment as Record<string, unknown>),
+        (instancia as InstanciaItem).movimentacoes.map((moviment) => ({
+          ...moviment,
           instancia: instancia.instancia,
         })),
       ) || [];
@@ -59,29 +75,32 @@ export class ProcessValidationWorker extends WorkerHost {
       'polo ativo',
       'exequente',
     ];
-    const autores = (process.instancias
-      ?.find((instancia) => instancia.instancia === 'PRIMEIRO_GRAU')
-      ?.partes as unknown[] | undefined)?.find(
-        (item: any) =>
+    const autores = (instancia: Record<string, unknown>) =>
+      (instancia as InstanciaItem).partes?.find(
+        (item: PartePrincipal) =>
           authorKeywords.some((keyword) =>
             item.tipo?.toLowerCase().includes(keyword),
           ) && item.principal,
       );
+    const primeiroGrau = process.instancias?.find(
+      (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
+    );
+    const autor = primeiroGrau ? autores(primeiroGrau) : undefined;
 
-    if (!autores) {
+    if (!autor) {
       this.logger.warn(`Sem "AUTOR" para o processo #${process.number}`);
       return;
     }
 
     const createComplainant = await this.complainantModule.findOneAndUpdate(
-      { name: (autores as any)?.nome, cpf: (autores as any)?.documento?.numero },
-      { $set: { name: (autores as any)?.nome, cpf: (autores as any)?.documento?.numero } },
+      { name: autor.nome, cpf: autor.documento?.numero },
+      { $set: { name: autor.nome, cpf: autor.documento?.numero } },
       { upsert: true, new: true },
     );
 
-    const classProcess = process.instancias?.find(
-      (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-    )?.classe;
+    const classProcess = primeiroGrau
+      ? (primeiroGrau as InstanciaItem).classe
+      : undefined;
 
     await this.processModule.updateOne(
       { number: process.number },

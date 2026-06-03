@@ -7,7 +7,7 @@ import {
 import { Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import Redis from 'ioredis';
-import { Model, Types } from 'mongoose';
+import { HydratedDocument, Model, Types } from 'mongoose';
 import { Root } from '../interfaces/process.interface';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Process as ProcessEntity } from '../schema/process.schema';
@@ -21,6 +21,11 @@ import { WebhookTstHandler } from './handlers/webhook-tst.handler';
 type IdempotencyAcquisition =
   | { acquired: true; previousState: 'NEW' | 'FAILED' | 'FAILED_PROCESS_NOT_FOUND' }
   | { acquired: false; currentState: string };
+
+type PopulatedProcessStatus = { _id: string; step: string };
+type WebhookProcess = HydratedDocument<ProcessEntity> & {
+  processStatus: PopulatedProcessStatus;
+};
 
 const ACQUIRE_IDEMPOTENCY_SCRIPT = `
 local key = KEYS[1]
@@ -97,16 +102,18 @@ export class WebhookService implements OnModuleInit {
         return;
       }
 
+      const webhookProcess = findProcess as WebhookProcess;
+
       const step = await this.stepModel.findById(
-        (findProcess.processStatus as any).step,
+        webhookProcess.processStatus.step,
       );
 
       if (body.status === 'NAO_ENCONTRADO') {
         await this.naoEncontradoHandler.handle(
           body,
-          findProcess as unknown as ProcessEntity & {
-            _id: string;
-            processStatus: { _id: string };
+          webhookProcess as ProcessEntity & {
+            _id: Types.ObjectId;
+            processStatus: { _id: string | Types.ObjectId };
           },
           step,
           correlationId,
@@ -114,9 +121,9 @@ export class WebhookService implements OnModuleInit {
       } else if (body.status === 'ERRO') {
         await this.erroHandler.handle(
           body,
-          findProcess as unknown as ProcessEntity & {
-            _id: string;
-            processStatus: { _id: string };
+          webhookProcess as ProcessEntity & {
+            _id: Types.ObjectId;
+            processStatus: { _id: string | Types.ObjectId };
           },
           correlationId,
         );
@@ -125,15 +132,12 @@ export class WebhookService implements OnModuleInit {
         if (origem.includes('tst')) {
           await this.tstHandler.handle(
             body,
-            findProcess as unknown as ProcessEntity & { _id: string },
+            webhookProcess as ProcessEntity & { _id: Types.ObjectId },
           );
         } else if (origem.includes('trt')) {
           await this.trtHandler.handle(
             body,
-            findProcess as unknown as ProcessEntity & {
-              _id: Types.ObjectId;
-              processStatus: { _id: string };
-            },
+            webhookProcess,
             step,
             correlationId,
           );

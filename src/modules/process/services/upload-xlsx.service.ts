@@ -22,7 +22,7 @@ export class UploadXLSXService {
     const sheet = workbook.Sheets[sheetName];
 
     // pega tudo como matriz (igual frontend)
-    const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const rows: (string | number)[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     const processNumberRegex = /^\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/;
 
