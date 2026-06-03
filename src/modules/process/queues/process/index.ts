@@ -1,7 +1,5 @@
 import { Logger, Inject } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
 import { InjectModel } from '@nestjs/mongoose';
-import { Queue } from 'bullmq';
 import { Model } from 'mongoose';
 import {
   InsertProceess,
@@ -32,16 +30,6 @@ export class ProcessQueue {
     private readonly insertProcessService: InsertProcessService,
     private readonly initialPetitionService: InitialPetitionService,
     @Inject('REDIS_CLIENT') private readonly redisClient: Redis,
-    @InjectQueue('insert-process-queue')
-    private readonly insertProcessQueue: Queue,
-    @InjectQueue('process-validation-queue')
-    private readonly processValidationQueue: Queue,
-    @InjectQueue('solvency-validation-queue')
-    private readonly solvencyValidationQueue: Queue,
-    @InjectQueue('extract-document-queue')
-    private readonly extractDocumentQueue: Queue,
-    @InjectQueue('initial-petition-queue')
-    private readonly initialPetitionQueue: Queue,
   ) {}
 
   async insertProcess(data: InsertProceess) {

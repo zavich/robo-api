@@ -115,8 +115,8 @@ export class WebhookTrtHandler {
       class: definedClass,
       moviments,
     });
-    this.logger.log('Next step:', step.slug);
-    this.logger.log('Body:', body.numero_processo);
+    this.logger.log(`Next step: ${step.slug}`);
+    this.logger.log(`Body: ${body.numero_processo}`);
     await this.nextStepsService.execute(step.slug, {
       processNumber: body.numero_processo,
       correlationId,

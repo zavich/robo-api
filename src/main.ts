@@ -93,16 +93,15 @@ async function bootstrap() {
     });
 
     app.use('/bull-board', serverAdapter.getRouter());
-    bootstrapLogger.log(`[BOOT] REDIS_URL: ${process.env.REDIS_URL}`);
+    const maskedRedisUrl = (process.env.REDIS_URL ?? '').replace(/\/\/[^:]*:[^@]*@/, '//*:*@');
+    bootstrapLogger.log(`[BOOT] REDIS_URL: ${maskedRedisUrl}`);
     bootstrapLogger.log(
       'Bull Board carregado com as filas: insert-process-queue, process-validation-queue, ' +
       'solvency-validation-queue, extract-document-queue, initial-petition-queue',
     );
     const logger = new Logger('BullBoard');
 
-    logger.warn(
-      `Tentando conectar ao Redis para Bull Board... ${process.env.REDIS_URL}`,
-    );
+    logger.warn(`Tentando conectar ao Redis para Bull Board... ${maskedRedisUrl}`);
     try {
       await insertProcessQueue.getJobCounts();
       logger.warn('Redis conectado com sucesso!');
