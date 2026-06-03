@@ -59,6 +59,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException();
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Conta desativada');
+    }
+
     if (!isKnownRole(user.role)) {
       this.logger.warn(
         `Token validado para usuario com role nao mapeada: ${user.email} (${user.role})`,

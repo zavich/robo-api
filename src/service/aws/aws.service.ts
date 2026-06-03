@@ -57,7 +57,7 @@ export class AwsServices {
 
     try {
       const command = new PublishCommand(params);
-      this.logger.log('command' + JSON.stringify(command));
+      this.logger.log(`SNS publish params: ${JSON.stringify(params)}`);
       // await snsClient.send(command);
     } catch (error) {
       this.logger.error(`Error sending sms: ${error instanceof Error ? error.stack : String(error)}`);
