@@ -6,22 +6,21 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { timingSafeEqual } from 'crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { Request } from 'express';
 import {
   WEBHOOK_SOURCE_KEY,
   WebhookSource,
 } from '../decorators/webhook-source.decorator';
 
+// Chave gerada uma vez no startup — impede que comparações de strings de comprimentos
+// diferentes vazem o tamanho do segredo via timing (length oracle).
+const HMAC_KEY = randomBytes(32);
+
 function safeEquals(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(leftBuffer, rightBuffer);
+  const leftHash = createHmac('sha256', HMAC_KEY).update(left).digest();
+  const rightHash = createHmac('sha256', HMAC_KEY).update(right).digest();
+  return timingSafeEqual(leftHash, rightHash);
 }
 
 @Injectable()

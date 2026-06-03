@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import { Model } from 'mongoose';
+import { AnaliseStatus } from 'src/utils/enum';
 import { PROCESSSTATUSENUM } from '../enums/process-status.enum';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Process as ProcessEntity } from '../schema/process.schema';
@@ -12,12 +13,23 @@ import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 // Processos presos em estados intermediários por mais de 2 horas (BUG-010)
 const ORPHAN_THRESHOLD_MS = 2 * 60 * 60 * 1000;
 
+// Limite igual ao definido em webhook-erro.handler.ts
+const MAX_SCRAPER_RETRIES = 3;
+
+// Estados que envolvem re-disparo ao scraper — sujeitos ao limite de scraperRetryCount
+const SCRAPER_STATES = new Set([
+  PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
+  PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS,
+  PROCESSSTATUSENUM.WAITING_FOR_LAWSUIT_MAIN,
+]);
+
 const STUCK_STATUS_NAMES = [
   PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
   PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS,
   PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS,
   PROCESSSTATUSENUM.EXTRACTION_MOVIMENTS_FINISHED,
   PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED,
+  PROCESSSTATUSENUM.WAITING_FOR_LAWSUIT_MAIN,
 ];
 
 @Injectable()
@@ -71,6 +83,32 @@ export class OrphanedProcessCron {
             );
           }
 
+          // Estados que disparam ao scraper: respeitar limite de scraperRetryCount
+          if (SCRAPER_STATES.has(currentStatusName as PROCESSSTATUSENUM)) {
+            const retryCount = proc.scraperRetryCount ?? 0;
+            if (retryCount >= MAX_SCRAPER_RETRIES) {
+              this.logger.warn(
+                `[OrphanedProcess] ${proc.number} atingiu max retries (${retryCount}/${MAX_SCRAPER_RETRIES}) — marcando como erro`,
+              );
+              await this.processStateMachine.transition(
+                this.processStatusModel,
+                proc.processStatus,
+                {
+                  name: PROCESSSTATUSENUM.ERROR,
+                  log: '',
+                  errorReason: AnaliseStatus.TRT_INACESSIVEL,
+                },
+              );
+              retried++;
+              continue;
+            }
+            // Incrementa contador antes de re-disparar ao scraper
+            await this.processModel.updateOne(
+              { _id: proc._id },
+              { $inc: { scraperRetryCount: 1 } },
+            );
+          }
+
           this.logger.warn(
             `[OrphanedProcess] Re-enfileirando processo orfão ${proc.number}`,
           );
@@ -99,6 +137,14 @@ export class OrphanedProcessCron {
               proc.number,
               proc,
               true,
+            );
+          } else if (
+            currentStatusName === PROCESSSTATUSENUM.WAITING_FOR_LAWSUIT_MAIN
+          ) {
+            await this.insertProcessService.fetchProcessExtract(
+              proc.number,
+              proc,
+              false,
             );
           } else if (
             currentStatusName ===
