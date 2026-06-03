@@ -71,7 +71,7 @@ export class AuthenticationController {
         const parts = token.split('.');
         if (parts.length === 3) {
           const payload = JSON.parse(
-            Buffer.from(parts[1], 'base64').toString('utf8'),
+            Buffer.from(parts[1], 'base64url').toString('utf8'),
           ) as { jti?: string; exp?: number };
 
           // Validate jti format (UUID-like) to prevent Redis key pollution

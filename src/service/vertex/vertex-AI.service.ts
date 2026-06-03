@@ -129,8 +129,8 @@ export class VertexAIService {
       );
       return jsonParsed;
     } catch (error) {
-      this.logger.error('VERTEX ERROR:', error);
-      this.logger.error('VERTEX RESPONSE:', (error as { response?: { data?: unknown } })?.response?.data);
+      const stack = error instanceof Error ? error.stack : String(error);
+      this.logger.error(`VERTEX ERROR: ${stack}`);
       throw error;
     }
   }

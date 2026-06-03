@@ -55,7 +55,7 @@ export class WebhookTrtHandler {
               (instancia) => instancia.instancia === 'SEGUNDO_GRAU',
             )?.movimentacoes as unknown[] | undefined)?.length,
     };
-    this.logger.log('Old moviments:', oldMoviments);
+    this.logger.log(`Old moviments: ${JSON.stringify(oldMoviments)}`);
 
     const definedClass = this.isProvisionalExecution(
       body.resposta?.instancias?.find(
@@ -110,7 +110,7 @@ export class WebhookTrtHandler {
       valueCase: body?.resposta?.instancias[0]?.valor_causa,
       processParts: body?.resposta?.instancias?.find(
         (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-      ).partes,
+      )?.partes,
       oldMoviments,
       class: definedClass,
       moviments,

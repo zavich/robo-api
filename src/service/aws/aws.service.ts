@@ -38,7 +38,7 @@ export class AwsServices {
 
       // await sesClient.send(command);
     } catch (error) {
-      this.logger.error('Error sending email', error);
+      this.logger.error(`Error sending email: ${error instanceof Error ? error.stack : String(error)}`);
     }
   }
 

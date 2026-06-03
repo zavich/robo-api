@@ -26,7 +26,7 @@ export class BrapiService {
       }
       return value;
     } catch (error) {
-      this.logger.error('Error getting current Selic rate:', error);
+      this.logger.error(`Error getting current Selic rate: ${error instanceof Error ? error.stack : String(error)}`);
       throw new Error('Error getting current Selic rate');
     }
   }

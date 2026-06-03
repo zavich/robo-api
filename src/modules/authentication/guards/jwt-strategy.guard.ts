@@ -15,7 +15,7 @@ import {
 
 export type iJwtPayload = {
   sub: string;
-  email: string;
+  identifier: string;
   jti?: string;
   permissions?: Permission[];
 };

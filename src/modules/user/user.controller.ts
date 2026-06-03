@@ -28,7 +28,7 @@ export class UsersController {
     @Body(updateUserSchemaPipe) body: UpdateUserSchemaBody,
     @Req() req: Request,
   ) {
-    const requester = (req as any).user;
+    const requester = req.user;
     return await this.updateUserService.execute(id, body, requester);
   }
 }
