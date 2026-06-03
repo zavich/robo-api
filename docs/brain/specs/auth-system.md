@@ -54,8 +54,8 @@ Arquivo: `src/modules/authentication/guards/apikey-auth.guard.ts`
 
 ## Fluxo de login
 
-1. `POST /v1/auth/login` com `{ email }`
-2. `LoginService` valida se o email existe e esta ativo
+1. `POST /v1/auth/login` com `{ email, password }`
+2. `LoginService` valida se o email existe, compara a senha com bcrypt, e verifica se a conta está ativa
 3. Redis aplica throttle/lockout por conta: 5 falhas -> bloqueio de 30 minutos
 4. JWT gerado com `{ identifier: email, sub: user._id, jti, permissions }`
 5. Set-Cookie `prosolutti_accessToken` (httpOnly, secure em production, sameSite=lax, maxAge=7d)

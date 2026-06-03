@@ -1,3 +1,4 @@
+import * as bcrypt from 'bcryptjs';
 import { HttpException, UnauthorizedException } from '@nestjs/common';
 import { LoginService } from './login.service';
 
@@ -31,9 +32,9 @@ describe('LoginService', () => {
     redis = makeRedis();
 
     service = new LoginService(
-      userModel as any,
-      jwtService as any,
-      redis as any,
+      userModel as never,
+      jwtService as never,
+      redis as never,
     );
   });
 
@@ -43,8 +44,8 @@ describe('LoginService', () => {
     userModel.findOne.mockResolvedValue(null);
 
     await expect(
-      service.execute({ email: 'nao-autorizado@acme.com' } as any),
-    ).rejects.toThrow(new UnauthorizedException('E-mail não autorizado'));
+      service.execute({ email: 'nao-autorizado@acme.com', password: 'qualquer' }),
+    ).rejects.toThrow(new UnauthorizedException('Credenciais inválidas'));
 
     expect(redis.expire).toHaveBeenCalledWith(
       'login:failed:nao-autorizado@acme.com',
@@ -52,15 +53,36 @@ describe('LoginService', () => {
     );
   });
 
+  it('rejeita senha incorreta', async () => {
+    redis.exists.mockResolvedValue(0);
+    redis.incr.mockResolvedValue(1);
+    userModel.findOne.mockResolvedValue({
+      _id: 'user-1',
+      email: 'user@acme.com',
+      password: '$2b$10$hashedpassword',
+      isActive: true,
+      role: 'advogado',
+    });
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
+
+    await expect(
+      service.execute({ email: 'user@acme.com', password: 'errada' }),
+    ).rejects.toThrow(new UnauthorizedException('Credenciais inválidas'));
+  });
+
   it('rejeita conta desativada', async () => {
     redis.exists.mockResolvedValue(0);
     userModel.findOne.mockResolvedValue({
+      _id: 'user-1',
       email: 'desativado@acme.com',
+      password: '$2b$10$hashedpassword',
       isActive: false,
+      role: 'advogado',
     });
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
     await expect(
-      service.execute({ email: 'desativado@acme.com' } as any),
+      service.execute({ email: 'desativado@acme.com', password: 'correta' }),
     ).rejects.toThrow(new UnauthorizedException('Conta desativada'));
   });
 
@@ -70,7 +92,7 @@ describe('LoginService', () => {
     userModel.findOne.mockResolvedValue(null);
 
     await expect(
-      service.execute({ email: 'lock@acme.com' } as any),
+      service.execute({ email: 'lock@acme.com', password: 'qualquer' }),
     ).rejects.toThrow(UnauthorizedException);
 
     expect(redis.set).toHaveBeenCalledWith(
@@ -87,7 +109,7 @@ describe('LoginService', () => {
     redis.ttl.mockResolvedValue(1200);
 
     await expect(
-      service.execute({ email: 'lock@acme.com' } as any),
+      service.execute({ email: 'lock@acme.com', password: 'qualquer' }),
     ).rejects.toThrow(HttpException);
   });
 
@@ -96,12 +118,14 @@ describe('LoginService', () => {
     userModel.findOne.mockResolvedValue({
       _id: 'user-1',
       email: 'ok@acme.com',
+      password: '$2b$10$hashedpassword',
       isActive: true,
       role: 'admin',
     });
+    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
     jwtService.sign.mockReturnValue('jwt-token');
 
-    const result = await service.execute({ email: 'ok@acme.com' } as any);
+    const result = await service.execute({ email: 'ok@acme.com', password: 'correta' });
 
     expect(redis.del).toHaveBeenCalledWith('login:failed:ok@acme.com');
     expect(jwtService.sign).toHaveBeenCalledWith(

@@ -56,11 +56,17 @@ export class ExtractDocumentsInfoService {
         /.*peticao.*inicial.*/i,
         promptPeticaoInicial,
       );
+      if (!promptPlanilhaCalc) {
+        this.logger.error(
+          `Prompt 'PlanilhaCalculo' não encontrado no banco. Configure o prompt antes de executar extração.`,
+        );
+        throw new Error(`Prompt 'PlanilhaCalculo' não configurado`);
+      }
       const resultPlanilha = await this.extractDocument(
         processFound.documents,
         lawsuit,
         /.*planilha.*de.*calculo.*/i,
-        promptPlanilhaCalc?.text ?? '',
+        promptPlanilhaCalc.text,
       );
 
       const results = [resultPeticao, resultPlanilha];
