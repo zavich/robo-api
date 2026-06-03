@@ -34,11 +34,15 @@ export class AppController {
 
     // Redis check
     try {
+      let pingTimer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([
-        this.redis.ping(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Redis ping timeout')), 3000),
-        ),
+        this.redis.ping().finally(() => clearTimeout(pingTimer)),
+        new Promise<never>((_, reject) => {
+          pingTimer = setTimeout(
+            () => reject(new Error('Redis ping timeout')),
+            3000,
+          );
+        }),
       ]);
       checks.redis = 'ok';
     } catch {

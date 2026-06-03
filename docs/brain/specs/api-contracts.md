@@ -34,7 +34,7 @@
 ### POST /v1/auth/login
 
 - **Auth**: nenhuma
-- **Body**: `{ email: string (IsEmail) }`
+- **Body**: `{ email: string (IsEmail), password: string (MinLength: 6) }`
 - **Response**: `{ message: 'Login successful' }`
 - **Throttle**: 5 req/min por IP
 - **Lockout**: 5 falhas por email bloqueiam a conta por 30 min

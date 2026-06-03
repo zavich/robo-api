@@ -57,17 +57,18 @@ export class ExtractDocumentsInfoService {
         promptPeticaoInicial,
       );
       if (!promptPlanilhaCalc) {
-        this.logger.error(
-          `Prompt 'PlanilhaCalculo' não encontrado no banco. Configure o prompt antes de executar extração.`,
+        this.logger.warn(
+          `Prompt 'PlanilhaCalculo' não encontrado — extração da planilha ignorada`,
         );
-        throw new Error(`Prompt 'PlanilhaCalculo' não configurado`);
       }
-      const resultPlanilha = await this.extractDocument(
-        processFound.documents,
-        lawsuit,
-        /.*planilha.*de.*calculo.*/i,
-        promptPlanilhaCalc.text,
-      );
+      const resultPlanilha = promptPlanilhaCalc
+        ? await this.extractDocument(
+            processFound.documents,
+            lawsuit,
+            /.*planilha.*de.*calculo.*/i,
+            promptPlanilhaCalc.text,
+          )
+        : { status: 'SKIPPED' as const };
 
       const results = [resultPeticao, resultPlanilha];
       const hasSuccess = results.some((r) => r.status === 'COMPLETED');
