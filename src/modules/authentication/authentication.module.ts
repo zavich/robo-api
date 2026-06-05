@@ -9,7 +9,6 @@ import { LoginService } from './services/login.service';
 import { AuthenticationController } from './authentication.controller';
 import { SignUpService } from './services/sign-up.service';
 import { RoleAuditService } from './services/role-audit.service';
-import type { StringValue } from 'ms';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -26,7 +25,7 @@ import type { StringValue } from 'ms';
           secret: config.get<string>('JWT_SECRET_KEY'),
           signOptions: {
             expiresIn:
-              (config.get<string>('JWT_EXPIRES_IN') as StringValue) ?? '1d',
+              (config.get<string>('JWT_EXPIRES_IN') as string) ?? '1d',
           },
         };
       },

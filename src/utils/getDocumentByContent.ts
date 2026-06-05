@@ -115,7 +115,9 @@ function getListDocumentByContent(
           doc.data === targetMoviment.data,
       );
 
-      documentFounds.push(documentFound);
+      if (documentFound) {
+        documentFounds.push(documentFound);
+      }
     }
 
     return documentFounds || null;
