@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -138,7 +139,9 @@ export class ExtractDocumentsInfoService {
         { $set: { 'documents.$.status': StatusExtractionInsight.PROCESSING } },
       );
 
-      const gsKey = `${lawsuit}_${String(document._id)}`;
+      // UUID por execução evita que reprocessamentos concorrentes sobrescrevam
+      // ou deletem o objeto GCS enquanto outro fluxo ainda o está usando
+      const gsKey = `${lawsuit}_${String(document._id)}_${randomUUID()}`;
       let uploadedToGcs = false;
 
       try {

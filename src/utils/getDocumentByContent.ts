@@ -96,14 +96,15 @@ function getListDocumentByContent(
         const string01 = splitContent[0].trim();
         const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
 
-        const documentSplitFounds = documents.find(
+        const documentSplitFounds = documents.filter(
           (doc) =>
             (doc.titulo.match(string02) || doc.descricao.match(string01)) &&
             doc.data === targetMoviment.data,
         );
 
-        if (documentSplitFounds) {
-          return [documentSplitFounds];
+        if (documentSplitFounds.length > 0) {
+          documentFounds.push(...documentSplitFounds);
+          continue;
         }
       }
 
