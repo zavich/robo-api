@@ -126,7 +126,11 @@ export class FindInsightsService {
             );
             this.logger.error(`Erro ao extrair insight do documento: ${error instanceof Error ? error.stack : String(error)}`);
           } finally {
-            await this.vertexAIService.deleteFileFromGCS(gsKey);
+            await this.vertexAIService.deleteFileFromGCS(gsKey).catch((err) => {
+              this.logger.warn(
+                `Falha ao remover arquivo GCS ${gsKey}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            });
           }
         }),
       );
