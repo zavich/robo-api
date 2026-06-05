@@ -103,7 +103,7 @@ function getListDocumentByContent(
         );
 
         if (documentSplitFounds) {
-          return documentSplitFounds;
+          return [documentSplitFounds];
         }
       }
 
