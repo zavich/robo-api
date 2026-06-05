@@ -68,7 +68,15 @@ export class ProcessStateMachineService {
     }
 
     const allowed = ALLOWED_TRANSITIONS[from];
-    return Boolean(allowed?.has(to as PROCESSSTATUSENUM));
+    if (allowed === undefined) {
+      // Status legado desconhecido (ex.: nomes livres de versões anteriores):
+      // fail-open com warning para não bloquear registros existentes.
+      this.logger.warn(
+        `canTransition: status desconhecido "${from}" → "${to}" — permitindo (fail-open)`,
+      );
+      return true;
+    }
+    return allowed.has(to as PROCESSSTATUSENUM);
   }
 
   async transition(

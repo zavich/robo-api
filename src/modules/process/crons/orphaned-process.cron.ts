@@ -86,8 +86,20 @@ export class OrphanedProcessCron {
 
           // Estados que disparam ao scraper: respeitar limite de scraperRetryCount
           if (SCRAPER_STATES.has(currentStatusName as PROCESSSTATUSENUM)) {
-            const retryCount = proc.scraperRetryCount ?? 0;
-            if (retryCount >= MAX_SCRAPER_RETRIES) {
+            // $inc atômico com condição $lt: dois corredores concorrentes não
+            // ultrapassam MAX_SCRAPER_RETRIES ao mesmo tempo (race TOCTOU)
+            const updated = await this.processModel.findOneAndUpdate(
+              {
+                _id: proc._id,
+                $or: [
+                  { scraperRetryCount: { $exists: false } },
+                  { scraperRetryCount: { $lt: MAX_SCRAPER_RETRIES } },
+                ],
+              },
+              { $inc: { scraperRetryCount: 1 } },
+            );
+            if (!updated) {
+              const retryCount = proc.scraperRetryCount ?? MAX_SCRAPER_RETRIES;
               this.logger.warn(
                 `[OrphanedProcess] ${proc.number} atingiu max retries (${retryCount}/${MAX_SCRAPER_RETRIES}) — marcando como erro`,
               );
@@ -103,11 +115,6 @@ export class OrphanedProcessCron {
               errored++;
               continue;
             }
-            // Incrementa contador antes de re-disparar ao scraper
-            await this.processModel.updateOne(
-              { _id: proc._id },
-              { $inc: { scraperRetryCount: 1 } },
-            );
           }
 
           this.logger.warn(

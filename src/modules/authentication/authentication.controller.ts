@@ -9,6 +9,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import Redis from 'ioredis';
@@ -27,6 +28,7 @@ export class AuthenticationController {
     private readonly loginService: LoginService,
     private readonly signUpService: SignUpService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    private readonly jwtService: JwtService,
   ) {}
 
   @Post('login')
@@ -68,24 +70,21 @@ export class AuthenticationController {
 
     if (token) {
       try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(
-            Buffer.from(parts[1], 'base64url').toString('utf8'),
-          ) as { jti?: string; exp?: number };
-
-          // Validate jti format (UUID-like) to prevent Redis key pollution
-          const jtiValid = typeof payload.jti === 'string' && /^[\w-]{8,128}$/.test(payload.jti);
-          if (jtiValid && payload.exp) {
-            const MAX_JWT_TTL = 24 * 60 * 60; // cap at 24h regardless of token claim
-            const ttl = Math.min(payload.exp - Math.floor(Date.now() / 1000), MAX_JWT_TTL);
-            if (ttl > 0) {
-              await this.redis.set(`jwt:revoked:${payload.jti}`, '1', 'EX', ttl);
-            }
+        // Verifica assinatura antes de confiar em jti/exp para evitar poluição do blocklist
+        const payload = this.jwtService.verify(token, { ignoreExpiration: true }) as {
+          jti?: string;
+          exp?: number;
+        };
+        const jtiValid = typeof payload.jti === 'string' && /^[\w-]{8,128}$/.test(payload.jti);
+        if (jtiValid && payload.exp) {
+          const MAX_JWT_TTL = 24 * 60 * 60;
+          const ttl = Math.min(payload.exp - Math.floor(Date.now() / 1000), MAX_JWT_TTL);
+          if (ttl > 0) {
+            await this.redis.set(`jwt:revoked:${payload.jti}`, '1', 'EX', ttl);
           }
         }
       } catch {
-        // Token malformado — prosseguir com o logout normalmente
+        // Assinatura inválida ou token malformado — prosseguir com logout sem revogar
       }
     }
 

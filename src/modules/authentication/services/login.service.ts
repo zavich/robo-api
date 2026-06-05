@@ -48,6 +48,7 @@ export class LoginService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
+    // Autenticação exige email + senha; bcrypt.compare valida a senha hasheada.
     const passwordValid = await bcrypt.compare(data.password, user.password);
     if (!passwordValid) {
       await this.recordFailedAttempt(attemptsKey, lockKey);
