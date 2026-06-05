@@ -42,12 +42,12 @@ import { RedisHealthService } from './service/redis-health.service';
     ThrottlerModule.forRoot([
       {
         name: 'default',
-        ttl: 60000, // 1 minuto em ms (v6 usa ms)
+        ttl: 60, // 1 minuto em ms (v6 usa ms)
         limit: 100,  // 100 requests/min por IP (geral)
       },
       {
         name: 'auth',
-        ttl: 60000,  // 1 minuto em ms
+        ttl: 60,  // 1 minuto em ms
         limit: 10,   // 10 tentativas de login por IP por minuto
       },
     ]),

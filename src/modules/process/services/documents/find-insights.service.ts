@@ -136,7 +136,7 @@ export class FindInsightsService {
       );
       return { documentsLawsuit, promptFind };
     } catch (error) {
-      this.logger.error(error);
+      this.logger.error(error instanceof Error ? error.stack : String(error));
       throw new Error('Error executing document insights');
     }
   }

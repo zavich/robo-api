@@ -53,6 +53,10 @@ export class ChangeStageService {
         { new: true }
       );
 
+      if (!updatedProcess) {
+        throw new NotFoundException('Process not found');
+      }
+
       // 5. Buscar ou criar registro de decisões do processo
       let processDecision = await this.processDecisionModel.findOne({
         process_id: changeStageData.processId,
