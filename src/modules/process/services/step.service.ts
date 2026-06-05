@@ -35,8 +35,10 @@ export class StepService {
       ]);
       return steps;
     } catch (error) {
-      this.logger.log(error);
-      return error;
+      this.logger.error(
+        `Erro ao inserir steps: ${error instanceof Error ? error.stack : String(error)}`,
+      );
+      throw error;
     }
   }
 }

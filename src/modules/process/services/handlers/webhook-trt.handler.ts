@@ -207,12 +207,15 @@ export class WebhookTrtHandler {
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase();
 
+    // Verifica se a CLASSE DO PROCESSO contém o termo-base (não o contrário):
+    // classProcess costuma ser mais descritivo que os termos de execucaoProvisoria.
     return execucaoProvisoria.some((execucao) =>
-      execucao
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .includes(normalizedClass),
+      normalizedClass.includes(
+        execucao
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase(),
+      ),
     );
   }
 }
