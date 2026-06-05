@@ -41,10 +41,11 @@ export class AuthenticationController {
   ) {
     const { accessToken } = await this.loginService.execute(loginUserDto);
 
+    const secure = process.env.NODE_ENV === 'production';
     res.cookie('prosolutti_accessToken', accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure,
+      sameSite: secure ? 'none' : 'lax',
       path: '/',
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });
@@ -88,11 +89,12 @@ export class AuthenticationController {
       }
     }
 
+    const secureClear = process.env.NODE_ENV === 'production';
     res.clearCookie('prosolutti_accessToken', {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: secureClear ? 'none' : 'lax',
       path: '/',
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureClear,
     });
 
     return { message: 'Logout realizado com sucesso' };
