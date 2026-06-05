@@ -248,7 +248,9 @@ export default class PipedriveService {
 
       return response.data;
     } catch (error) {
-      this.logger.log(`Error updating Pipedrive deal: ${error}`);
+      this.logger.error(
+        `Error updating Pipedrive deal: ${error instanceof Error ? error.stack : String(error)}`,
+      );
 
       if (error?.response?.status === 429 || error?.response?.status === 403) {
         this.logger.warn(

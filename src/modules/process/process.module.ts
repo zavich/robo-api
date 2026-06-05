@@ -6,7 +6,6 @@ import { NextStepsModule } from 'src/service/next-steps/next-steps.module';
 import PipedriveService from 'src/service/pipedrive/pipedrive';
 import { VertexModule } from 'src/service/vertex/vertex.module';
 import { ProcessController } from './process.controller';
-import { ProcessQueue } from './queues/process';
 import { InitialPetitionService } from './queues/process/services/initial-petition.service';
 import { InsertProcessService } from './queues/process/services/insert-process.service';
 import { ProcessValidationService } from './queues/process/services/process-validation.service';
@@ -144,7 +143,6 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     SolvencyValidationService,
     InitialPetitionService,
     InsertProcessService,
-    ProcessQueue,
     BrapiService,
     LawsuitValidationService,
     WebhookPipedriveService,
