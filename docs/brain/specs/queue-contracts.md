@@ -9,7 +9,7 @@ O `robo-api` usa filas BullMQ separadas por etapa. O `NextStepsService` roteia c
 ## Job: `insert-process`
 
 **Producers**: `CreateProcessService`, `WebhookPipedriveService`, `InitialPetitionService`, `LossRevalidationCron`
-**Consumer**: `ProcessQueue.insertProcess()`
+**Consumer**: `InsertProcessWorker`
 
 **Payload**:
 ```typescript
@@ -36,7 +36,7 @@ O `robo-api` usa filas BullMQ separadas por etapa. O `NextStepsService` roteia c
 ## Job: `process-validation` (step-1)
 
 **Producer**: `NextStepsService`, `WebhookErroHandler` (retry transitório)
-**Consumer**: `ProcessQueue.processValidationJob()`
+**Consumer**: `ProcessValidationWorker`
 
 **Payload**: `{ processNumber: string, correlationId?: string }`
 
@@ -47,7 +47,7 @@ O `robo-api` usa filas BullMQ separadas por etapa. O `NextStepsService` roteia c
 ## Job: `solvency-validation` (step-2)
 
 **Producer**: `NextStepsService`
-**Consumer**: `ProcessQueue.solvencyValidationJob()`
+**Consumer**: `SolvencyValidationWorker`
 
 **Payload**: `{ processNumber: string }`
 
@@ -58,7 +58,7 @@ O `robo-api` usa filas BullMQ separadas por etapa. O `NextStepsService` roteia c
 ## Job: `extract-document` (step-3)
 
 **Producer**: `NextStepsService`
-**Consumer**: `ProcessQueue.extractDocumentJob()`
+**Consumer**: `ExtractDocumentWorker`
 
 **Payload**: `Root` (body do webhook scraping) ou `{ processNumber: string }`
 
@@ -69,7 +69,7 @@ O `robo-api` usa filas BullMQ separadas por etapa. O `NextStepsService` roteia c
 ## Job: `initial-petition` (step-4)
 
 **Producer**: `NextStepsService`
-**Consumer**: `ProcessQueue.initialPetitionJob()`
+**Consumer**: `InitialPetitionWorker`
 
 **Payload**: `{ processNumber: string, resposta?: { numero_unico: string } }`
 

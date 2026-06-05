@@ -158,6 +158,8 @@ class Process {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: ProcessStatus.name })
   processStatus: mongoose.Types.ObjectId;
 
+  // MIGRAÇÃO: garantir ausência de duplicatas em `number` antes do deploy;
+  // a criação do índice único aborta se houver documentos duplicados no banco.
   @Prop({ index: true, unique: true, sparse: true })
   number: string;
 

@@ -32,11 +32,11 @@ process.on('uncaughtException', (error) => {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // whitelist/forbidNonWhitelisted omitidos: projeto usa nestjs-zod (createZodDto)
+  // cujos DTOs não têm decorators class-validator — whitelist zeraria todos os campos.
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
     }),
   );
 
