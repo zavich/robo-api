@@ -14,7 +14,7 @@ import * as bodyParser from 'body-parser';
 import { Queue } from 'bullmq';
 import * as cookieParser from 'cookie-parser';
 import { setMaxListeners } from 'events';
-import { patchNestJsSwagger } from 'nestjs-zod';
+import { patchNestJsSwagger, ZodValidationPipe } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { Env } from './config/zod/env';
 
@@ -32,9 +32,11 @@ process.on('uncaughtException', (error) => {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // whitelist/forbidNonWhitelisted omitidos: projeto usa nestjs-zod (createZodDto)
-  // cujos DTOs não têm decorators class-validator — whitelist zeraria todos os campos.
+  // ZodValidationPipe valida DTOs criados com createZodDto (nestjs-zod).
+  // ValidationPipe(transform) mantém coerção de tipos para DTOs class-validator.
+  // whitelist/forbidNonWhitelisted omitidos: whitelist zeraria todos os campos Zod.
   app.useGlobalPipes(
+    new ZodValidationPipe(),
     new ValidationPipe({
       transform: true,
     }),

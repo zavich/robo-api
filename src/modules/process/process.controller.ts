@@ -18,6 +18,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Request as ExpressRequest, Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
 import { CheckPermissions } from '../authentication/decorators/check-permissions.decorator';
@@ -180,6 +181,7 @@ export class ProcessController {
   @Post('webhook')
   @HttpCode(200)
   @Public()
+  @SkipThrottle()
   @UseGuards(ServiceWebhookGuard)
   @WebhookSourceMetadata('service')
   async webhook(
@@ -362,6 +364,7 @@ export class ProcessController {
   }
   @Post('webhook-pipedrive/')
   @Public()
+  @SkipThrottle()
   @UseGuards(ServiceWebhookGuard)
   @WebhookSourceMetadata('pipedrive')
   async webhookPipedrive(
