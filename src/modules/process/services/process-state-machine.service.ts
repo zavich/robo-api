@@ -37,6 +37,7 @@ const ALLOWED_TRANSITIONS: Record<string, Set<PROCESSSTATUSENUM>> = {
   ]),
   [PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED]: new Set([
     PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
+    PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS,
     PROCESSSTATUSENUM.WAITING_FOR_LAWSUIT_MAIN,
     PROCESSSTATUSENUM.SUCCESS,
     PROCESSSTATUSENUM.ERROR,
@@ -94,10 +95,7 @@ export class ProcessStateMachineService {
       throw new Error(`Process status ${processStatusRef} não encontrado`);
     }
 
-    if (
-      patch.name &&
-      !this.canTransition(currentStatus.name, patch.name)
-    ) {
+    if (patch.name && !this.canTransition(currentStatus.name, patch.name)) {
       this.logger.error(
         `Transição inválida de status: ${currentStatus.name} -> ${patch.name}`,
       );

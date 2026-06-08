@@ -38,7 +38,9 @@ export class AwsServices {
 
       // await sesClient.send(command);
     } catch (error) {
-      this.logger.error(`Error sending email: ${error instanceof Error ? error.stack : String(error)}`);
+      this.logger.error(
+        `Error sending email: ${error instanceof Error ? error.stack : String(error)}`,
+      );
     }
   }
 
@@ -60,7 +62,9 @@ export class AwsServices {
       this.logger.log(`SNS publish params: ${JSON.stringify(params)}`);
       // await snsClient.send(command);
     } catch (error) {
-      this.logger.error(`Error sending sms: ${error instanceof Error ? error.stack : String(error)}`);
+      this.logger.error(
+        `Error sending sms: ${error instanceof Error ? error.stack : String(error)}`,
+      );
       throw new BadRequestException('Error send sms');
     }
   }
@@ -77,7 +81,9 @@ export class AwsServices {
       await this.s3Client.send(command);
       this.logger.log(`Arquivo ${key} excluído com sucesso do S3.`);
     } catch (error) {
-      this.logger.error(`Erro ao excluir o arquivo ${key} do S3: ${error instanceof Error ? error.stack : String(error)}`);
+      this.logger.error(
+        `Erro ao excluir o arquivo ${key} do S3: ${error instanceof Error ? error.stack : String(error)}`,
+      );
 
       throw error;
     }
@@ -106,7 +112,9 @@ export class AwsServices {
         type: params.ContentType,
       };
     } catch (error) {
-      this.logger.error(`Erro ao realizar upload do arquivo do S3: ${error instanceof Error ? error.stack : String(error)}`);
+      this.logger.error(
+        `Erro ao realizar upload do arquivo do S3: ${error instanceof Error ? error.stack : String(error)}`,
+      );
       throw error;
     }
   }
@@ -122,7 +130,9 @@ export class AwsServices {
       }); // URL válida por 1 hora
       return signedUrl;
     } catch (error) {
-      this.logger.error(`Erro ao gerar URL assinada para o arquivo ${key}: ${error instanceof Error ? error.stack : String(error)}`);
+      this.logger.error(
+        `Erro ao gerar URL assinada para o arquivo ${key}: ${error instanceof Error ? error.stack : String(error)}`,
+      );
       throw error;
     }
   }

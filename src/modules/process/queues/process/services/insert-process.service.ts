@@ -135,10 +135,13 @@ export class InsertProcessService {
       );
     } catch (error) {
       const axiosError = error as AxiosError;
-      this.logger.debug(`HTTP ${axiosError.response?.status ?? 'sem status'} ao enviar para extração`);
+      this.logger.debug(
+        `HTTP ${axiosError.response?.status ?? 'sem status'} ao enviar para extração`,
+      );
       if (axiosError.response?.status === 422) {
         await this.processModule.findByIdAndUpdate(processCreate._id, {
-          integrationId: (axiosError.response.data as { async_id?: string }).async_id,
+          integrationId: (axiosError.response.data as { async_id?: string })
+            .async_id,
         });
         await this.processStateMachine.transition(
           this.processStatusModule,
@@ -154,9 +157,6 @@ export class InsertProcessService {
         this.logger.error(
           `Erro ao enviar processo ${processNumber} para a extração`,
         );
-        // await this.processModule.findByIdAndUpdate(processCreate._id, {
-        //   situation: Situation.ISSUED,
-        // });
         await this.processStateMachine.transition(
           this.processStatusModule,
           processCreate.processStatus,
