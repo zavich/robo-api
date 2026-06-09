@@ -30,16 +30,21 @@ function getDocumentByContent(
 
     const splitContent = targetMoviment.conteudo.split('|');
     if (splitContent.length === 2 && !onlyTitle) {
-      const string01 = splitContent[0].trim();
-      const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
-
-      const documentSplitFound = documents.find(
-        (doc) =>
-          (doc.titulo.includes(string01) ||
-            doc.descricao.includes(string01) ||
-            doc.descricao.includes(string02)) &&
-          doc.data === targetMoviment.data,
+      const normString01 = normalizeString(splitContent[0].trim());
+      const normString02 = normalizeString(
+        splitContent[1].replace(/ \(RESTRITO\)/, '').trim(),
       );
+
+      const documentSplitFound = documents.find((doc) => {
+        const normTitulo = normalizeString(doc.titulo);
+        const normDescricao = normalizeString(doc.descricao);
+        return (
+          (normTitulo.includes(normString01) ||
+            normDescricao.includes(normString01) ||
+            normDescricao.includes(normString02)) &&
+          doc.data === targetMoviment.data
+        );
+      });
 
       if (documentSplitFound) {
         return documentSplitFound;
@@ -47,14 +52,19 @@ function getDocumentByContent(
     }
 
     if (splitContent.length === 2 && onlyTitle) {
-      const string01 = splitContent[0].trim();
-      const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
-
-      const documentSplitFound = documents.find(
-        (doc) =>
-          (doc.titulo.includes(string01) || doc.titulo.includes(string02)) &&
-          doc.data === targetMoviment.data,
+      const normString01 = normalizeString(splitContent[0].trim());
+      const normString02 = normalizeString(
+        splitContent[1].replace(/ \(RESTRITO\)/, '').trim(),
       );
+
+      const documentSplitFound = documents.find((doc) => {
+        const normTitulo = normalizeString(doc.titulo);
+        return (
+          (normTitulo.includes(normString01) ||
+            normTitulo.includes(normString02)) &&
+          doc.data === targetMoviment.data
+        );
+      });
 
       if (documentSplitFound) {
         return documentSplitFound;
@@ -93,15 +103,20 @@ function getListDocumentByContent(
     for (const targetMoviment of targetMoviments) {
       const splitContent = targetMoviment.conteudo.split('|');
       if (splitContent.length === 2) {
-        const string01 = splitContent[0].trim();
-        const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
-
-        const documentSplitFounds = documents.filter(
-          (doc) =>
-            (doc.titulo.includes(string02) ||
-              doc.descricao.includes(string01)) &&
-            doc.data === targetMoviment.data,
+        const normString01 = normalizeString(splitContent[0].trim());
+        const normString02 = normalizeString(
+          splitContent[1].replace(/ \(RESTRITO\)/, '').trim(),
         );
+
+        const documentSplitFounds = documents.filter((doc) => {
+          const normTitulo = normalizeString(doc.titulo);
+          const normDescricao = normalizeString(doc.descricao);
+          return (
+            (normTitulo.includes(normString02) ||
+              normDescricao.includes(normString01)) &&
+            doc.data === targetMoviment.data
+          );
+        });
 
         if (documentSplitFounds.length > 0) {
           documentFounds.push(...documentSplitFounds);

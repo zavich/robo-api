@@ -136,12 +136,16 @@ export class InitialPetitionService {
     );
   }
 
-  findMostRecentPeticaoInicial(docs: RestrictedDocument[] = []): RestrictedDocument | RestrictedDocument[] {
+  findMostRecentPeticaoInicial(
+    docs: RestrictedDocument[] = [],
+  ): RestrictedDocument | null {
     if (!docs.length) {
-      return [];
+      return null;
     }
     return docs.reduce((latest, current) => {
-      return new Date(current.date ?? '') > new Date(latest.date ?? '') ? current : latest;
+      return new Date(current.date ?? '') > new Date(latest.date ?? '')
+        ? current
+        : latest;
     });
   }
 }

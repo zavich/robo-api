@@ -36,8 +36,16 @@ export class ChangeStageService {
         throw new NotFoundException('Process not found');
       }
 
-      // 3. Verificar se o stage realmente mudou
-      if (process.stage === StageByCode[changeStageData.newStageId]) {
+      // 3. Validar mapeamento newStageId -> stage ANTES de qualquer write para
+      //    nao corromper o documento com `stage: undefined`.
+      const nextStage = StageByCode[changeStageData.newStageId];
+      if (!nextStage) {
+        throw new BadRequestException(
+          `newStageId invalido: ${changeStageData.newStageId}`,
+        );
+      }
+
+      if (process.stage === nextStage) {
         throw new BadRequestException('Process is already in the specified stage');
       }
 
@@ -47,7 +55,7 @@ export class ChangeStageService {
       const updatedProcess = await this.processModel.findByIdAndUpdate(
         changeStageData.processId,
         {
-          stage: StageByCode[changeStageData.newStageId],
+          stage: nextStage,
           stageId: changeStageData.newStageId,
         },
         { new: true }
