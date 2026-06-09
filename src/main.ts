@@ -3,7 +3,6 @@
 // dotenv.config();
 
 import { createBullBoard } from '@bull-board/api';
-import type { BaseAdapter } from '@bull-board/api/baseAdapter';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { Logger, ValidationPipe } from '@nestjs/common';
@@ -17,6 +16,7 @@ import { setMaxListeners } from 'events';
 import { patchNestJsSwagger, ZodValidationPipe } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { Env } from './config/zod/env';
+import { BaseAdapter } from '@bull-board/api/dist/src/queueAdapters/base';
 
 const bootstrapLogger = new Logger('Bootstrap');
 
@@ -46,7 +46,11 @@ async function bootstrap() {
   patchNestJsSwagger();
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
-    : ['http://localhost:3000', 'https://scraping-api.juri.capital', 'https://painel-robo.juri.capital'];
+    : [
+        'http://localhost:3000',
+        'https://scraping-api.juri.capital',
+        'https://painel-robo.juri.capital',
+      ];
 
   app.enableCors({
     origin: allowedOrigins,
@@ -77,11 +81,21 @@ async function bootstrap() {
 
     const redisClient = app.get('REDIS_CLIENT');
 
-    const insertProcessQueue = new Queue('insert-process-queue', { connection: redisClient });
-    const processValidationQueue = new Queue('process-validation-queue', { connection: redisClient });
-    const solvencyValidationQueue = new Queue('solvency-validation-queue', { connection: redisClient });
-    const extractDocumentQueue = new Queue('extract-document-queue', { connection: redisClient });
-    const initialPetitionQueue = new Queue('initial-petition-queue', { connection: redisClient });
+    const insertProcessQueue = new Queue('insert-process-queue', {
+      connection: redisClient,
+    });
+    const processValidationQueue = new Queue('process-validation-queue', {
+      connection: redisClient,
+    });
+    const solvencyValidationQueue = new Queue('solvency-validation-queue', {
+      connection: redisClient,
+    });
+    const extractDocumentQueue = new Queue('extract-document-queue', {
+      connection: redisClient,
+    });
+    const initialPetitionQueue = new Queue('initial-petition-queue', {
+      connection: redisClient,
+    });
 
     createBullBoard({
       queues: [
@@ -95,15 +109,20 @@ async function bootstrap() {
     });
 
     app.use('/bull-board', serverAdapter.getRouter());
-    const maskedRedisUrl = (process.env.REDIS_URL ?? '').replace(/\/\/[^:]*:[^@]*@/, '//*:*@');
+    const maskedRedisUrl = (process.env.REDIS_URL ?? '').replace(
+      /\/\/[^:]*:[^@]*@/,
+      '//*:*@',
+    );
     bootstrapLogger.log(`[BOOT] REDIS_URL: ${maskedRedisUrl}`);
     bootstrapLogger.log(
       'Bull Board carregado com as filas: insert-process-queue, process-validation-queue, ' +
-      'solvency-validation-queue, extract-document-queue, initial-petition-queue',
+        'solvency-validation-queue, extract-document-queue, initial-petition-queue',
     );
     const logger = new Logger('BullBoard');
 
-    logger.warn(`Tentando conectar ao Redis para Bull Board... ${maskedRedisUrl}`);
+    logger.warn(
+      `Tentando conectar ao Redis para Bull Board... ${maskedRedisUrl}`,
+    );
     try {
       await insertProcessQueue.getJobCounts();
       logger.warn('Redis conectado com sucesso!');
@@ -116,4 +135,3 @@ async function bootstrap() {
   await app.listen(finalPort, '0.0.0.0');
 }
 bootstrap();
-
