@@ -4,70 +4,13 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { SendEmailCommand, SendEmailCommandInput } from '@aws-sdk/client-ses';
-import { PublishCommand, PublishCommandInput } from '@aws-sdk/client-sns';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as mimeTypes from 'mime-types';
 
 export class AwsServices {
   private readonly logger = new Logger(AwsServices.name);
-
-  async sendEmail(to: string, subject: string, text: string) {
-    const params: SendEmailCommandInput = {
-      Destination: {
-        ToAddresses: [to],
-      },
-      Message: {
-        Body: {
-          Html: {
-            Charset: 'UTF-8',
-            Data: text,
-          },
-        },
-
-        Subject: { Data: subject },
-      },
-      Source: 'gabriel@paguru.com.br',
-    };
-
-    try {
-      const command = new SendEmailCommand(params);
-      this.logger.log(command);
-
-      // await sesClient.send(command);
-    } catch (error) {
-      this.logger.error(
-        `Error sending email: ${error instanceof Error ? error.stack : String(error)}`,
-      );
-    }
-  }
-
-  async sendSMS(message: string, phoneNumber: string): Promise<void> {
-    const params: PublishCommandInput = {
-      Message: message,
-      MessageStructure: 'string',
-      PhoneNumber: phoneNumber,
-      MessageAttributes: {
-        'AWS.SNS.SMS.SMSType': {
-          DataType: 'String',
-          StringValue: 'Transactional',
-        },
-      },
-    };
-
-    try {
-      const command = new PublishCommand(params);
-      this.logger.log(`SNS publish params: ${JSON.stringify(params)}`);
-      // await snsClient.send(command);
-    } catch (error) {
-      this.logger.error(
-        `Error sending sms: ${error instanceof Error ? error.stack : String(error)}`,
-      );
-      throw new BadRequestException('Error send sms');
-    }
-  }
 
   async deleteImageS3(key: string) {
     const params = {

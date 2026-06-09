@@ -77,7 +77,9 @@ export class OrphanedProcessCron {
 
       for (const proc of orphanedProcesses) {
         try {
-          const currentStatusName = statusNameById.get(String(proc.processStatus));
+          const currentStatusName = statusNameById.get(
+            String(proc.processStatus),
+          );
           if (!currentStatusName) {
             throw new Error(
               `Status atual não encontrado para processo órfão ${proc.number}`,
@@ -156,21 +158,21 @@ export class OrphanedProcessCron {
             );
           } else if (
             currentStatusName ===
-              PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS
+            PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS
           ) {
             await this.nextStepsService.execute('step-3', {
               processNumber: proc.number,
             });
           } else if (
             currentStatusName ===
-              PROCESSSTATUSENUM.EXTRACTION_MOVIMENTS_FINISHED
+            PROCESSSTATUSENUM.EXTRACTION_MOVIMENTS_FINISHED
           ) {
             await this.nextStepsService.execute('step-4', {
               processNumber: proc.number,
             });
           } else if (
             currentStatusName ===
-              PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED
+            PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED
           ) {
             await this.nextStepsService.execute('step-4', {
               processNumber: proc.number,

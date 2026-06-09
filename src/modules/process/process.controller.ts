@@ -371,7 +371,9 @@ export class ProcessController {
     @Body(webhookPipedriveSchemaPipe) body: WebhookPipedriveSchemaBody,
   ) {
     try {
-      return await this.webhookPipedriveService.execute(body as Record<string, unknown>);
+      return await this.webhookPipedriveService.execute(
+        body as Record<string, unknown>,
+      );
     } catch (error) {
       throw error;
     }
@@ -420,7 +422,7 @@ export class ProcessController {
   @UseGuards(ApiKeyAuthGuard)
   async getDocument(
     @Param('number') number: string,
-    @Param('documentId') documentId: number,
+    @Param('documentId') documentId: string,
   ) {
     try {
       return await this.findOneDocumentService.execute(number, documentId);
@@ -434,7 +436,7 @@ export class ProcessController {
   @CheckPermissions('process_insertion')
   async deleteDocumentInsights(
     @Param('number') number: string,
-    @Param('documentId') documentId: number,
+    @Param('documentId') documentId: string,
   ) {
     try {
       return await this.deleteInsightsDocumentService.execute(
