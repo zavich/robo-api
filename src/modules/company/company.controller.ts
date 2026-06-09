@@ -56,6 +56,7 @@ export class CompanyController {
   }
   @Post('webhook')
   async handleWebhook(@Body() payload: Record<string, unknown>, @Query('type') type: string) {
-    this.webhookService.execute(payload, type);
+    await this.webhookService.execute(payload, type);
+    return { message: 'Webhook processado' };
   }
 }

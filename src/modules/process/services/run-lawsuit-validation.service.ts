@@ -149,14 +149,9 @@ export class LawsuitValidationService {
               process.number,
               process,
             );
-          } else if (step) {
+          } else {
+            // step e obrigatorio pelo DTO (@MinLength(1)), entao chega aqui sempre definido.
             await this.nextStepsService.execute(step, {
-              processNumber: process.number,
-              mainProcessId:
-                process.class === 'MAIN' ? process._id : process.processMain,
-            });
-          } else if (currentStepSlug) {
-            await this.nextStepsService.execute(currentStepSlug, {
               processNumber: process.number,
               mainProcessId:
                 process.class === 'MAIN' ? process._id : process.processMain,
