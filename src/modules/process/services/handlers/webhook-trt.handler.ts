@@ -107,7 +107,7 @@ export class WebhookTrtHandler {
     await this.processModel.findByIdAndUpdate(findProcess._id, {
       instancias: body?.resposta?.instancias,
       origem: body?.resposta?.origem,
-      valueCase: body?.resposta?.instancias[0]?.valor_causa,
+      valueCase: body?.resposta?.instancias?.[0]?.valor_causa,
       processParts: body?.resposta?.instancias?.find(
         (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
       )?.partes,
@@ -132,7 +132,7 @@ export class WebhookTrtHandler {
     correlationId?: string,
   ): Promise<void> {
     this.logger.log('Processo com autos encontrado');
-    const docs = body.resposta?.instancias[0].documentos;
+    const docs = body.resposta?.instancias?.[0]?.documentos;
 
     if (!docs?.length) return;
 
@@ -144,7 +144,7 @@ export class WebhookTrtHandler {
     await this.processModel.findByIdAndUpdate(findProcess._id, {
       origem: body?.resposta?.origem,
       instanciasAutosWithDocs: body?.resposta?.instancias,
-      valueCase: body?.resposta?.instancias[0]?.valor_causa,
+      valueCase: body?.resposta?.instancias?.[0]?.valor_causa,
       documents: docsWithStatus,
       class: definedClass,
       moviments,
@@ -202,20 +202,23 @@ export class WebhookTrtHandler {
   isProvisionalExecution(classProcess?: string): boolean {
     if (!classProcess) return false;
 
-    const normalizedClass = classProcess
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
+    const normalize = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
 
-    // Verifica se a CLASSE DO PROCESSO contém o termo-base (não o contrário):
-    // classProcess costuma ser mais descritivo que os termos de execucaoProvisoria.
-    return execucaoProvisoria.some((execucao) =>
-      normalizedClass.includes(
-        execucao
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .toLowerCase(),
-      ),
-    );
+    const normalizedClass = normalize(classProcess);
+
+    // classProcess pode vir curto ("Execucao Provisoria") ou descritivo
+    // ("Cumprimento Provisório de Sentença com adendo"). Testa ambos os lados.
+    return execucaoProvisoria.some((execucao) => {
+      const normalizedTerm = normalize(execucao);
+      return (
+        normalizedClass.includes(normalizedTerm) ||
+        normalizedTerm.includes(normalizedClass)
+      );
+    });
   }
 }

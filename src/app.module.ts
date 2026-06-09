@@ -42,13 +42,13 @@ import { RedisHealthService } from './service/redis-health.service';
     ThrottlerModule.forRoot([
       {
         name: 'default',
-        ttl: 60, // 1 minuto em ms (v6 usa ms)
-        limit: 100,  // 100 requests/min por IP (geral)
+        ttl: 60_000, // 1 minuto em ms (@nestjs/throttler v6)
+        limit: 100, // 100 requests/min por IP (geral)
       },
       {
         name: 'auth',
-        ttl: 60,  // 1 minuto em ms
-        limit: 10,   // 10 tentativas de login por IP por minuto
+        ttl: 60_000, // 1 minuto em ms
+        limit: 10, // 10 tentativas de login por IP por minuto
       },
     ]),
     DatabaseModule,

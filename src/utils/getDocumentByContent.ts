@@ -35,9 +35,9 @@ function getDocumentByContent(
 
       const documentSplitFound = documents.find(
         (doc) =>
-          (doc.titulo.match(string01) ||
-            doc.descricao.match(string01) ||
-            doc.descricao.match(string02)) &&
+          (doc.titulo.includes(string01) ||
+            doc.descricao.includes(string01) ||
+            doc.descricao.includes(string02)) &&
           doc.data === targetMoviment.data,
       );
 
@@ -52,7 +52,7 @@ function getDocumentByContent(
 
       const documentSplitFound = documents.find(
         (doc) =>
-          (doc.titulo.match(string01) || doc.titulo.match(string02)) &&
+          (doc.titulo.includes(string01) || doc.titulo.includes(string02)) &&
           doc.data === targetMoviment.data,
       );
 
@@ -98,7 +98,8 @@ function getListDocumentByContent(
 
         const documentSplitFounds = documents.filter(
           (doc) =>
-            (doc.titulo.match(string02) || doc.descricao.match(string01)) &&
+            (doc.titulo.includes(string02) ||
+              doc.descricao.includes(string01)) &&
             doc.data === targetMoviment.data,
         );
 

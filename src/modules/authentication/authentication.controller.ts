@@ -34,7 +34,7 @@ export class AuthenticationController {
   @Post('login')
   @HttpCode(200)
   @Public()
-  @Throttle({ auth: { ttl: 60, limit: 5 } })
+  @Throttle({ auth: { ttl: 60_000, limit: 5 } })
   async login(
     @Body() loginUserDto: AuthDto,
     @Res({ passthrough: true }) res: Response,
@@ -53,7 +53,7 @@ export class AuthenticationController {
   }
 
   @Post('signup')
-  @Throttle({ auth: { ttl: 60, limit: 5 } })
+  @Throttle({ auth: { ttl: 60_000, limit: 5 } })
   @UseGuards(ApiKeyAuthGuard)
   @CheckPermissions('user_management')
   async signUp(@Body() createUserDto: CreateUserDto) {

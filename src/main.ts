@@ -3,7 +3,7 @@
 // dotenv.config();
 
 import { createBullBoard } from '@bull-board/api';
-import { BaseAdapter } from '@bull-board/api/dist/src/queueAdapters/base';
+import type { BaseAdapter } from '@bull-board/api/baseAdapter';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { Logger, ValidationPipe } from '@nestjs/common';

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import type { StringValue } from 'ms';
 import { JwtStrategy } from './guards/jwt-strategy.guard';
 import { User, UserSchema } from '../user/schema/user.schema';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -21,12 +22,12 @@ import { RoleAuditService } from './services/role-audit.service';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
+        const expiresIn =
+          (config.get<string>('JWT_EXPIRES_IN') as StringValue) ??
+          ('1d' as StringValue);
         return {
           secret: config.get<string>('JWT_SECRET_KEY'),
-          signOptions: {
-            expiresIn:
-              (config.get<string>('JWT_EXPIRES_IN') as string) ?? '1d',
-          },
+          signOptions: { expiresIn },
         };
       },
     }),
