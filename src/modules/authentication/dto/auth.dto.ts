@@ -1,9 +1,15 @@
-import { IsEmail, IsNotEmpty } from 'class-validator';
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class AuthDto {
-  @IsEmail()
-  readonly email: string;
+// Valida e normaliza o e-mail (trim + lowercase) já no parse, pra casar com o
+// lookup do SSO e evitar 500 quando o campo vier ausente/null/tipo errado.
+const authSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(1),
+});
 
-  @IsNotEmpty()
-  readonly password: string;
-}
+type AuthDto = z.infer<typeof authSchema>;
+class AuthSchemaBody extends createZodDto(authSchema) {}
+const authSchemaPipe = new ZodValidationPipe(authSchema);
+
+export { AuthDto, AuthSchemaBody, authSchemaPipe };

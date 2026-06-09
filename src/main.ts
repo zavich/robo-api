@@ -33,13 +33,17 @@ async function bootstrap() {
     'https://painel-robo.juri.capital',
     'https://app.juri.capital', // front da juri-api (SSO cross-origin)
   ];
+  const localOrigins =
+    process.env.NODE_ENV === 'local'
+      ? ['http://localhost:3000', 'http://localhost:5173']
+      : [];
   // Origens extras de dev/local via env (comma-separated). Não definir em produção.
   const extraOrigins = (process.env.CORS_EXTRA_ORIGINS ?? '')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
   app.enableCors({
-    origin: [...corsOrigins, ...extraOrigins],
+    origin: [...corsOrigins, ...localOrigins, ...extraOrigins],
     credentials: true,
   });
 

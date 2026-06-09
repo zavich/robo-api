@@ -6,7 +6,12 @@ import { Model } from 'mongoose';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import { User, UserDocument } from 'src/modules/user/schema/user.schema';
-import { AUTH_COOKIE_NAME, JWT_ALGORITHM } from '../jwt/jwt.constants';
+import {
+  AUTH_COOKIE_NAME,
+  JURI_ISSUER,
+  JWT_ALGORITHM,
+  SELF_ISSUER,
+} from '../jwt/jwt.constants';
 import { buildPublicKeyMap, readIssuer } from '../jwt/jwt-keys';
 
 /**
@@ -39,8 +44,21 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       publicKeyPainelRobo: configService.get<string>(
         'JWT_PUBLIC_KEY_PAINEL_ROBO',
       ),
-      publicKeyApi: configService.get<string>('JWT_PUBLIC_KEY_API'),
+      publicKeyApi: configService.get<string>('JWT_PUBLIC_KEY_JURI_API'),
     });
+
+    // Falha cedo: sem a chave do issuer no mapa, qualquer token daquele emissor
+    // é rejeitado com 401 silencioso (inclusive os próprios, emitidos por esta
+    // API). O SSO é bidirecional, então as duas chaves são obrigatórias.
+    const missing: string[] = [];
+    if (!publicKeys[SELF_ISSUER]) missing.push('JWT_PUBLIC_KEY_PAINEL_ROBO');
+    if (!publicKeys[JURI_ISSUER]) missing.push('JWT_PUBLIC_KEY_JURI_API');
+    if (missing.length) {
+      throw new Error(
+        `Chave(s) pública(s) de SSO ausente(s): ${missing.join(', ')}. ` +
+          'Sem elas a validação de tokens RS256 retorna 401. Configure a(s) env(s).',
+      );
+    }
 
     super({
       // aceita o token tanto via header Authorization: Bearer quanto via cookie

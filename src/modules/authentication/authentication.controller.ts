@@ -9,10 +9,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { AuthDto } from './dto/auth.dto';
+import { AuthSchemaBody, authSchemaPipe } from './dto/auth.dto';
 import { ApiKeyAuthGuard } from './guards/apikey-auth.guard';
 import { LoginService } from './services/login.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import {
+  CreateUserSchemaBody,
+  createUserSchemaPipe,
+} from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
 import { AUTH_COOKIE_NAME } from './jwt/jwt.constants';
 import { authCookieBaseOptions, authCookieSetOptions } from './jwt/auth-cookie';
@@ -27,7 +30,7 @@ export class AuthenticationController {
   @Post('login')
   @HttpCode(200)
   async login(
-    @Body() loginUserDto: AuthDto,
+    @Body(authSchemaPipe) loginUserDto: AuthSchemaBody,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken } = await this.loginService.execute(loginUserDto);
@@ -38,7 +41,9 @@ export class AuthenticationController {
   }
 
   @Post('signup')
-  async signUp(@Body() createUserDto: CreateUserDto) {
+  async signUp(
+    @Body(createUserSchemaPipe) createUserDto: CreateUserSchemaBody,
+  ) {
     return this.signUpService.createUser(createUserDto);
   }
 
