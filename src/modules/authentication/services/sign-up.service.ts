@@ -13,14 +13,16 @@ export class SignUpService {
   ) {}
 
   async createUser(createUserDto: CreateUserDto): Promise<User> {
-    const { password, ...userData } = createUserDto;
+    const { password, email, ...userData } = createUserDto;
 
     // Hash da senha antes de salvar
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = new this.userModel({
       ...userData,
-      email: userData.email.trim().toLowerCase(),
+      // normalizado para casar com o lookup do SSO (sempre lowercase + trim).
+      // Usa o `email` desestruturado: `userData.email` é undefined aqui.
+      email: email.trim().toLowerCase(),
       password: hashedPassword,
     });
 

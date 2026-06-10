@@ -1,14 +1,17 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { createZodDto, ZodValidationPipe } from 'nestjs-zod';
+import { z } from 'zod';
 
-export class CreateUserDto {
-  @IsEmail({}, { message: 'E-mail inválido' })
-  email: string;
+// Valida e normaliza o e-mail (trim + lowercase) no parse, pra casar com o
+// lookup do SSO e evitar 500 quando o campo vier ausente/null/tipo errado.
+// `password.min(8)` preserva a regra de senha mínima introduzida no refactor.
+const createUserSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8),
+  name: z.string().trim().min(1),
+});
 
-  @IsString()
-  @MinLength(8, { message: 'Senha deve ter pelo menos 8 caracteres' })
-  password: string;
+type CreateUserDto = z.infer<typeof createUserSchema>;
+class CreateUserSchemaBody extends createZodDto(createUserSchema) {}
+const createUserSchemaPipe = new ZodValidationPipe(createUserSchema);
 
-  @IsString()
-  @IsNotEmpty({ message: 'Nome é obrigatório' })
-  name: string;
-}
+export { CreateUserDto, CreateUserSchemaBody, createUserSchemaPipe };

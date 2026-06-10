@@ -4,7 +4,7 @@
 
 - Framework: NestJS 10
 - Prefixo global: `/v1`
-- CORS origins: `http://localhost:3000`, `https://scraping-api.juri.capital`, `https://painel-robo.juri.capital`
+- CORS origins (base, prod): `https://scraping-api.juri.capital`, `https://painel-robo.juri.capital`, `https://app.juri.capital` (SSO). `credentials: true`. Override por `CORS_ORIGINS`; `localhost`+`CORS_EXTRA_ORIGINS` só em `NODE_ENV=local`
 - Cookie parser ativo. Body parser limit: 50MB
 - Swagger UI: `/api`
 - Bull Board: `/bull-board` (apenas nao-production)
@@ -33,28 +33,28 @@
 
 ### POST /v1/auth/login
 
-- **Auth**: nenhuma
-- **Body**: `{ email: string (IsEmail), password: string (MinLength: 8) }`
+- **Auth**: `@Public()` (sem JWT)
+- **Body** (Zod, normaliza e-mail trim+lowercase): `{ email: string (email), password: string (min 8) }`
 - **Response**: `{ message: 'Login successful' }`
 - **Throttle**: 5 req/min por IP
 - **Lockout**: 5 falhas por email bloqueiam a conta por 30 min
-- **Side effect**: Set-Cookie `prosolutti_accessToken` (httpOnly, secure apenas em production, sameSite=lax em dev / sameSite=none em production, maxAge=7 dias). Valor = JWT com `jti` e `permissions`
+- **Side effect**: Set-Cookie `auth_token` (httpOnly, `Secure`+SameSite=Lax+domínio `.juri.capital` em produção; host-only sem `Secure` em local; maxAge=2 dias). Valor = JWT RS256 (`iss=painel-robo`) com `identifier`, `sub`, `jti`, `permissions` e bloco `user` do SSO
 
 ### POST /v1/auth/signup
 
-- **Auth**: nenhuma
-- **Body**: `{ email: string, password: string, name: string }`
+- **Auth**: `ApiKeyAuthGuard` (JWT) + `@CheckPermissions('user_management')` — só admin cria usuário
+- **Body** (Zod): `{ email: string (email), password: string (min 8), name: string }`
 - **Response**: User document criado (password hashado bcrypt rounds=10)
 
 ### POST /v1/auth/logout
 
-- **Auth**: nenhuma
-- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie (mesmos flags do Set-Cookie: sameSite=lax em dev / sameSite=none em production) + registro de `jti` revogado em Redis quando presente
+- **Auth**: `@Public()` (sem JWT)
+- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie `auth_token` (mesmas opções do set, sem maxAge) + revogação: verifica a assinatura RS256 e grava `jwt:revoked:<jti>` em Redis quando presente
 
 ### GET /v1/auth/me
 
-- **Auth**: `ApiKeyAuthGuard` (JWT do cookie)
-- **Response**: User document completo
+- **Auth**: `ApiKeyAuthGuard` (JWT do cookie `auth_token` ou header `Authorization: Bearer`)
+- **Response**: usuário autenticado (`req.user`) + `permissions`
 
 ---
 
@@ -410,9 +410,10 @@
 
 ## Auth Guard: ApiKeyAuthGuard
 
-- Apesar do nome, e um JWT guard (`extends AuthGuard('jwt')`)
-- JWT extraido do cookie `prosolutti_accessToken` (nao do header Authorization)
-- Validacao: `userModel.findOne({ _id: payload.sub })`, throws `UnauthorizedException` se nao encontrado
-- Seta `req.user` com User document completo (incluindo password hash)
-- JWT payload: `{ identifier: string (email), sub: string (ObjectId) }`
-- JWT secret: `process.env.JWT_SECRET_KEY`
+- Apesar do nome, e um JWT guard (`extends AuthGuard('jwt')`); aplicado globalmente, com bypass via `@Public()`
+- JWT extraido do cookie `auth_token` **ou** do header `Authorization: Bearer`
+- Algoritmo **RS256**; a chave pública é escolhida pelo `iss` do token (multi-emissor SSO)
+- Validacao: revogação por `jti` (Redis) → `userModel.findOne({ email: payload.user.email })` (identidade por e-mail) → `isActive` → permissões. Throws `UnauthorizedException` se não encontrado/revogado/inativo
+- Seta `req.user` = documento do usuário (sem password) + `id` + `permissions`
+- JWT payload: `{ identifier, sub, jti, permissions, user: { email, nome?, cargo?, ... } }`
+- Chaves: `JWT_PRIVATE_KEY_ROBO_API` (assina), `JWT_PUBLIC_KEY_ROBO_API` / `JWT_PUBLIC_KEY_JURI_API` (verificam)

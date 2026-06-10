@@ -44,16 +44,30 @@ async function bootstrap() {
 
   app.setGlobalPrefix('v1', { exclude: ['health'] });
   patchNestJsSwagger();
-  const allowedOrigins = process.env.CORS_ORIGINS
+  // Origens de produção (fronts que consomem esta API com cookie/credenciais).
+  // `CORS_ORIGINS` (do refactor) sobrescreve a lista base quando definido.
+  const corsOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
     : [
-        'http://localhost:3000',
         'https://scraping-api.juri.capital',
         'https://painel-robo.juri.capital',
+        'https://app.juri.capital', // front da juri-api (SSO cross-origin)
       ];
-
+  const isLocal = process.env.NODE_ENV === 'local';
+  const localOrigins = isLocal
+    ? ['http://localhost:3000', 'http://localhost:5173']
+    : [];
+  // Origens extras de dev/local via env (comma-separated). Só aplicadas em local:
+  // com `credentials: true`, um valor residual/mal configurado em produção
+  // abriria CORS com cookie para origens arbitrárias.
+  const extraOrigins = isLocal
+    ? (process.env.CORS_EXTRA_ORIGINS ?? '')
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+    : [];
   app.enableCors({
-    origin: allowedOrigins,
+    origin: [...corsOrigins, ...localOrigins, ...extraOrigins],
     credentials: true,
   });
 

@@ -59,6 +59,18 @@
           "valueFrom": "<SECRET_ARN_PREFIX>:JWT_EXPIRES_IN::"
         },
         {
+          "name": "JWT_PRIVATE_KEY_ROBO_API",
+          "valueFrom": "<SECRET_ARN_PREFIX>:JWT_PRIVATE_KEY_ROBO_API::"
+        },
+        {
+          "name": "JWT_PUBLIC_KEY_ROBO_API",
+          "valueFrom": "<SECRET_ARN_PREFIX>:JWT_PUBLIC_KEY_ROBO_API::"
+        },
+        {
+          "name": "JWT_PUBLIC_KEY_JURI_API",
+          "valueFrom": "<SECRET_ARN_PREFIX>:JWT_PUBLIC_KEY_JURI_API::"
+        },
+        {
           "name": "DATABASE_URL",
           "valueFrom": "<SECRET_ARN_PREFIX>:DATABASE_URL::"
         },

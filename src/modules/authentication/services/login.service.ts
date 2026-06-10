@@ -63,11 +63,25 @@ export class LoginService {
 
     const jti = randomUUID();
     const permissions = getPermissionsForRole(user.role);
+
+    // Payload combinado:
+    //  - claims do refactor (`identifier`/`sub`/`jti`/`permissions`) p/ revogação
+    //    e autorização local;
+    //  - bloco `user` no formato do contrato de SSO RS256, pra que tanto esta API
+    //    quanto a juri-api resolvam a identidade por e-mail.
+    // `algorithm`, `issuer` e `expiresIn` vêm do JwtModule (assinatura RS256).
     const accessToken = this.jwtService.sign({
       identifier: normalizedEmail,
       sub: user._id,
       jti,
       permissions,
+      user: {
+        email: user.email,
+        nome: user.name,
+        sobreNome: '', // robo-api não modela sobrenome; mantido por consistência
+        cargo: user.role,
+        permissoes: [], // contrato SSO: robo-api não publica permissões p/ a juri-api
+      },
     });
 
     return {
@@ -80,7 +94,10 @@ export class LoginService {
     };
   }
 
-  private async recordFailedAttempt(attemptsKey: string, lockKey: string): Promise<void> {
+  private async recordFailedAttempt(
+    attemptsKey: string,
+    lockKey: string,
+  ): Promise<void> {
     const attempts = await this.redis.incr(attemptsKey);
     if (attempts === 1) {
       await this.redis.expire(attemptsKey, LOCKOUT_SECONDS);

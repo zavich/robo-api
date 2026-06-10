@@ -13,14 +13,19 @@ import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import Redis from 'ioredis';
-import { AuthDto } from './dto/auth.dto';
+import { AuthSchemaBody, authSchemaPipe } from './dto/auth.dto';
 import { ApiKeyAuthGuard } from './guards/apikey-auth.guard';
 import { LoginService } from './services/login.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import {
+  CreateUserSchemaBody,
+  createUserSchemaPipe,
+} from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
 import { CheckPermissions } from './decorators/check-permissions.decorator';
 import { Public } from './decorators/public.decorator';
 import { getPermissionsForRole } from './constants/permissions.constant';
+import { AUTH_COOKIE_NAME, TOKEN_TTL_SECONDS } from './jwt/jwt.constants';
+import { authCookieBaseOptions, authCookieSetOptions } from './jwt/auth-cookie';
 
 @Controller('auth')
 export class AuthenticationController {
@@ -36,19 +41,13 @@ export class AuthenticationController {
   @Public()
   @Throttle({ auth: { ttl: 60_000, limit: 5 } })
   async login(
-    @Body() loginUserDto: AuthDto,
+    @Body(authSchemaPipe) loginUserDto: AuthSchemaBody,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken } = await this.loginService.execute(loginUserDto);
 
-    const secure = process.env.NODE_ENV === 'production';
-    res.cookie('prosolutti_accessToken', accessToken, {
-      httpOnly: true,
-      secure,
-      sameSite: secure ? 'none' : 'lax',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
+    // cookie compartilhado do SSO (auth_token em .juri.capital em produção)
+    res.cookie(AUTH_COOKIE_NAME, accessToken, authCookieSetOptions());
     return { message: 'Login successful' };
   }
 
@@ -56,46 +55,44 @@ export class AuthenticationController {
   @Throttle({ auth: { ttl: 60_000, limit: 5 } })
   @UseGuards(ApiKeyAuthGuard)
   @CheckPermissions('user_management')
-  async signUp(@Body() createUserDto: CreateUserDto) {
+  async signUp(
+    @Body(createUserSchemaPipe) createUserDto: CreateUserSchemaBody,
+  ) {
     return this.signUpService.createUser(createUserDto);
   }
 
   @Post('logout')
   @HttpCode(200)
   @Public()
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const token: string | undefined = req.cookies?.prosolutti_accessToken;
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token: string | undefined = req.cookies?.[AUTH_COOKIE_NAME];
 
     if (token) {
       try {
-        // Verifica assinatura antes de confiar em jti/exp para evitar poluição do blocklist
-        const payload = this.jwtService.verify(token, { ignoreExpiration: true }) as {
-          jti?: string;
-          exp?: number;
-        };
-        const jtiValid = typeof payload.jti === 'string' && /^[\w-]{8,128}$/.test(payload.jti);
+        // Verifica a assinatura (RS256, chave pública própria no JwtModule)
+        // antes de confiar em jti/exp, pra não poluir a blocklist com lixo.
+        const payload = this.jwtService.verify(token, {
+          ignoreExpiration: true,
+        }) as { jti?: string; exp?: number };
+        const jtiValid =
+          typeof payload.jti === 'string' && /^[\w-]{8,128}$/.test(payload.jti);
         if (jtiValid && payload.exp) {
-          const MAX_JWT_TTL = 24 * 60 * 60;
-          const ttl = Math.min(payload.exp - Math.floor(Date.now() / 1000), MAX_JWT_TTL);
+          const ttl = Math.min(
+            payload.exp - Math.floor(Date.now() / 1000),
+            TOKEN_TTL_SECONDS,
+          );
           if (ttl > 0) {
             await this.redis.set(`jwt:revoked:${payload.jti}`, '1', 'EX', ttl);
           }
         }
       } catch {
-        // Assinatura inválida ou token malformado — prosseguir com logout sem revogar
+        // Assinatura inválida ou token malformado — segue o logout sem revogar.
       }
     }
 
-    const secureClear = process.env.NODE_ENV === 'production';
-    res.clearCookie('prosolutti_accessToken', {
-      httpOnly: true,
-      sameSite: secureClear ? 'none' : 'lax',
-      path: '/',
-      secure: secureClear,
-    });
+    // mesmas opções do set (sem maxAge), senão o browser não casa o cookie
+    // e ele fica órfão no domínio .juri.capital
+    res.clearCookie(AUTH_COOKIE_NAME, authCookieBaseOptions());
 
     return { message: 'Logout realizado com sucesso' };
   }
@@ -104,7 +101,8 @@ export class AuthenticationController {
   @UseGuards(ApiKeyAuthGuard)
   getProfile(@Req() req: Request) {
     const user = req.user;
-    const permissions = user?.permissions ?? getPermissionsForRole(user?.role);
+    const permissions =
+      user?.permissions ?? getPermissionsForRole(user?.role ?? '');
     return { ...user, permissions };
   }
 }
