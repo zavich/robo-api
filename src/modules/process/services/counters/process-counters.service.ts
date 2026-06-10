@@ -1,8 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { FilterQuery, Model } from 'mongoose';
 import { Process as ProcessEntity } from '../../schema/process.schema';
 import { LossReasonsService } from '../loss-reasons-service';
+
+interface ProcessCountersQuery {
+  search?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  lossReason?: string | string[];
+  emptyDocuments?: boolean;
+  emptyInstances?: boolean;
+  hasNewMovements?: boolean | string;
+}
 
 @Injectable()
 export class ProcessCountersService {
@@ -12,7 +23,7 @@ export class ProcessCountersService {
     private readonly lossReasonsService: LossReasonsService,
   ) {}
 
-  async execute(query: any = {}) {
+  async execute(query: ProcessCountersQuery = {}) {
     const {
       search,
       status,
@@ -34,8 +45,8 @@ export class ProcessCountersService {
       }
     }
 
-    const initialMatch: any = { stageId: { $ne: null } };
-    const dateFilter: any = {};
+    const initialMatch: FilterQuery<ProcessEntity> = { stageId: { $ne: null } };
+    const dateFilter: Record<string, Date> = {};
     if (startDate) dateFilter.$gte = new Date(startDate);
     if (endDate) {
       const endDateTime = new Date(endDate);
@@ -44,7 +55,7 @@ export class ProcessCountersService {
     }
     if (Object.keys(dateFilter).length > 0) initialMatch.createdAt = dateFilter;
 
-    const searchMatch: any = {};
+    const searchMatch: FilterQuery<ProcessEntity> = {};
     if (search && search.trim() !== '') {
       searchMatch.$or = [
         { number: { $regex: search, $options: 'i' } },
@@ -54,7 +65,7 @@ export class ProcessCountersService {
       searchMatch.situation = { $regex: status, $options: 'i' };
     }
 
-    let lossReasonFilter: any = {};
+    let lossReasonFilter: FilterQuery<ProcessEntity> = {};
     let needsLatestHistoryField = false;
 
     if (lossReason) {
@@ -88,7 +99,7 @@ export class ProcessCountersService {
       }
     }
 
-    const emptyFilters: any = {};
+    const emptyFilters: Record<string, boolean> = {};
     if (emptyDocuments !== undefined)
       emptyFilters.isDocuments = !emptyDocuments;
     if (emptyInstances !== undefined)
@@ -110,44 +121,27 @@ export class ProcessCountersService {
 
       // Filtro de movimentações novas
       ...(hasNewMovements !== undefined
-        ? [
-            {
-              $match: {
-                hasNewMovements: hasNewMovements,
-              },
-            },
-          ]
+        ? [{ $match: { hasNewMovements: hasNewMovements } }]
         : []),
 
-      {
-        $lookup: {
-          from: 'processstatuses',
-          localField: 'processStatus',
-          foreignField: '_id',
-          as: 'processStatus',
-        },
-      },
-      {
-        $addFields: {
-          processStatus: { $arrayElemAt: ['$processStatus', 0] },
-        },
-      },
-      {
-        $lookup: {
-          from: 'processdecisions',
-          localField: '_id',
-          foreignField: 'process_id',
-          as: 'processDecisions',
-        },
-      },
-      {
-        $addFields: {
-          processDecisions: { $arrayElemAt: ['$processDecisions', 0] },
-        },
-      },
-      // Adicionar campo com o último item do histórico (se necessário)
+      // processdecisions lookup: apenas quando lossReason está ativo
       ...(needsLatestHistoryField
         ? [
+            {
+              $lookup: {
+                from: 'processdecisions',
+                localField: '_id',
+                foreignField: 'process_id',
+                as: 'processDecisions',
+              },
+            },
+            {
+              $addFields: {
+                processDecisions: {
+                  $arrayElemAt: ['$processDecisions', 0],
+                },
+              },
+            },
             {
               $addFields: {
                 'processDecisions.latestHistory': {
@@ -155,10 +149,8 @@ export class ProcessCountersService {
                 },
               },
             },
+            { $match: lossReasonFilter },
           ]
-        : []),
-      ...(Object.keys(lossReasonFilter).length > 0
-        ? [{ $match: lossReasonFilter }]
         : []),
     ];
 

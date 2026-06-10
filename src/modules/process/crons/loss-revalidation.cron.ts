@@ -4,6 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model } from 'mongoose';
 import { AnaliseStatus } from 'src/utils/enum';
 import { InsertProcessService } from '../queues/process/services/insert-process.service';
+import { ProcessStateMachineService } from '../services/process-state-machine.service';
 import { ProcessDecisions } from '../schema/process-decisions.schema';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Process as ProcessEntity } from '../schema/process.schema';
@@ -23,6 +24,7 @@ export class LossRevalidationCron {
     @InjectModel(Step.name)
     private readonly stepService: Model<Step>,
     private readonly insertProcessService: InsertProcessService,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT) // Executa todas as 00:00
@@ -109,14 +111,12 @@ export class LossRevalidationCron {
             });
 
             // Atualizar processStatus para revalidação
-            await this.processStatusService.findByIdAndUpdate(
+            await this.processStateMachine.transition(
+              this.processStatusService,
               process.processStatus._id,
               {
-                $set: {
-                  step: findStep._id,
-                },
+                step: findStep._id,
               },
-              { new: true },
             );
 
             await this.insertProcessService.fetchProcessExtract(

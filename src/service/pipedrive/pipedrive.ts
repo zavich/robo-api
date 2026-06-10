@@ -4,7 +4,6 @@ import axios from 'axios';
 // Update the path below to the correct location of process.schema.ts
 import { Model } from 'mongoose';
 import {
-  AutosData,
   PeticaoInicialData,
   RestrictedDocumentType,
 } from 'src/modules/process/interfaces/process.interface';
@@ -14,7 +13,7 @@ import {
 } from '../../modules/process/schema/process.schema';
 @Injectable()
 export default class PipedriveService {
-  private readonly logger = new Logger();
+  private readonly logger = new Logger(PipedriveService.name);
   constructor(
     @InjectModel(Process.name) private readonly processModel: Model<Process>,
   ) {}
@@ -55,44 +54,45 @@ export default class PipedriveService {
       const planilhasCalc =
         findProcessByDealId?.class === 'MAIN'
           ? findProcessByDealId?.documents.filter(
-              (doc: any) => doc.type === ProcessDocumentType.PlanilhaCalculo,
+              (doc) => doc.type === ProcessDocumentType.PlanilhaCalculo,
             )
-          : (lawsuit?.documents as unknown as RestrictedDocumentType[])?.filter(
+          : (lawsuit?.documents as RestrictedDocumentType[] | undefined)?.filter(
               (doc) => doc.type === ProcessDocumentType.PlanilhaCalculo,
             );
       const peticaoData =
         findProcessByDealId?.class === 'MAIN'
           ? ((
-              findProcessByDealId?.documents as unknown as RestrictedDocumentType[]
+              findProcessByDealId?.documents as RestrictedDocumentType[]
             ).find((doc) => doc.type === 'PeticaoInicial')
               ?.data as PeticaoInicialData)
-          : ((lawsuit?.documents as unknown as RestrictedDocumentType[])?.find(
+          : ((lawsuit?.documents as RestrictedDocumentType[] | undefined)?.find(
               (doc) => doc.type === 'PeticaoInicial',
             )?.data as PeticaoInicialData);
       const homologadoCalc =
         findProcessByDealId?.class === 'MAIN'
           ? ((
-              findProcessByDealId?.documents as unknown as RestrictedDocumentType[]
+              findProcessByDealId?.documents as RestrictedDocumentType[]
             ).find(
               (doc) => doc.type === ProcessDocumentType.HomologacaoDeCalculo,
-            )?.data as any)
-          : ((lawsuit?.documents as unknown as RestrictedDocumentType[])?.find(
+            )?.data as { calculoOwner?: string } | undefined)
+          : ((lawsuit?.documents as RestrictedDocumentType[] | undefined)?.find(
               (doc) => doc.type === ProcessDocumentType.HomologacaoDeCalculo,
-            )?.data as any);
+            )?.data as { calculoOwner?: string } | undefined);
       interface AcordaoData {
         hipotese?: string;
-        [key: string]: any;
+        valor_condenacao?: string;
+        [key: string]: unknown;
       }
       const acordao =
         findProcessByDealId?.class === 'MAIN'
           ? (
-              findProcessByDealId.documents as unknown as RestrictedDocumentType[]
+              findProcessByDealId.documents as RestrictedDocumentType[]
             ).find(
               (doc) =>
                 doc.type === ProcessDocumentType.Acordao &&
                 doc.title === 'Acórdão',
             )
-          : (lawsuit?.documents as unknown as RestrictedDocumentType[])?.find(
+          : (lawsuit?.documents as RestrictedDocumentType[] | undefined)?.find(
               (doc) =>
                 doc.type === ProcessDocumentType.Acordao &&
                 doc.title === 'Acórdão',
@@ -105,16 +105,16 @@ export default class PipedriveService {
       const parcelasDeferidas =
         findProcessByDealId?.class === 'MAIN'
           ? (
-              findProcessByDealId.documents as unknown as RestrictedDocumentType[]
+              findProcessByDealId.documents as RestrictedDocumentType[]
             ).find((doc) => doc.type === ProcessDocumentType.SentencaMerito)
-          : (lawsuit?.documents as unknown as RestrictedDocumentType[])?.find(
+          : (lawsuit?.documents as RestrictedDocumentType[] | undefined)?.find(
               (doc) => doc.type === ProcessDocumentType.SentencaMerito,
             );
       const datasUnicas = new Set();
       const acordaoRecursos =
         findProcessByDealId?.class === 'MAIN'
           ? (
-              findProcessByDealId.documents as unknown as RestrictedDocumentType[]
+              findProcessByDealId.documents as RestrictedDocumentType[]
             )
               .filter((doc) => doc.type === ProcessDocumentType.AcordaoTRT)
               .filter((doc) => {
@@ -124,11 +124,11 @@ export default class PipedriveService {
               })
               .flatMap((doc) =>
                 doc.data && 'recursos' in doc.data
-                  ? ((doc.data as { recursos?: any[] }).recursos ?? [])
+                  ? ((doc.data as { recursos?: Record<string, unknown>[] }).recursos ?? [])
                   : [],
               )
               .filter((recurso) => recurso.provido)
-          : (lawsuit?.documents as unknown as RestrictedDocumentType[])
+          : (lawsuit?.documents as RestrictedDocumentType[] | undefined)
               ?.filter((doc) => doc.type === ProcessDocumentType.AcordaoTRT)
               .filter((doc) => {
                 if (datasUnicas.has(doc.date)) return false;
@@ -137,7 +137,7 @@ export default class PipedriveService {
               })
               .flatMap((doc) =>
                 doc.data && 'recursos' in doc.data
-                  ? ((doc.data as { recursos?: any[] }).recursos ?? [])
+                  ? ((doc.data as { recursos?: Record<string, unknown>[] }).recursos ?? [])
                   : [],
               )
               .filter((recurso) => recurso.provido);
@@ -147,7 +147,7 @@ export default class PipedriveService {
           ? acordaoRecursos
               .map((recurso, index) => {
                 const materias =
-                  recurso.materias?.map((m) => m.name).join(', ') ||
+                  (recurso.materias as { name?: string }[] | undefined)?.map((m) => m.name).join(', ') ||
                   'Não informado';
                 return `Recurso ${index + 1}:
 - Tipo: ${recurso.name}
@@ -162,16 +162,16 @@ export default class PipedriveService {
 
       const calculoHomologadoPorOwner = `
       \n\nCálculo do Reclamante:
-      ${this.calcularTotaisPorOwner(planilhasCalc, 'reclamante')}
+      ${this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], 'reclamante')}
 
       \n\nCálculo da Reclamada:
-      ${this.calcularTotaisPorOwner(planilhasCalc, 'reclamada')}
+      ${this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], 'reclamada')}
 
       \n\nCálculo do Perito:
-      ${this.calcularTotaisPorOwner(planilhasCalc, 'perito')}
+      ${this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], 'perito')}
 
       \n\nCálculo Homologado ${homologadoOwner || ''}:
-      ${homologadoOwner ? this.calcularTotaisPorOwner(planilhasCalc, homologadoOwner) : 'Não identificado'}
+      ${homologadoOwner ? this.calcularTotaisPorOwner(planilhasCalc as RestrictedDocumentType[], homologadoOwner) : 'Não identificado'}
 `;
 
       const bodyNote = {
@@ -184,7 +184,7 @@ export default class PipedriveService {
         \n\Parcelas deferidas na sentença: ${(parcelasDeferidas?.data as { resumoCondenacao?: string })?.resumoCondenacao || 'Não identificado'}
         \n\nÚltima movimentação: ${ultimaMovimentacao ? `${ultimaMovimentacao?.conteudo} em ${ultimaMovimentacao?.data}` : 'Não identificado'}
         \n\nConclusão do Acórdão:\n ${conclusao || 'Não identificado'}
-        \n\nTrânsito em julgado: ${(findProcessByDealId?.autosData as unknown as AutosData)?.dateOfTransit ? 'Sim' : 'Não'}
+        \n\nTrânsito em julgado: ${(findProcessByDealId?.autosData as { dateOfTransit?: string })?.dateOfTransit ? 'Sim' : 'Não'}
         \n\n${findProcessByDealId.class === 'MAIN' ? 'Execução Provisória' : 'Processo Principal'}: ${findProcessByDealId?.class === 'MAIN' ? lawsuit?.calledByProvisionalLawsuitNumber || 'Não identificado' : lawsuit?.number || 'Não identificado'}
         ${
           acordaoData
@@ -248,7 +248,9 @@ export default class PipedriveService {
 
       return response.data;
     } catch (error) {
-      console.log(`Error updating Pipedrive deal: ${error}`);
+      this.logger.error(
+        `Error updating Pipedrive deal: ${error instanceof Error ? error.stack : String(error)}`,
+      );
 
       if (error?.response?.status === 429 || error?.response?.status === 403) {
         this.logger.warn(
@@ -279,18 +281,19 @@ export default class PipedriveService {
       return dataAtual > dataMaisRecente ? atual : maisRecente;
     }, null);
   }
-  calcularTotaisPorOwner(planilhasCalc: any[], owner: string) {
-    const docs = planilhasCalc?.filter((doc) => doc?.data?.ownerType === owner);
+  calcularTotaisPorOwner(planilhasCalc: RestrictedDocumentType[], owner: string) {
+    type CalcData = { ownerType?: string; bruto?: number; liquido?: number; fgts?: number };
+    const docs = planilhasCalc?.filter((doc) => (doc?.data as CalcData)?.ownerType === owner);
     if (docs?.length === 0) return 'Não identificado';
 
     const bruto = docs
-      ?.reduce((acc, doc) => acc + (doc?.data?.bruto || 0), 0)
+      ?.reduce((acc, doc) => acc + ((doc?.data as CalcData)?.bruto || 0), 0)
       .toFixed(2);
     const liquido = docs
-      ?.reduce((acc, doc) => acc + (doc?.data?.liquido || 0), 0)
+      ?.reduce((acc, doc) => acc + ((doc?.data as CalcData)?.liquido || 0), 0)
       .toFixed(2);
     const fgts = docs
-      ?.reduce((acc, doc) => acc + (doc?.data?.fgts || 0), 0)
+      ?.reduce((acc, doc) => acc + ((doc?.data as CalcData)?.fgts || 0), 0)
       .toFixed(2);
 
     return `bruto: ${bruto}\nliquido: ${liquido}\nFGTS: ${fgts}`;

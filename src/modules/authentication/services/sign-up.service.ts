@@ -20,6 +20,7 @@ export class SignUpService {
 
     const newUser = new this.userModel({
       ...userData,
+      email: userData.email.trim().toLowerCase(),
       password: hashedPassword,
     });
 

@@ -60,7 +60,7 @@ Template de prompt AI: type (PromptType), content.
 
 `src/modules/user/schema/user.schema.ts`
 
-Usuario: email, password (hashed), role (admin/advogado), isActive.
+Usuario: email, password (hashed, legado para criacao/edicao), role (admin/advogado), isActive, name.
 
 ### Notification
 

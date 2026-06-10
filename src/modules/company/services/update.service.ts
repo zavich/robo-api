@@ -10,7 +10,7 @@ export class UpdateCompanyService {
     private readonly companyModel: Model<Company>,
   ) {}
 
-  async execute(id: number, updateData: any): Promise<Company> {
+  async execute(id: number, updateData: Record<string, unknown>): Promise<Company> {
     try {
       const company = await this.companyModel.findByIdAndUpdate(
         id,

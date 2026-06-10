@@ -1,9 +1,22 @@
 import { normalizeString } from './normalize-string';
 
+interface Moviment {
+  conteudo: string;
+  data: string;
+  [key: string]: unknown;
+}
+
+interface DocumentItem {
+  titulo: string;
+  descricao: string;
+  data: string;
+  [key: string]: unknown;
+}
+
 function getDocumentByContent(
   contentRegex: RegExp,
-  moviments: any[],
-  documents: any[],
+  moviments: Moviment[],
+  documents: DocumentItem[],
   onlyTitle = false,
 ) {
   try {
@@ -16,37 +29,44 @@ function getDocumentByContent(
     }
 
     const splitContent = targetMoviment.conteudo.split('|');
-    console.log('splitContent: ', splitContent);
     if (splitContent.length === 2 && !onlyTitle) {
-      const string01 = splitContent[0].trim();
-      const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
-
-      const documentSplitFound = documents.find(
-        (doc) =>
-          (doc.titulo.match(string01) ||
-            doc.descricao.match(string01) ||
-            doc.descricao.match(string02)) &&
-          doc.data === targetMoviment.data,
+      const normString01 = normalizeString(splitContent[0].trim());
+      const normString02 = normalizeString(
+        splitContent[1].replace(/ \(RESTRITO\)/, '').trim(),
       );
 
+      const documentSplitFound = documents.find((doc) => {
+        const normTitulo = normalizeString(doc.titulo);
+        const normDescricao = normalizeString(doc.descricao);
+        return (
+          (normTitulo.includes(normString01) ||
+            normDescricao.includes(normString01) ||
+            normDescricao.includes(normString02)) &&
+          doc.data === targetMoviment.data
+        );
+      });
+
       if (documentSplitFound) {
-        console.log('documentSplitFound: ', documentSplitFound);
         return documentSplitFound;
       }
     }
 
     if (splitContent.length === 2 && onlyTitle) {
-      const string01 = splitContent[0].trim();
-      const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
-
-      const documentSplitFound = documents.find(
-        (doc) =>
-          (doc.titulo.match(string01) || doc.titulo.match(string02)) &&
-          doc.data === targetMoviment.data,
+      const normString01 = normalizeString(splitContent[0].trim());
+      const normString02 = normalizeString(
+        splitContent[1].replace(/ \(RESTRITO\)/, '').trim(),
       );
 
+      const documentSplitFound = documents.find((doc) => {
+        const normTitulo = normalizeString(doc.titulo);
+        return (
+          (normTitulo.includes(normString01) ||
+            normTitulo.includes(normString02)) &&
+          doc.data === targetMoviment.data
+        );
+      });
+
       if (documentSplitFound) {
-        console.log('documentSplitFound: ', documentSplitFound);
         return documentSplitFound;
       }
     }
@@ -59,16 +79,15 @@ function getDocumentByContent(
     );
 
     return documentFound || null;
-  } catch (error) {
-    console.error('Erro ao processar documentos:', error);
+  } catch {
     return null;
   }
 }
 
 function getListDocumentByContent(
   contentRegex: RegExp,
-  moviments: any[],
-  documents: any[],
+  moviments: Moviment[],
+  documents: DocumentItem[],
 ) {
   try {
     const targetMoviments = moviments.filter((moviment) =>
@@ -84,18 +103,24 @@ function getListDocumentByContent(
     for (const targetMoviment of targetMoviments) {
       const splitContent = targetMoviment.conteudo.split('|');
       if (splitContent.length === 2) {
-        const string01 = splitContent[0].trim();
-        const string02 = splitContent[1].replace(/ \(RESTRITO\)/, '').trim();
-
-        const documentSplitFounds = documents.find(
-          (doc) =>
-            (doc.titulo.match(string02) || doc.descricao.match(string01)) &&
-            doc.data === targetMoviment.data,
+        const normString01 = normalizeString(splitContent[0].trim());
+        const normString02 = normalizeString(
+          splitContent[1].replace(/ \(RESTRITO\)/, '').trim(),
         );
 
-        if (documentSplitFounds?.length) {
-          console.log('documentSplitFound: ', documentSplitFounds);
-          return documentSplitFounds;
+        const documentSplitFounds = documents.filter((doc) => {
+          const normTitulo = normalizeString(doc.titulo);
+          const normDescricao = normalizeString(doc.descricao);
+          return (
+            (normTitulo.includes(normString02) ||
+              normDescricao.includes(normString01)) &&
+            doc.data === targetMoviment.data
+          );
+        });
+
+        if (documentSplitFounds.length > 0) {
+          documentFounds.push(...documentSplitFounds);
+          continue;
         }
       }
 
@@ -106,12 +131,13 @@ function getListDocumentByContent(
           doc.data === targetMoviment.data,
       );
 
-      documentFounds.push(documentFound);
+      if (documentFound) {
+        documentFounds.push(documentFound);
+      }
     }
 
     return documentFounds || null;
-  } catch (error) {
-    console.error('Erro ao processar documentos:', error);
+  } catch {
     return null;
   }
 }

@@ -17,7 +17,15 @@
 ### GET /health
 
 - **Auth**: nenhuma (sem prefixo `/v1`)
-- **Response**: `{ status: 'ok' }`
+- **Throttle**: `@SkipThrottle()`
+- **Response**:
+  ```typescript
+  {
+    status: 'ok',
+    checks: { mongodb: 'ok', redis: 'ok' },
+    memory: { rssMB: number, heapUsedMB: number }
+  }
+  ```
 
 ---
 
@@ -26,9 +34,11 @@
 ### POST /v1/auth/login
 
 - **Auth**: nenhuma
-- **Body**: `{ email: string (IsEmail), password: string (IsNotEmpty) }`
+- **Body**: `{ email: string (IsEmail), password: string (MinLength: 8) }`
 - **Response**: `{ message: 'Login successful' }`
-- **Side effect**: Set-Cookie `prosolutti_accessToken` (httpOnly, secure, sameSite=none, maxAge=7 dias). Valor = JWT
+- **Throttle**: 5 req/min por IP
+- **Lockout**: 5 falhas por email bloqueiam a conta por 30 min
+- **Side effect**: Set-Cookie `prosolutti_accessToken` (httpOnly, secure apenas em production, sameSite=lax em dev / sameSite=none em production, maxAge=7 dias). Valor = JWT com `jti` e `permissions`
 
 ### POST /v1/auth/signup
 
@@ -39,7 +49,7 @@
 ### POST /v1/auth/logout
 
 - **Auth**: nenhuma
-- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie
+- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie (mesmos flags do Set-Cookie: sameSite=lax em dev / sameSite=none em production) + registro de `jti` revogado em Redis quando presente
 
 ### GET /v1/auth/me
 
@@ -55,7 +65,7 @@
 - **Auth**: `ApiKeyAuthGuard`
 - **Body (Zod)**: `{ processes: string[] }` — array de numeros CNJ
 - **Response**: `{ message: 'Processes added to queue for processing.' }` ou `{ message: 'All processes already exist in database.' }`
-- **Side effect**: enfileira jobs `insert-process` em `process-queue`
+- **Side effect**: enfileira jobs `insert-process` em `insert-process-queue`
 
 ### GET /v1/process
 
@@ -91,13 +101,14 @@
 
 ### POST /v1/process/webhook
 
-- **Auth**: nenhuma
+- **Auth**: `ServiceWebhookGuard` via header `x-service-key` (ou bearer/query key legado)
 - **Body**: `Root` interface (callback do scraping-fetch-robo — ver `specs/inter-service.md`)
 - **Response**: 200 OK
 
 ### POST /v1/process/webhook-pipedrive/
 
-- **Auth**: nenhuma
+- **Auth**: `ServiceWebhookGuard` via `PIPEDRIVE_WEBHOOK_KEY` (fallback para `WEBHOOK_SERVICE_KEY`)
+- **Path matching do guard**: a validacao normaliza barra final, entao `/webhook-pipedrive` e `/webhook-pipedrive/` sao tratados como equivalentes
 - **Body**: `{ num_processo: string, deal_id: number, stage_id: number }`
 - **Side effect**: enfileira job `insert-process`
 

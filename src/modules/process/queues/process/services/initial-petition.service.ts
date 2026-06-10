@@ -6,7 +6,7 @@ import { Model } from 'mongoose';
 import { ClaimedProcesses } from 'src/modules/process/schema/claimed-processes.schema';
 import { Company } from 'src/modules/process/schema/company.schema';
 import { Complainant } from 'src/modules/process/schema/complainant.schema';
-import { Process as ProcessEntity } from 'src/modules/process/schema/process.schema';
+import { Process as ProcessEntity, RestrictedDocument } from 'src/modules/process/schema/process.schema';
 import PipedriveService from 'src/service/pipedrive/pipedrive';
 import { normalizeString } from 'src/utils/normalize-string';
 
@@ -21,7 +21,7 @@ export class InitialPetitionService {
     @InjectModel(Complainant.name)
     private readonly complainantModel: Model<Complainant>,
     private readonly pipedriveService: PipedriveService,
-    @InjectQueue('process-queue')
+    @InjectQueue('insert-process-queue')
     private readonly processQueue: Queue,
   ) {}
 
@@ -54,15 +54,15 @@ export class InitialPetitionService {
 
         if (
           !findProcessMain &&
-          peticaoInicialDoc.data?.numero_processo_principal
+          peticaoInicialDoc?.data?.numero_processo_principal
         ) {
           const called = await this.callToGetMainLawsuit(
-            peticaoInicialDoc.data.numero_processo_principal,
+            peticaoInicialDoc.data.numero_processo_principal as string,
             findProcess,
           );
           if (!called) {
             this.logger.error(
-              `Error in request MainLawsuit ${peticaoInicialDoc.data.numero_processo_principal}`,
+              `Error in request MainLawsuit ${peticaoInicialDoc.data.numero_processo_principal as string}`,
             );
           }
           return;
@@ -87,7 +87,7 @@ export class InitialPetitionService {
           })
           .populate({ path: 'companyId' });
         const company = claimed?.companyId as Company;
-        this.pipedriveService.updateApprovedLawsuit(
+        await this.pipedriveService.updateApprovedLawsuit(
           complainant.name,
           company.name,
           processFound.dealId,
@@ -101,7 +101,7 @@ export class InitialPetitionService {
 
   async callToGetMainLawsuit(
     mainLawsuitNumber: string,
-    provisionalNumber: any,
+    provisionalNumber: ProcessEntity,
   ) {
     try {
       const finProcessMain = await this.processModule.findOne({
@@ -115,7 +115,7 @@ export class InitialPetitionService {
           },
         );
       } else {
-        console.log('Chamando extração do processo principal');
+        this.logger.log('Chamando extração do processo principal');
         await this.processQueue.add('insert-process', {
           processNumber: mainLawsuitNumber,
           calledByInitialPetitionProvisionalNumber: provisionalNumber?.number,
@@ -128,7 +128,7 @@ export class InitialPetitionService {
     }
   }
 
-  isProcessArchived(process: any): boolean {
+  isProcessArchived(process: ProcessEntity): boolean {
     return (
       process?.instancias.find(
         (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
@@ -136,12 +136,16 @@ export class InitialPetitionService {
     );
   }
 
-  findMostRecentPeticaoInicial(docs: any[] = []): any {
+  findMostRecentPeticaoInicial(
+    docs: RestrictedDocument[] = [],
+  ): RestrictedDocument | null {
     if (!docs.length) {
-      return [];
+      return null;
     }
     return docs.reduce((latest, current) => {
-      return new Date(current.data) > new Date(latest.data) ? current : latest;
+      return new Date(current.date ?? '') > new Date(latest.date ?? '')
+        ? current
+        : latest;
     });
   }
 }

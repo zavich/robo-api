@@ -5,7 +5,7 @@ interface UpdatePipedrive {
   stageId?: number;
   lostReason?: string;
   status?: 'open' | 'lost';
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export async function updateStageToPipedrive({
@@ -14,7 +14,7 @@ export async function updateStageToPipedrive({
   lostReason,
   status = 'open',
   data = {},
-}: UpdatePipedrive): Promise<any> {
+}: UpdatePipedrive): Promise<Record<string, unknown>> {
   const url = `${process.env.PIPEDRIVE_PROSOLUTTI_URL}/v1/deals/${dealId}`;
   const body = {
     stage_id: stageId,
@@ -36,9 +36,10 @@ export async function updateStageToPipedrive({
     });
 
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: { error?: string } }; message?: string };
     throw new Error(
-      `Failed to add note to Pipedrive: ${error.response?.data?.error || error.message}`,
+      `Failed to update stage in Pipedrive: ${axiosError.response?.data?.error || axiosError.message}`,
     );
   }
 }

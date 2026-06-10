@@ -1,393 +1,221 @@
-import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Queue } from 'bullmq';
-import { Model } from 'mongoose';
-import { NextStepsService } from 'src/service/next-steps/next-steps.service';
-import { VertexAIService } from 'src/service/vertex/vertex-AI.service';
-import { AnaliseStatus } from 'src/utils/enum';
-import { normalizeString } from 'src/utils/normalize-string';
-import { StatusExtractionInsight } from '../enums/status-extraction-insight.enum';
-import { Instancia, Root } from '../interfaces/process.interface';
-import { execucaoProvisoria } from '../mock/extract';
-import { ExtractDocumentsInfoService } from '../queues/process/services/extract-documents-info.service';
 import {
-  ProcessStatus,
-  processStatusName,
-} from '../schema/process-status.schema';
-import { Process as ProcessEntity, Situation } from '../schema/process.schema';
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
+import { Inject } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import Redis from 'ioredis';
+import { HydratedDocument, Model, Types } from 'mongoose';
+import { Root } from '../interfaces/process.interface';
+import { ProcessStatus } from '../schema/process-status.schema';
+import { Process as ProcessEntity } from '../schema/process.schema';
 import { Step } from '../schema/step.schema';
+import { NotificationsGateway } from 'src/gateway/notifications.gateway';
+import { WebhookErroHandler } from './handlers/webhook-erro.handler';
+import { WebhookNaoEncontradoHandler } from './handlers/webhook-nao-encontrado.handler';
+import { WebhookTrtHandler } from './handlers/webhook-trt.handler';
+import { WebhookTstHandler } from './handlers/webhook-tst.handler';
+
+type IdempotencyAcquisition =
+  | { acquired: true; previousState: 'NEW' | 'FAILED' | 'FAILED_PROCESS_NOT_FOUND' }
+  | { acquired: false; currentState: string };
+
+type PopulatedProcessStatus = { _id: string; step: string };
+type WebhookProcess = HydratedDocument<ProcessEntity> & {
+  processStatus: PopulatedProcessStatus;
+};
+
+const ACQUIRE_IDEMPOTENCY_SCRIPT = `
+local key = KEYS[1]
+local ttl = ARGV[1]
+local current = redis.call("GET", key)
+if not current or current == "FAILED" or current == "FAILED_PROCESS_NOT_FOUND" then
+  redis.call("SET", key, "PROCESSING", "EX", ttl)
+  if current then return current end
+  return "NEW"
+end
+return current
+`;
 
 @Injectable()
-export class WebhookService {
+export class WebhookService implements OnModuleInit {
   private readonly logger = new Logger(WebhookService.name);
+  private idempotencyScriptSha: string | null = null;
 
   constructor(
-    @InjectModel(ProcessEntity.name) private processModel: Model<ProcessEntity>,
-    @InjectModel(ProcessStatus.name)
-    private readonly processStatusModel: Model<ProcessStatus>,
+    @InjectModel(ProcessEntity.name)
+    private readonly processModel: Model<ProcessEntity>,
     @InjectModel(Step.name)
     private readonly stepModel: Model<Step>,
-    private readonly nextStepsService: NextStepsService,
-    private readonly vertexAIService: VertexAIService,
-    private readonly extractDocumentsService: ExtractDocumentsInfoService,
-    @InjectQueue('process-queue')
-    private readonly processQueue: Queue,
+    @Inject('REDIS_CLIENT')
+    private readonly redis: Redis,
+    private readonly naoEncontradoHandler: WebhookNaoEncontradoHandler,
+    private readonly erroHandler: WebhookErroHandler,
+    private readonly tstHandler: WebhookTstHandler,
+    private readonly trtHandler: WebhookTrtHandler,
+    private readonly gateway: NotificationsGateway,
   ) {}
 
-  async execute(body: Root) {
-    this.logger.log(`Recebendo requisição de ${body.numero_processo}`);
+  async onModuleInit() {
+    await this.loadIdempotencyScript().catch((error: unknown) => {
+      this.logger.warn(
+        `Falha ao pre-carregar script de idempotencia: ${String((error as Error)?.message ?? error)}`,
+      );
+    });
+  }
+
+  async execute(body: Root, correlationId?: string) {
+    this.logger.log(
+      `Recebendo webhook de ${body.numero_processo} (correlationId=${correlationId ?? 'n/a'})`,
+    );
+
+    const idempotencyKey = this.buildIdempotencyKey(body);
+    const acquisition = await this.acquireIdempotencyLock(idempotencyKey);
+
+    if (acquisition.acquired === false) {
+      this.logger.warn(
+        `Webhook duplicado ignorado para ${body.numero_processo} (status: ${body.status}, key=${idempotencyKey}, state=${acquisition.currentState})`,
+      );
+      return;
+    }
+
+    if (acquisition.previousState !== 'NEW') {
+      this.logger.warn(
+        `Retentando webhook ${body.numero_processo} apos estado ${acquisition.previousState}`,
+      );
+    }
 
     try {
       const findProcess = await this.processModel
-        .findOne({
-          number: body.numero_processo,
-        })
+        .findOne({ number: body.numero_processo })
         .populate(['processStatus']);
+
       if (!findProcess) {
         this.logger.error(
           `Processo de número ${body.numero_processo} não encontrado!`,
         );
-      } else {
-        const step = await this.stepModel.findById(
-          (findProcess.processStatus as any).step,
+        await this.redis
+          .set(idempotencyKey, 'FAILED_PROCESS_NOT_FOUND', 'EX', 5 * 60)
+          .catch(() => undefined);
+        return;
+      }
+
+      const webhookProcess = findProcess as WebhookProcess;
+
+      const step = await this.stepModel.findById(
+        webhookProcess.processStatus.step,
+      );
+
+      if (body.status === 'NAO_ENCONTRADO') {
+        await this.naoEncontradoHandler.handle(
+          body,
+          webhookProcess as ProcessEntity & {
+            _id: Types.ObjectId;
+            processStatus: { _id: string | Types.ObjectId };
+          },
+          step,
+          correlationId,
         );
-        if (body.status === 'NAO_ENCONTRADO') {
-          if (findProcess.sentToRecords === 'SENT') {
-            await this.processModel.updateOne(
-              {
-                _id: findProcess._id,
-              },
-              {
-                sentToRecords: 'NOT_FOUND',
-                autosData: null,
-              },
-            );
-            return;
-          }
-
-          if (
-            findProcess &&
-            findProcess.situation === Situation.PENDING &&
-            findProcess.class === 'MAIN' &&
-            findProcess?.calledByProvisionalLawsuitNumber
-          ) {
-            const findLawsuitProvisional: any = await this.processModel
-              .findOne({
-                number: findProcess.calledByProvisionalLawsuitNumber,
-              })
-              .populate({
-                path: 'processStatus',
-                populate: ['step'],
-              });
-
-            if (
-              findLawsuitProvisional &&
-              findLawsuitProvisional?.processStatus
-            ) {
-              await this.nextStepsService.execute(
-                findLawsuitProvisional?.processStatus?.step.slug,
-                {
-                  processNumber: findLawsuitProvisional?.number,
-                },
-              );
-            }
-          }
-
-          // await this.processModel.findByIdAndUpdate(findProcess._id, {
-          //   situation: Situation.ISSUED,
-          // });
-
-          if (findProcess?.processMain) {
-            const mainProcess: any = await this.processModel
-              .findOne({
-                _id: findProcess.processMain,
-              })
-              .populate({
-                path: 'processStatus',
-                populate: ['step'],
-              });
-
-            if (mainProcess?.processStatus?.step.slug === 'step-3') {
-              this.nextStepsService.execute(
-                mainProcess?.processStatus?.step.slug,
-                {
-                  processNumber: mainProcess.number,
-                },
-              );
-              console.log(
-                'Processo provisorio não encontrado, seguindo com principal',
-              );
-            }
-            return;
-          }
-
-          return await this.processStatusModel.findByIdAndUpdate(
-            findProcess.processStatus._id,
-            {
-              name: 'Error',
-              log: body.resposta.message,
-              errorReason: body.resposta.message,
-            },
+      } else if (body.status === 'ERRO') {
+        await this.erroHandler.handle(
+          body,
+          webhookProcess as ProcessEntity & {
+            _id: Types.ObjectId;
+            processStatus: { _id: string | Types.ObjectId };
+          },
+          correlationId,
+        );
+      } else {
+        const origem = body.tribunal.sigla.toLowerCase();
+        if (origem.includes('tst')) {
+          await this.tstHandler.handle(
+            body,
+            webhookProcess as ProcessEntity & { _id: Types.ObjectId },
           );
-        } else if (body.status === 'ERRO') {
-          // await this.processModel.findByIdAndUpdate(findProcess._id, {
-          //   situation: Situation.ISSUED,
-          // });
-          return await this.processStatusModel.findByIdAndUpdate(
-            findProcess.processStatus,
-            {
-              name: processStatusName.Rejected,
-              log: '',
-              errorReason: AnaliseStatus.TRT_INACESSIVEL,
-            },
+        } else if (origem.includes('trt')) {
+          await this.trtHandler.handle(
+            body,
+            webhookProcess,
+            step,
+            correlationId,
           );
-        } else {
-          const origem = body.tribunal.sigla.toLowerCase();
-          if (origem.includes('tst')) {
-            const oldMoviments = {
-              tst:
-                findProcess?.instanciasAutos[0]?.movimentacoes?.length === 0
-                  ? body.resposta?.instancias?.find(
-                      (instancia) => instancia.instancia === 'TST',
-                    )?.movimentacoes?.length
-                  : findProcess?.instanciasAutos[0]?.movimentacoes?.length,
-            };
-            await this.processModel.updateOne(
-              {
-                _id: findProcess._id,
-              },
-              {
-                sentToRecords: 'FOUND',
-                instanciasAutos: body?.resposta?.instancias,
-                oldMoviments,
-              },
-            );
-            return this.extractRecordData(
-              body.numero_processo,
-              body?.resposta?.instancias[0],
-            );
-          } else if (origem.includes('trt')) {
-            const oldMoviments = {
-              primeiroGrau:
-                findProcess?.instancias?.find(
-                  (instancia) => instancia?.instancia === 'PRIMEIRO_GRAU',
-                )?.movimentacoes?.length === 0
-                  ? body.resposta?.instancias?.find(
-                      (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-                    )?.movimentacoes?.length
-                  : findProcess?.instancias?.find(
-                      (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-                    )?.movimentacoes?.length,
-              segundoGrau:
-                findProcess?.instancias?.find(
-                  (instancia) => instancia.instancia === 'SEGUNDO_GRAU',
-                )?.movimentacoes?.length === 0
-                  ? body.resposta?.instancias?.find(
-                      (instancia) => instancia.instancia === 'SEGUNDO_GRAU',
-                    )?.movimentacoes?.length
-                  : findProcess?.instancias?.find(
-                      (instancia) => instancia.instancia === 'SEGUNDO_GRAU',
-                    )?.movimentacoes?.length,
-            };
-            console.log('Old moviments:', oldMoviments);
-
-            const definedClass = this.isProvisionalExecution(
-              body.resposta?.instancias?.find(
-                (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-              )?.classe,
-            )
-              ? 'PROVISIONAL_EXECUTION'
-              : 'MAIN';
-            const moviments =
-              body?.resposta?.instancias?.flatMap((instancia) =>
-                instancia.movimentacoes.map((moviment) => ({
-                  ...moviment,
-                  instancia: instancia.instancia,
-                })),
-              ) || [];
-            if (!body?.opcoes?.autos) {
-              await this.processModel.findByIdAndUpdate(findProcess._id, {
-                instancias: body?.resposta?.instancias,
-                origem: body?.resposta?.origem,
-                valueCase: body?.resposta?.instancias[0]?.valor_causa,
-                processParts: body?.resposta?.instancias?.find(
-                  (instancia) => instancia.instancia === 'PRIMEIRO_GRAU',
-                ).partes,
-                oldMoviments: oldMoviments,
-                class: definedClass,
-                moviments: moviments,
-              });
-              // verfifica se existe a ultima validação não da next step.
-              this.logger.log('Next step:', step.slug);
-              this.logger.log('Body:', body.numero_processo);
-              this.nextStepsService.execute(step.slug, {
-                processNumber: body.numero_processo,
-              });
-            } else {
-              console.log('Processo com autos encontrado');
-
-              const docs = body.resposta?.instancias[0].documentos;
-
-              if (docs?.length) {
-                const docsWithStatus = docs.map((doc) => ({
-                  ...doc,
-                  status: StatusExtractionInsight.PENDING,
-                }));
-
-                await this.processModel.findByIdAndUpdate(findProcess._id, {
-                  origem: body?.resposta?.origem,
-                  instanciasAutosWithDocs: body?.resposta?.instancias,
-                  valueCase: body?.resposta?.instancias[0]?.valor_causa,
-                  documents: docsWithStatus,
-                  class: definedClass,
-                  moviments: moviments,
-                });
-                if (findProcess.class === 'MAIN') {
-                  const provisionFound = await this.processModel.findOne({
-                    number: findProcess.calledByProvisionalLawsuitNumber,
-                  });
-
-                  if (provisionFound) {
-                    console.log(
-                      `Processo de execução provisória encontrado na base para processo principal ${findProcess.number}`,
-                    );
-                    this.nextStepsService.execute(step.slug, body);
-                    return;
-                  }
-                }
-
-                if (findProcess.processMain) {
-                  // Extract documents from provisional execution process
-                  await this.extractDocumentsService.execute(
-                    findProcess.number,
-                  );
-                  const mainProcess: any = await this.processModel
-                    .findOne({
-                      _id: findProcess.processMain,
-                    })
-                    .populate({
-                      path: 'processStatus',
-                      populate: ['step'],
-                    });
-
-                  if (mainProcess) {
-                    if (mainProcess?.processStatus?.step.slug === 'step-3') {
-                      this.nextStepsService.execute(
-                        mainProcess?.processStatus?.step.slug,
-                        {
-                          processNumber: mainProcess.number,
-                        },
-                      );
-                    } else {
-                      this.nextStepsService.execute(step.slug, {
-                        processNumber: findProcess.number,
-                      });
-                    }
-                    return;
-                  }
-                }
-                console.log(
-                  `Seguindo com processo ${body?.resposta?.numero_unico}`,
-                );
-                this.nextStepsService.execute(step.slug, body);
-              }
-            }
-          }
         }
       }
+
+      await this.redis.set(idempotencyKey, 'DONE', 'EX', 60 * 60 * 24);
+      this.gateway.processUpdated(body.numero_processo);
     } catch (error) {
-      console.log('error', error);
       this.logger.error(`Erro ao processar a requisição: ${error.message}`);
+      await this.redis.set(idempotencyKey, 'FAILED', 'EX', 60 * 60).catch(() => undefined);
+      throw error;
     }
   }
 
-  async extractRecordData(processNumber: string, instancias: Instancia) {
-    try {
-      const orgaoJulgador = instancias.orgao_julgador ?? null;
-      const relator = instancias?.pessoa_relator ?? null;
-      const partes = instancias.partes ?? [];
-
-      const partesAtivas = partes
-        ?.filter((parte) =>
-          ['embargante', 'requerente', 'agravante', 'recorrente', 'autor'].some(
-            (tipo) => normalizeString(parte?.tipo)?.includes(tipo),
-          ),
-        )
-        ?.map((parte) => parte.nome);
-
-      const partesPassivas = partes
-        ?.filter((parte) =>
-          ['embargado', 'agravado', 'requerido', 'recorrido', 'reu'].some(
-            (tipo) => normalizeString(parte?.tipo)?.includes(tipo),
-          ),
-        )
-        ?.map((parte) => parte.nome);
-
-      const ativo = partesAtivas.length > 0 ? partesAtivas.join(', ') : null;
-      const passivo =
-        partesPassivas.length > 0 ? partesPassivas.join(', ') : null;
-
-      const dataTransito =
-        instancias?.movimentacoes
-          ?.find((movimento) =>
-            ['transitado em julgado']?.some((term) =>
-              movimento.conteudo
-                ?.normalize('NFD')
-                ?.replace(/[0-\u036f]/g, '')
-                ?.toLocaleLowerCase()
-                ?.includes(term),
-            ),
-          )
-          ?.conteudo?.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] ?? null;
-      const dataDistribuicao =
-        instancias?.movimentacoes?.find((movimento) =>
-          ['distribuído por sorteio', 'sorteio']?.some((term) =>
-            movimento.conteudo
-              ?.normalize('NFD')
-              ?.replace(/[0-\u036f]/g, '')
-              ?.toLocaleLowerCase()
-              ?.includes(term),
-          ),
-        )?.data ?? null;
-
-      const movimentacoes = instancias?.movimentacoes ?? null;
-
-      /* TODO: Alterar campos appellant e appellee para ativo e passivo */
-      const autosData = {
-        class: orgaoJulgador,
-        relator,
-        ativo,
-        passivo,
-        dateOfTransit: dataTransito,
-        dateOfDistribution: dataDistribuicao,
-        movements: movimentacoes,
-      };
-
-      await this.processModel.updateOne(
-        { number: processNumber },
-        { autosData },
+  private buildIdempotencyKey(body: Root): string {
+    if (!body.webhookId) {
+      throw new BadRequestException(
+        `Webhook ${body.numero_processo} chegou sem webhookId`,
       );
-      this.logger.log('Finished extracting record data');
-    } catch (error) {
-      this.logger.error(`Erro ao extrair dados do processo: ${error.message}`);
     }
+
+    return `webhook:${body.webhookId}`;
   }
 
-  isProvisionalExecution(classProcess?: string): boolean {
-    if (!classProcess) return false;
+  private async acquireIdempotencyLock(
+    idempotencyKey: string,
+  ): Promise<IdempotencyAcquisition> {
+    const ttlSeconds = 60 * 60 * 24;
+    const result = (await this.executeIdempotencyScript(
+      idempotencyKey,
+      ttlSeconds.toString(),
+    )) as string;
 
-    const normalizedClass = classProcess
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
+    if (
+      result === 'NEW' ||
+      result === 'FAILED' ||
+      result === 'FAILED_PROCESS_NOT_FOUND'
+    ) {
+      return { acquired: true, previousState: result };
+    }
 
-    return execucaoProvisoria.some((execucao) =>
-      execucao
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .includes(normalizedClass),
-    );
+    return { acquired: false, currentState: result };
+  }
+
+  private async loadIdempotencyScript(force = false) {
+    if (this.idempotencyScriptSha && !force) {
+      return this.idempotencyScriptSha;
+    }
+
+    this.idempotencyScriptSha = (await this.redis.script(
+      'LOAD',
+      ACQUIRE_IDEMPOTENCY_SCRIPT,
+    )) as string;
+
+    return this.idempotencyScriptSha;
+  }
+
+  private async executeIdempotencyScript(
+    idempotencyKey: string,
+    ttlSeconds: string,
+  ) {
+    const sha = await this.loadIdempotencyScript();
+
+    try {
+      return await this.redis.evalsha(
+        sha,
+        1,
+        idempotencyKey,
+        ttlSeconds,
+      );
+    } catch (error: unknown) {
+      if (!String((error as Error)?.message ?? error).includes('NOSCRIPT')) {
+        throw error;
+      }
+
+      const reloadedSha = await this.loadIdempotencyScript(true);
+      return this.redis.evalsha(reloadedSha, 1, idempotencyKey, ttlSeconds);
+    }
   }
 }

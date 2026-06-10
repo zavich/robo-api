@@ -28,7 +28,7 @@ const approvedProcessSchema = z.object({
       abatimento: z.string().optional(),
       observacao: z.string().optional(),
     })
-    .catchall(z.any())
+    .catchall(z.unknown())
     .optional(),
 });
 type ApprovedProcessDTO = z.infer<typeof approvedProcessSchema>;

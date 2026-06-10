@@ -33,6 +33,10 @@
 | `BRAPI_URL` | `brapi.service.ts` | string | URL base da API BRAPI (ex: `https://brapi.dev/api`) |
 | `BRAPI_TOKEN` | `brapi.service.ts` | string | Token de autenticacao BRAPI |
 | `SCRAPING_API_KEY` | `document.service.ts` | string | API key para autenticar chamadas ao scraping-fetch-robo (header `Authorization: Bearer`) |
+| `WEBHOOK_SERVICE_KEY` | `service-webhook.guard.ts` | string | Segredo para webhooks internos (`x-service-key`) |
+| `PIPEDRIVE_WEBHOOK_KEY` | `service-webhook.guard.ts` | string | Segredo dedicado para `/webhook-pipedrive` |
+| `AUTH_STRICT_ROLE_AUDIT` | `role-audit.service.ts` | `'true' | 'false'` | Se `'true'`, aborta o bootstrap quando houver roles desconhecidas no banco |
+| `AUTH_AUDIT_SKIP` | `role-audit.service.ts` | `'true' | 'false'` | Se `'true'`, desabilita a auditoria de roles no bootstrap mesmo fora de `NODE_ENV=test` |
 | `MICROSOFT_SITE_ID` | `sharepoint.service.ts` | string | SharePoint site ID (Graph API) |
 | `MICROSOFT_DRIVE_ID` | `sharepoint.service.ts` | string | Document library drive ID |
 | `MICROSOFT_ITEM_ID` | `sharepoint.service.ts` | string | Item ID do arquivo PLANILHA SOLVENCIA no drive |
@@ -45,3 +49,5 @@
 - Apenas 4 variaveis tem validacao Zod. As demais 16+ sao lidas diretamente de `process.env`.
 - `GOOGLE_PRIVATE_KEY` precisa ter `\\n` literais que sao substituidos por `\n` reais no runtime.
 - `AWS_SECRET_ID` default `juri-api-prd` carrega secrets do Secrets Manager em producao.
+- `task-definition.json` e um template anonimo; a versao materializada para deploy deve ser gerada via `yarn render:task-definition`.
+- `AUTH_STRICT_ROLE_AUDIT=true` deve ser usado apenas quando a base ja estiver saneada para `admin`/`advogado`. Em staging ou migracoes, `AUTH_AUDIT_SKIP=true` permite pular a auditoria explicitamente.

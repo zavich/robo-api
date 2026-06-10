@@ -4,7 +4,7 @@
 
 ```
 email:     String, required, unique
-password:  String, required (bcrypt hashed, rounds=10)
+password:  String, required (bcrypt hashed; autenticação requer email + senha)
 isActive:  Boolean, required, default: true
 role:      String, enum: ['admin', 'advogado'], required, default: 'advogado'
 name:      String, required
@@ -49,8 +49,35 @@ synchronizedAt:                   Date
 oldMoviments:                     Mixed
 formPipedrive:                    Mixed (PipedriveFormData shape)
 activities:                       ActivityDocument[] (subdocument)
+scraperRetryCount:                Number, default: 0 (vide nota de migracao abaixo)
 createdAt, updatedAt:             auto
 ```
+
+#### Nota sobre `scraperRetryCount` (campo introduzido pela refatoracao 2026-05)
+
+O campo armazena o numero de retentativas automaticas que o `WebhookErroHandler` ja efetuou para um processo apos status `ERRO`/`NAO_ENCONTRADO`. O schema declara `default: 0`, entao documentos NOVOS sempre tem 0.
+
+**Para documentos legados** (criados antes do campo existir), `scraperRetryCount` e `undefined` em vez de 0. O `WebhookErroHandler` (`src/modules/process/services/handlers/webhook-erro.handler.ts`) usa o filtro:
+
+```typescript
+$or: [
+  { scraperRetryCount: { $exists: false } },
+  { scraperRetryCount: { $lt: MAX_SCRAPER_RETRIES } },
+]
+```
+
+Esse `$or` garante que documentos legados (campo ausente) sao tratados como "0 retries" — mesmo comportamento que documentos novos.
+
+**Alternativa (opcional):** rodar uma migration de uma vez para popular o campo em todos os documentos legados:
+
+```javascript
+db.processes.updateMany(
+  { scraperRetryCount: { $exists: false } },
+  { $set: { scraperRetryCount: 0 } }
+);
+```
+
+Apos a migration, o `$or` no handler pode ser simplificado para `{ scraperRetryCount: { $lt: MAX_SCRAPER_RETRIES } }` — mas nao e obrigatorio.
 
 ### RestrictedDocument (subdocument de Process.documents)
 

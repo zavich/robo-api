@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Process } from '../../schema/process.schema';
 import { Model } from 'mongoose';
@@ -7,6 +7,8 @@ import { PipedriveFormData } from '../../interfaces/process.interface';
 
 @Injectable()
 export class UpdateLawsuitService {
+  private readonly logger = new Logger(UpdateLawsuitService.name);
+
   constructor(
     @InjectModel(Process.name)
     private readonly lawsuitModule: Model<Process>,
@@ -57,7 +59,7 @@ export class UpdateLawsuitService {
       
       // Extrai campos do formPipedrive que vieram diretamente no body
       const formPipedriveFromDirectFields: Partial<PipedriveFormData> = {};
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
 
       // Processa cada campo do body
       for (const [key, value] of Object.entries(data)) {
@@ -94,9 +96,9 @@ export class UpdateLawsuitService {
       // Adiciona formPipedrive ao updateData se houver campos para atualizar
       if (Object.keys(finalFormPipedrive).length > 0) {
         updateData.formPipedrive = finalFormPipedrive;
-        console.log('[UpdateLawsuitService] Salvando formPipedrive:', JSON.stringify(finalFormPipedrive, null, 2));
+        this.logger.log(`[UpdateLawsuitService] Salvando formPipedrive: ${JSON.stringify(finalFormPipedrive, null, 2)}`);
       } else {
-        console.log('[UpdateLawsuitService] Nenhum campo formPipedrive para salvar');
+        this.logger.log('[UpdateLawsuitService] Nenhum campo formPipedrive para salvar');
       }
 
       const update = await this.lawsuitModule.findByIdAndUpdate(

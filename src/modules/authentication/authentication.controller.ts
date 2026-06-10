@@ -3,64 +3,108 @@ import {
   Controller,
   Get,
   HttpCode,
+  Inject,
   Post,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { JwtService } from '@nestjs/jwt';
+import { Throttle } from '@nestjs/throttler';
+import { Request, Response } from 'express';
+import Redis from 'ioredis';
 import { AuthDto } from './dto/auth.dto';
 import { ApiKeyAuthGuard } from './guards/apikey-auth.guard';
 import { LoginService } from './services/login.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
+import { CheckPermissions } from './decorators/check-permissions.decorator';
+import { Public } from './decorators/public.decorator';
+import { getPermissionsForRole } from './constants/permissions.constant';
 
 @Controller('auth')
 export class AuthenticationController {
   constructor(
     private readonly loginService: LoginService,
     private readonly signUpService: SignUpService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    private readonly jwtService: JwtService,
   ) {}
 
   @Post('login')
   @HttpCode(200)
+  @Public()
+  @Throttle({ auth: { ttl: 60_000, limit: 5 } })
   async login(
     @Body() loginUserDto: AuthDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken } = await this.loginService.execute(loginUserDto);
 
+    const secure = process.env.NODE_ENV === 'production';
     res.cookie('prosolutti_accessToken', accessToken, {
       httpOnly: true,
-      secure: true, // Railway = HTTPS sempre
-      sameSite: 'none', // obrigatório porque é cross-site
+      secure,
+      sameSite: secure ? 'none' : 'lax',
       path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 dias em milissegundos
+      maxAge: 1000 * 60 * 60 * 24 * 7,
     });
     return { message: 'Login successful' };
   }
 
   @Post('signup')
+  @Throttle({ auth: { ttl: 60_000, limit: 5 } })
+  @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('user_management')
   async signUp(@Body() createUserDto: CreateUserDto) {
     return this.signUpService.createUser(createUserDto);
   }
 
   @Post('logout')
   @HttpCode(200)
-  logout(@Res({ passthrough: true }) res: Response) {
+  @Public()
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token: string | undefined = req.cookies?.prosolutti_accessToken;
+
+    if (token) {
+      try {
+        // Verifica assinatura antes de confiar em jti/exp para evitar poluição do blocklist
+        const payload = this.jwtService.verify(token, { ignoreExpiration: true }) as {
+          jti?: string;
+          exp?: number;
+        };
+        const jtiValid = typeof payload.jti === 'string' && /^[\w-]{8,128}$/.test(payload.jti);
+        if (jtiValid && payload.exp) {
+          const MAX_JWT_TTL = 24 * 60 * 60;
+          const ttl = Math.min(payload.exp - Math.floor(Date.now() / 1000), MAX_JWT_TTL);
+          if (ttl > 0) {
+            await this.redis.set(`jwt:revoked:${payload.jti}`, '1', 'EX', ttl);
+          }
+        }
+      } catch {
+        // Assinatura inválida ou token malformado — prosseguir com logout sem revogar
+      }
+    }
+
+    const secureClear = process.env.NODE_ENV === 'production';
     res.clearCookie('prosolutti_accessToken', {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: secureClear ? 'none' : 'lax',
       path: '/',
-      secure: process.env.NODE_ENV === 'production',
+      secure: secureClear,
     });
 
-    // você ainda pode invalidar o refreshToken no banco, se usar
     return { message: 'Logout realizado com sucesso' };
   }
+
   @Get('me')
   @UseGuards(ApiKeyAuthGuard)
-  getProfile(@Req() req: { user: { id: string } }) {
-    return req.user;
+  getProfile(@Req() req: Request) {
+    const user = req.user;
+    const permissions = user?.permissions ?? getPermissionsForRole(user?.role);
+    return { ...user, permissions };
   }
 }

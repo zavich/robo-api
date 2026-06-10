@@ -23,14 +23,14 @@ export class SavedMovementsService {
       }
       const oldMoviment = process.oldMoviments || {};
       if (instance === 'PRIMEIRO_GRAU') {
-        oldMoviment.primeiroGrau = process?.instancias?.[0]?.moviments?.length;
+        oldMoviment.primeiroGrau = (process?.instancias?.[0]?.moviments as Record<string, unknown>[] | undefined)?.length;
       }
       if (instance === 'SEGUNDO_GRAU') {
-        oldMoviment.segundoGrau = process?.instancias?.[1]?.moviments?.length;
+        oldMoviment.segundoGrau = (process?.instancias?.[1]?.moviments as Record<string, unknown>[] | undefined)?.length;
       }
       if (instance === 'TST') {
         oldMoviment.tst =
-          (process.autosData as any)?.movements?.length || undefined;
+          (process.autosData as { movements?: Record<string, unknown>[] } | null)?.movements?.length || undefined;
       }
       const updateProcess = await this.processModel.findByIdAndUpdate(
         process._id,
