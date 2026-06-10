@@ -32,7 +32,10 @@ import { normalizePem } from './jwt/jwt-keys';
         // Falha cedo: sem a chave privada o módulo sobe "ok" mas todo
         // jwtService.sign() quebra em runtime (login/SSO) de forma pouco
         // diagnóstica. Melhor abortar o bootstrap com mensagem clara.
-        if (!privateKey) {
+        // Em testes (NODE_ENV=test) não abortamos: o AppModule sempre importa
+        // este módulo e a suíte não exercita assinatura/SSO. O sign() ainda
+        // falharia em runtime se chamado sem chave.
+        if (!privateKey && process.env.NODE_ENV !== 'test') {
           throw new Error(
             'JWT_PRIVATE_KEY_PAINEL_ROBO ausente: necessária para assinar tokens (RS256). Configure a env.',
           );

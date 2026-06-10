@@ -5,6 +5,10 @@ export const envSchema = z.object({
   PORT: z.coerce.number().optional().default(3333),
   BASE_URL_EMPRESAQUI: z.string().url(),
   EMPRESAQUI_API_KEY: z.string(),
+  // "local" relaxa cookie/CORS p/ dev e controla o envFilePath (app.module)
+  NODE_ENV: z.string().optional(),
+  // != "production" habilita o Bull Board (main.ts)
+  ENVIRONMENT: z.string().optional(),
   // SSO RS256 (ver src/modules/authentication/jwt)
   JWT_PRIVATE_KEY_PAINEL_ROBO: z.string().optional(), // privada do painel-robo (assina)
   JWT_PUBLIC_KEY_PAINEL_ROBO: z.string().optional(), // pública do painel-robo (valida tokens próprios)

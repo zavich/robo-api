@@ -50,10 +50,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // Falha cedo: sem a chave do issuer no mapa, qualquer token daquele emissor
     // é rejeitado com 401 silencioso (inclusive os próprios, emitidos por esta
     // API). O SSO é bidirecional, então as duas chaves são obrigatórias.
+    // Em testes (NODE_ENV=test) não abortamos: o AppModule sempre importa o
+    // AuthenticationModule e a suíte não exercita validação de tokens; tokens
+    // ainda são rejeitados em runtime se a chave do issuer não estiver no mapa.
     const missing: string[] = [];
     if (!publicKeys[SELF_ISSUER]) missing.push('JWT_PUBLIC_KEY_PAINEL_ROBO');
     if (!publicKeys[JURI_ISSUER]) missing.push('JWT_PUBLIC_KEY_JURI_API');
-    if (missing.length) {
+    if (missing.length && process.env.NODE_ENV !== 'test') {
       throw new Error(
         `Chave(s) pública(s) de SSO ausente(s): ${missing.join(', ')}. ` +
           'Sem elas a validação de tokens RS256 retorna 401. Configure a(s) env(s).',
