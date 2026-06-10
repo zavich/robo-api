@@ -416,4 +416,4 @@
 - Validacao: revogação por `jti` (Redis) → `userModel.findOne({ email: payload.user.email })` (identidade por e-mail) → `isActive` → permissões. Throws `UnauthorizedException` se não encontrado/revogado/inativo
 - Seta `req.user` = documento do usuário (sem password) + `id` + `permissions`
 - JWT payload: `{ identifier, sub, jti, permissions, user: { email, nome?, cargo?, ... } }`
-- Chaves: `JWT_PRIVATE_KEY_PAINEL_ROBO` (assina), `JWT_PUBLIC_KEY_PAINEL_ROBO` / `JWT_PUBLIC_KEY_JURI_API` (verificam)
+- Chaves: `JWT_PRIVATE_KEY_ROBO_API` (assina), `JWT_PUBLIC_KEY_ROBO_API` / `JWT_PUBLIC_KEY_JURI_API` (verificam)

@@ -28,13 +28,13 @@ import { normalizePem } from './jwt/jwt-keys';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const privateKey = normalizePem(
-          config.get<string>('JWT_PRIVATE_KEY_PAINEL_ROBO'),
+          config.get<string>('JWT_PRIVATE_KEY_ROBO_API'),
         );
         // Chave pública própria: usada para VERIFICAR tokens emitidos por esta
         // API (ex.: revogação no logout). Como a assinatura é RS256, a chave de
         // verificação é diferente da de assinatura.
         const publicKey = normalizePem(
-          config.get<string>('JWT_PUBLIC_KEY_PAINEL_ROBO'),
+          config.get<string>('JWT_PUBLIC_KEY_ROBO_API'),
         );
         // Falha cedo: sem a chave privada o módulo sobe "ok" mas todo
         // jwtService.sign() quebra em runtime (login/SSO) de forma pouco
@@ -43,7 +43,7 @@ import { normalizePem } from './jwt/jwt-keys';
         // este módulo e a suíte não exercita assinatura/SSO.
         if (!privateKey && process.env.NODE_ENV !== 'test') {
           throw new Error(
-            'JWT_PRIVATE_KEY_PAINEL_ROBO ausente: necessária para assinar tokens (RS256). Configure a env.',
+            'JWT_PRIVATE_KEY_ROBO_API ausente: necessária para assinar tokens (RS256). Configure a env.',
           );
         }
 

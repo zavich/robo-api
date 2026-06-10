@@ -55,7 +55,9 @@ export class AuthenticationController {
   @Throttle({ auth: { ttl: 60_000, limit: 5 } })
   @UseGuards(ApiKeyAuthGuard)
   @CheckPermissions('user_management')
-  async signUp(@Body(createUserSchemaPipe) createUserDto: CreateUserSchemaBody) {
+  async signUp(
+    @Body(createUserSchemaPipe) createUserDto: CreateUserSchemaBody,
+  ) {
     return this.signUpService.createUser(createUserDto);
   }
 

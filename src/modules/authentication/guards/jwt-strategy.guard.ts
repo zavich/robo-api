@@ -63,7 +63,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   ) {
     const publicKeys = buildPublicKeyMap({
       publicKeyPainelRobo: configService.get<string>(
-        'JWT_PUBLIC_KEY_PAINEL_ROBO',
+        'JWT_PUBLIC_KEY_ROBO_API',
       ),
       publicKeyApi: configService.get<string>('JWT_PUBLIC_KEY_JURI_API'),
     });
@@ -75,7 +75,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // AuthenticationModule e a suíte não exercita validação de tokens; tokens
     // ainda são rejeitados em runtime se a chave do issuer não estiver no mapa.
     const missing: string[] = [];
-    if (!publicKeys[SELF_ISSUER]) missing.push('JWT_PUBLIC_KEY_PAINEL_ROBO');
+    if (!publicKeys[SELF_ISSUER]) missing.push('JWT_PUBLIC_KEY_ROBO_API');
     if (!publicKeys[JURI_ISSUER]) missing.push('JWT_PUBLIC_KEY_JURI_API');
     if (missing.length && process.env.NODE_ENV !== 'test') {
       throw new Error(

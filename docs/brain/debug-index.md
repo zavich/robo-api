@@ -85,7 +85,7 @@ Leia:
 Checar:
 
 - `src/modules/authentication/guards/jwt-strategy.guard.ts`.
-- Chaves RS256 no env: `JWT_PRIVATE_KEY_PAINEL_ROBO` (assina) e `JWT_PUBLIC_KEY_PAINEL_ROBO` / `JWT_PUBLIC_KEY_JURI_API` (verificam). Faltando, o bootstrap aborta (fora de `NODE_ENV=test`).
+- Chaves RS256 no env: `JWT_PRIVATE_KEY_ROBO_API` (assina) e `JWT_PUBLIC_KEY_ROBO_API` / `JWT_PUBLIC_KEY_JURI_API` (verificam). Faltando, o bootstrap aborta (fora de `NODE_ENV=test`).
 - `iss` do token reconhecido (`painel-robo` / `api.juri.capital`) — emissor sem chave no mapa = 401.
 - Identidade resolvida por e-mail: o usuário do token (`user.email`) precisa existir e estar ativo na base local.
 - Se o token foi revogado (`jwt:revoked:<jti>` no Redis após logout).

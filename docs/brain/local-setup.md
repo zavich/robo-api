@@ -21,8 +21,8 @@ DATABASE_URL="mongodb://..."
 PORT=8080
 REDIS_URL="redis://localhost:6381"
 # SSO RS256 (PEM em uma linha, com \n literais). Ver docs/brain/specs/auth-system.md
-JWT_PRIVATE_KEY_PAINEL_ROBO="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-JWT_PUBLIC_KEY_PAINEL_ROBO="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+JWT_PRIVATE_KEY_ROBO_API="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+JWT_PUBLIC_KEY_ROBO_API="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 JWT_PUBLIC_KEY_JURI_API="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
 GOOGLE_PROJECT_ID="..."
 GOOGLE_VERTEX_LOCATION="..."

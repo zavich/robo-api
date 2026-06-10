@@ -10,8 +10,8 @@
 | `EMPRESAQUI_API_KEY` | string | Sim | - | API key do EmpresaQui |
 | `NODE_ENV` | string | Nao | - | `'local'` relaxa cookie/CORS e carrega `.env`; qualquer outro = produção |
 | `ENVIRONMENT` | string | Nao | - | Se `!= 'production'`, habilita o Bull Board |
-| `JWT_PRIVATE_KEY_PAINEL_ROBO` | string (PEM) | SSO | - | Chave **privada** RS256 que assina os tokens (`iss=painel-robo`) |
-| `JWT_PUBLIC_KEY_PAINEL_ROBO` | string (PEM) | SSO | - | Chave **pública** própria; valida tokens emitidos por esta API (`iss=painel-robo`) |
+| `JWT_PRIVATE_KEY_ROBO_API` | string (PEM) | SSO | - | Chave **privada** RS256 que assina os tokens (`iss=painel-robo`) |
+| `JWT_PUBLIC_KEY_ROBO_API` | string (PEM) | SSO | - | Chave **pública** própria; valida tokens emitidos por esta API (`iss=painel-robo`) |
 | `JWT_PUBLIC_KEY_JURI_API` | string (PEM) | SSO | - | Chave **pública** da juri-api; valida tokens dela (`iss=api.juri.capital`) |
 | `AUTH_COOKIE_DOMAIN` | string | Nao | `.juri.capital` (prod) | Sobrescreve o domínio do cookie `auth_token` (ex.: SSO local) |
 | `CORS_ORIGINS` | string (csv) | Nao | lista base | Sobrescreve a lista base de origens CORS |

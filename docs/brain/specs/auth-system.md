@@ -27,9 +27,9 @@ chave **pública** do emissor, sem compartilhar segredo. Ver `src/modules/authen
 ### Configuracao
 
 - **Algoritmo**: `RS256` (único aceito; nunca `none`/HS256). Ver `jwt.constants.ts`.
-- **Assinatura**: `JWT_PRIVATE_KEY_PAINEL_ROBO` (privada), `issuer = 'painel-robo'`.
+- **Assinatura**: `JWT_PRIVATE_KEY_ROBO_API` (privada), `issuer = 'painel-robo'`.
 - **Verificação (multi-emissor)**: mapa `iss → chave pública` montado em
-  `jwt-keys.ts` a partir de `JWT_PUBLIC_KEY_PAINEL_ROBO` (iss `painel-robo`) e
+  `jwt-keys.ts` a partir de `JWT_PUBLIC_KEY_ROBO_API` (iss `painel-robo`) e
   `JWT_PUBLIC_KEY_JURI_API` (iss `api.juri.capital`). Emissor sem chave = 401.
 - **Storage**: cookie httpOnly `auth_token`, compartilhado no domínio pai
   `.juri.capital` (override via `AUTH_COOKIE_DOMAIN`). Em `NODE_ENV=local` cai

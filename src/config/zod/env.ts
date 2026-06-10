@@ -10,8 +10,8 @@ export const envSchema = z.object({
   // != "production" habilita o Bull Board (main.ts)
   ENVIRONMENT: z.string().optional(),
   // SSO RS256 (ver src/modules/authentication/jwt)
-  JWT_PRIVATE_KEY_PAINEL_ROBO: z.string().optional(), // privada do painel-robo (assina)
-  JWT_PUBLIC_KEY_PAINEL_ROBO: z.string().optional(), // pública do painel-robo (valida tokens próprios)
+  JWT_PRIVATE_KEY_ROBO_API: z.string().optional(), // privada do painel-robo (assina)
+  JWT_PUBLIC_KEY_ROBO_API: z.string().optional(), // pública do painel-robo (valida tokens próprios)
   JWT_PUBLIC_KEY_JURI_API: z.string().optional(), // pública da juri-api (valida tokens dela)
   // domínio do cookie auth_token (sobrescreve o default; usado p/ SSO local)
   AUTH_COOKIE_DOMAIN: z.string().optional(),
