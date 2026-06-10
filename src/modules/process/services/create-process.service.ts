@@ -1,28 +1,25 @@
-import { BadRequestException, Injectable, Inject } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { JobsOptions, Queue } from 'bullmq';
-import { Redis } from 'ioredis';
 import { Model } from 'mongoose';
 import { CreateProcessSchemaBody } from '../dtos/create.dto';
 import { Process } from '../schema/process.schema';
 
 @Injectable()
 export class CreateProcessService {
-  private processQueue: Queue;
+  private readonly logger = new Logger(CreateProcessService.name);
 
   constructor(
     @InjectModel(Process.name)
     private readonly processModule: Model<Process>,
-    @Inject('REDIS_CLIENT') private readonly redisClient: Redis,
-  ) {
-    this.processQueue = new Queue('process-queue', {
-      connection: this.redisClient,
-    });
-  }
+    @InjectQueue('insert-process-queue')
+    private readonly processQueue: Queue,
+  ) {}
 
   async execute(body: CreateProcessSchemaBody) {
     try {
-      const newArray: any[] = [];
+      const newArray: string[] = [];
 
       // Processamento em paralelo para verificar processos existentes
       const findProcesses = await Promise.all(
@@ -60,13 +57,14 @@ export class CreateProcessService {
               this.processQueue.add(job.name, job.data, jobOptions),
             ),
           );
-        } catch (queueError: any) {
+        } catch (queueError: unknown) {
+          const qe = queueError as Error & { name?: string };
           if (
-            queueError.name?.includes('Redis') ||
-            queueError.message?.includes('redis') ||
-            queueError.message?.includes('MaxRetriesPerRequestError')
+            qe.name?.includes('Redis') ||
+            qe.message?.includes('redis') ||
+            qe.message?.includes('MaxRetriesPerRequestError')
           ) {
-            console.warn(
+            this.logger.warn(
               `[CreateProcessService] Redis unavailable, processes will need to be added manually: ${batch.join(', ')}`,
             );
             return {
@@ -76,7 +74,7 @@ export class CreateProcessService {
               queueError: true,
             };
           }
-          throw queueError;
+          throw qe;
         }
       }
 

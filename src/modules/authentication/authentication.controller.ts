@@ -3,12 +3,16 @@ import {
   Controller,
   Get,
   HttpCode,
+  Inject,
   Post,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { JwtService } from '@nestjs/jwt';
+import { Throttle } from '@nestjs/throttler';
+import { Request, Response } from 'express';
+import Redis from 'ioredis';
 import { AuthSchemaBody, authSchemaPipe } from './dto/auth.dto';
 import { ApiKeyAuthGuard } from './guards/apikey-auth.guard';
 import { LoginService } from './services/login.service';
@@ -17,7 +21,10 @@ import {
   createUserSchemaPipe,
 } from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
-import { AUTH_COOKIE_NAME } from './jwt/jwt.constants';
+import { CheckPermissions } from './decorators/check-permissions.decorator';
+import { Public } from './decorators/public.decorator';
+import { getPermissionsForRole } from './constants/permissions.constant';
+import { AUTH_COOKIE_NAME, TOKEN_TTL_SECONDS } from './jwt/jwt.constants';
 import { authCookieBaseOptions, authCookieSetOptions } from './jwt/auth-cookie';
 
 @Controller('auth')
@@ -25,40 +32,75 @@ export class AuthenticationController {
   constructor(
     private readonly loginService: LoginService,
     private readonly signUpService: SignUpService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    private readonly jwtService: JwtService,
   ) {}
 
   @Post('login')
   @HttpCode(200)
+  @Public()
+  @Throttle({ auth: { ttl: 60_000, limit: 5 } })
   async login(
     @Body(authSchemaPipe) loginUserDto: AuthSchemaBody,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken } = await this.loginService.execute(loginUserDto);
 
-    // cookie compartilhado do SSO (.juri.capital em produção)
+    // cookie compartilhado do SSO (auth_token em .juri.capital em produção)
     res.cookie(AUTH_COOKIE_NAME, accessToken, authCookieSetOptions());
     return { message: 'Login successful' };
   }
 
   @Post('signup')
-  async signUp(
-    @Body(createUserSchemaPipe) createUserDto: CreateUserSchemaBody,
-  ) {
+  @Throttle({ auth: { ttl: 60_000, limit: 5 } })
+  @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('user_management')
+  async signUp(@Body(createUserSchemaPipe) createUserDto: CreateUserSchemaBody) {
     return this.signUpService.createUser(createUserDto);
   }
 
   @Post('logout')
   @HttpCode(200)
-  logout(@Res({ passthrough: true }) res: Response) {
+  @Public()
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token: string | undefined = req.cookies?.[AUTH_COOKIE_NAME];
+
+    if (token) {
+      try {
+        // Verifica a assinatura (RS256, chave pública própria no JwtModule)
+        // antes de confiar em jti/exp, pra não poluir a blocklist com lixo.
+        const payload = this.jwtService.verify(token, {
+          ignoreExpiration: true,
+        }) as { jti?: string; exp?: number };
+        const jtiValid =
+          typeof payload.jti === 'string' && /^[\w-]{8,128}$/.test(payload.jti);
+        if (jtiValid && payload.exp) {
+          const ttl = Math.min(
+            payload.exp - Math.floor(Date.now() / 1000),
+            TOKEN_TTL_SECONDS,
+          );
+          if (ttl > 0) {
+            await this.redis.set(`jwt:revoked:${payload.jti}`, '1', 'EX', ttl);
+          }
+        }
+      } catch {
+        // Assinatura inválida ou token malformado — segue o logout sem revogar.
+      }
+    }
+
     // mesmas opções do set (sem maxAge), senão o browser não casa o cookie
     // e ele fica órfão no domínio .juri.capital
     res.clearCookie(AUTH_COOKIE_NAME, authCookieBaseOptions());
 
     return { message: 'Logout realizado com sucesso' };
   }
+
   @Get('me')
   @UseGuards(ApiKeyAuthGuard)
-  getProfile(@Req() req: { user: { id: string } }) {
-    return req.user;
+  getProfile(@Req() req: Request) {
+    const user = req.user;
+    const permissions =
+      user?.permissions ?? getPermissionsForRole(user?.role ?? '');
+    return { ...user, permissions };
   }
 }

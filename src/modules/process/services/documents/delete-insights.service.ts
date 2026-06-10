@@ -11,13 +11,13 @@ export class DeleteInsightsDocumentService {
     private readonly lawsuitModel: Model<Process>,
   ) {}
 
-  async execute(lawsuit: string, id: number) {
+  async execute(lawsuit: string, id: string) {
     try {
       const findLawsuit = await this.lawsuitModel.findOne({ number: lawsuit });
       if (!findLawsuit) {
         throw new BadRequestException('Lawsuit not found');
       }
-      await this.lawsuitModel.findOneAndUpdate(
+      const updatedLawsuit = await this.lawsuitModel.findOneAndUpdate(
         {
           number: lawsuit,
           'documents._id': id,
@@ -30,6 +30,11 @@ export class DeleteInsightsDocumentService {
         },
         { new: true },
       );
+
+      if (!updatedLawsuit) {
+        throw new BadRequestException('Document not found');
+      }
+
       return { message: 'Insights deleted successfully' };
     } catch (error) {
       throw error;

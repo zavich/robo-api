@@ -1,10 +1,16 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { PassportStrategy } from '@nestjs/passport';
 import { Model } from 'mongoose';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
+import Redis from 'ioredis';
 import { User, UserDocument } from 'src/modules/user/schema/user.schema';
 import {
   AUTH_COOKIE_NAME,
@@ -13,13 +19,25 @@ import {
   SELF_ISSUER,
 } from '../jwt/jwt.constants';
 import { buildPublicKeyMap, readIssuer } from '../jwt/jwt-keys';
+import {
+  getPermissionsForRole,
+  isKnownRole,
+  Permission,
+} from '../constants/permissions.constant';
 
 /**
- * Payload no formato do contrato de SSO. A juri-api emite a mesma forma,
- * por isso a robo-api lê `payload.user` independente de quem assinou.
+ * Payload combinado SSO + refactor.
+ *  - `user.email`: identidade do contrato de SSO (a juri-api emite a mesma
+ *    forma), resolvida por e-mail independente de quem assinou.
+ *  - `jti`/`permissions`: revogação e autorização introduzidas no refactor.
+ *  - `iss`: emissor do token; só confiamos em `permissions` quando for o próprio.
  */
 export type iJwtPayload = {
   sub: string;
+  iss?: string;
+  identifier?: string;
+  jti?: string;
+  permissions?: Permission[];
   user: {
     email: string;
     nome?: string;
@@ -35,10 +53,13 @@ const cookieExtractor = (req: Request): string | null => {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
     configService: ConfigService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {
     const publicKeys = buildPublicKeyMap({
       publicKeyPainelRobo: configService.get<string>(
@@ -88,18 +109,46 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: iJwtPayload) {
+    // Revogação por jti (refactor): token cujo jti está na blocklist do Redis
+    // (ex.: após logout) é recusado mesmo dentro da validade.
+    if (payload.jti) {
+      const isRevoked = await this.redis.exists(`jwt:revoked:${payload.jti}`);
+      if (isRevoked) {
+        throw new UnauthorizedException('Token revogado');
+      }
+    }
+
+    // Identidade resolvida por e-mail (contrato do SSO): funciona tanto para
+    // tokens próprios quanto para tokens da juri-api, cujo `sub` é o _id do
+    // outro serviço e não casaria com a base local.
     const email = payload?.user?.email?.trim().toLowerCase();
     if (!email) {
       throw new UnauthorizedException();
     }
 
-    // Resolução de identidade por email (decisão de arquitetura do SSO).
-    // Não encontrou usuário local -> bloqueia o SSO; a pessoa usa o login normal.
     const user = await this.userModel.findOne({ email });
     if (!user) {
       throw new UnauthorizedException();
     }
 
-    return user;
+    if (!user.isActive) {
+      throw new UnauthorizedException('Conta desativada');
+    }
+
+    if (!isKnownRole(user.role)) {
+      this.logger.warn(
+        `Token validado para usuario com role nao mapeada: ${user.email} (${user.role})`,
+      );
+    }
+
+    // Autorização sempre a partir do papel LOCAL. Só confiamos na lista de
+    // permissões do payload quando o token foi emitido por esta própria API;
+    // de um token de outro serviço (juri-api) derivamos do role local.
+    const permissions =
+      payload.iss === SELF_ISSUER && payload.permissions
+        ? payload.permissions
+        : getPermissionsForRole(user.role);
+    const { password: _pw, ...userObj } = user.toObject();
+    return { ...userObj, id: String(userObj._id), permissions };
   }
 }

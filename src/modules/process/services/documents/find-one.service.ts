@@ -10,7 +10,7 @@ export class FindOneDocumentService {
     private readonly lawsuitModel: Model<Process>,
   ) {}
 
-  async execute(lawsuit: string, id: number) {
+  async execute(lawsuit: string, id: string) {
     try {
       const findLawsuit = await this.lawsuitModel.findOne({ number: lawsuit });
       if (!findLawsuit) {

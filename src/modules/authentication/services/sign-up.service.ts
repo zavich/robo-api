@@ -20,7 +20,8 @@ export class SignUpService {
 
     const newUser = new this.userModel({
       ...userData,
-      // normalizado para casar com o lookup do SSO (sempre lowercase + trim)
+      // normalizado para casar com o lookup do SSO (sempre lowercase + trim).
+      // Usa o `email` desestruturado: `userData.email` é undefined aqui.
       email: email.trim().toLowerCase(),
       password: hashedPassword,
     });

@@ -25,10 +25,7 @@ class AwsSecretsManager {
       const raw =
         response.SecretString ??
         (response.SecretBinary
-          ? Buffer.from(
-              response.SecretBinary as unknown as string,
-              'base64',
-            ).toString('utf-8')
+          ? Buffer.from(response.SecretBinary).toString('utf-8')
           : undefined);
 
       if (!raw) {

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 interface UpdateDealFields {
   dealId: number;
-  data: any;
+  data: Record<string, unknown>;
 }
 
 /**
@@ -12,7 +12,7 @@ interface UpdateDealFields {
 export async function updateDealFields({
   dealId,
   data = {},
-}: UpdateDealFields): Promise<any> {
+}: UpdateDealFields): Promise<Record<string, unknown>> {
   const url = `${process.env.PIPEDRIVE_PROSOLUTTI_URL}/v1/deals/${dealId}`;
   
   // Envia APENAS os campos customizados, sem stage_id
@@ -31,9 +31,10 @@ export async function updateDealFields({
     });
 
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: { error?: string } }; message?: string };
     throw new Error(
-      `Failed to update deal fields in Pipedrive: ${error.response?.data?.error || error.message}`,
+      `Failed to update deal fields in Pipedrive: ${axiosError.response?.data?.error || axiosError.message}`,
     );
   }
 }

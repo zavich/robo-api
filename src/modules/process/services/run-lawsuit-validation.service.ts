@@ -9,6 +9,7 @@ import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Step } from '../schema/step.schema';
 import { InsertProcessService } from '../queues/process/services/insert-process.service';
+import { ProcessStateMachineService } from './process-state-machine.service';
 
 @Injectable()
 export class LawsuitValidationService {
@@ -23,6 +24,7 @@ export class LawsuitValidationService {
     private readonly processStatusService: Model<ProcessStatus>,
     @InjectModel(Step.name)
     private readonly stepService: Model<Step>,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
   async execute(
@@ -34,7 +36,7 @@ export class LawsuitValidationService {
   ) {
     try {
       if (isAll) {
-        console.log('Executing Lawsuit Validation');
+        this.logger.log('Executing Lawsuit Validation');
         const start = new Date(`${startDate}T00:00:00.000-03:00`);
         const end = new Date(`${endDate}T23:59:59.999-03:00`);
 
@@ -78,7 +80,7 @@ export class LawsuitValidationService {
         });
         for (const process of processes) {
           if (process.documents?.length === 0) {
-            console.log(
+            this.logger.log(
               `Process ${process.number} has no documents, skipping...`,
             );
             continue;
@@ -92,17 +94,16 @@ export class LawsuitValidationService {
             },
             { new: true },
           );
-          await this.processStatusService.findByIdAndUpdate(
+          await this.processStateMachine.transition(
+            this.processStatusService,
             process.processStatus._id,
             {
-              $set: {
-                log: null,
-                errorReason: null,
-                step: findStep._id,
-              },
+              log: null,
+              errorReason: null,
+              step: findStep._id,
             },
           );
-          console.log(`Processing: ${process.number}`);
+          this.logger.log(`Processing: ${process.number}`);
           await this.nextStepsService.execute(step, {
             processNumber: process.number,
             mainProcessId:
@@ -111,11 +112,11 @@ export class LawsuitValidationService {
         }
       } else {
         for (const number of lawsuits) {
-          const process: any = await this.processModule
+          const process = await this.processModule
             .findOne({ number })
             .populate({ path: 'processStatus', populate: ['step'] });
           if (!process || process.documents?.length === 0) {
-            console.log(
+            this.logger.log(
               `Process ${number} not found or has no documents, skipping...`,
             );
             continue;
@@ -132,38 +133,29 @@ export class LawsuitValidationService {
           const findStep = await this.stepService.findOne({
             slug: step,
           });
-          await this.processStatusService.findByIdAndUpdate(
-            process.processStatus._id,
+          await this.processStateMachine.transition(
+            this.processStatusService,
+            process.processStatus,
             {
-              $set: {
-                log: null,
-                errorReason: null,
-                step: findStep._id,
-              },
+              log: null,
+              errorReason: null,
+              step: findStep._id,
             },
           );
-
-          console.log(`Processing: ${process.number} ${step}`);
-          if (process.processStatus.step.slug === 'step-0') {
+          this.logger.log(`Processing: ${process.number} ${step}`);
+          const currentStepSlug = (process.processStatus as { step?: { slug?: string } }).step?.slug;
+          if (currentStepSlug === 'step-0') {
             await this.insertProcessService.fetchProcessExtract(
               process.number,
               process,
             );
-          } else if (step) {
+          } else {
+            // step e obrigatorio pelo DTO (@MinLength(1)), entao chega aqui sempre definido.
             await this.nextStepsService.execute(step, {
               processNumber: process.number,
               mainProcessId:
                 process.class === 'MAIN' ? process._id : process.processMain,
             });
-          } else {
-            await this.nextStepsService.execute(
-              process.processStatus.step.slug,
-              {
-                processNumber: process.number,
-                mainProcessId:
-                  process.class === 'MAIN' ? process._id : process.processMain,
-              },
-            );
           }
         }
       }

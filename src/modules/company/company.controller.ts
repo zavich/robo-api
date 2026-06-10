@@ -37,7 +37,7 @@ export class CompanyController {
   }
   @Get()
   @UseGuards(ApiKeyAuthGuard)
-  async findAll(@Query() query: any) {
+  async findAll(@Query() query: Record<string, string>) {
     return this.listCompanyService.execute(query);
   }
   @Post('document')
@@ -51,11 +51,12 @@ export class CompanyController {
   }
   @Put(':id')
   @UseGuards(ApiKeyAuthGuard)
-  async update(@Param('id') id: number, @Body() updateData: any) {
+  async update(@Param('id') id: number, @Body() updateData: Record<string, unknown>) {
     return this.updateCompanyService.execute(id, updateData);
   }
   @Post('webhook')
-  async handleWebhook(@Body() payload: any, @Query('type') type: string) {
-    this.webhookService.execute(payload, type);
+  async handleWebhook(@Body() payload: Record<string, unknown>, @Query('type') type: string) {
+    await this.webhookService.execute(payload, type);
+    return { message: 'Webhook processado' };
   }
 }

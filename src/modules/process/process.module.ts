@@ -6,7 +6,6 @@ import { NextStepsModule } from 'src/service/next-steps/next-steps.module';
 import PipedriveService from 'src/service/pipedrive/pipedrive';
 import { VertexModule } from 'src/service/vertex/vertex.module';
 import { ProcessController } from './process.controller';
-import { ProcessQueue } from './queues/process';
 import { InitialPetitionService } from './queues/process/services/initial-petition.service';
 import { InsertProcessService } from './queues/process/services/insert-process.service';
 import { ProcessValidationService } from './queues/process/services/process-validation.service';
@@ -35,6 +34,7 @@ import { NextStepsService } from 'src/service/next-steps/next-steps.service';
 import { NotificationModule } from '../notification/notification.module';
 import { User, UserSchema } from '../user/schema/user.schema';
 import { LossRevalidationCron } from './crons/loss-revalidation.cron';
+import { OrphanedProcessCron } from './crons/orphaned-process.cron';
 import { ExtractDocumentsInfoService } from './queues/process/services/extract-documents-info.service';
 import {
   ProcessDecisions,
@@ -64,13 +64,28 @@ import { RunListLawsuitsValidationService } from './services/run-list-lawsuits-v
 import { SavedMovementsService } from './services/saved-movements.service';
 import { MetricsService } from './services/metrics.service';
 import { UploadXLSXService } from './services/upload-xlsx.service';
+import { WebhookNaoEncontradoHandler } from './services/handlers/webhook-nao-encontrado.handler';
+import { WebhookErroHandler } from './services/handlers/webhook-erro.handler';
+import { WebhookTstHandler } from './services/handlers/webhook-tst.handler';
+import { WebhookTrtHandler } from './services/handlers/webhook-trt.handler';
+import { InsertProcessWorker } from './queues/workers/insert-process.worker';
+import { ProcessValidationWorker } from './queues/workers/process-validation.worker';
+import { SolvencyValidationWorker } from './queues/workers/solvency-validation.worker';
+import { ExtractDocumentWorker } from './queues/workers/extract-document.worker';
+import { InitialPetitionWorker } from './queues/workers/initial-petition.worker';
 import { BullModule } from '@nestjs/bullmq';
+import { ServiceWebhookGuard } from './guards/service-webhook.guard';
+import { ProcessStateMachineService } from './services/process-state-machine.service';
 
 @Module({
   imports: [
-    BullModule.registerQueue({
-      name: 'process-queue',
-    }),
+    BullModule.registerQueue(
+      { name: 'insert-process-queue' },
+      { name: 'process-validation-queue' },
+      { name: 'solvency-validation-queue' },
+      { name: 'extract-document-queue' },
+      { name: 'initial-petition-queue' },
+    ),
     MongooseModule.forFeature([
       {
         name: Process.name,
@@ -128,7 +143,6 @@ import { BullModule } from '@nestjs/bullmq';
     SolvencyValidationService,
     InitialPetitionService,
     InsertProcessService,
-    ProcessQueue,
     BrapiService,
     LawsuitValidationService,
     WebhookPipedriveService,
@@ -148,6 +162,7 @@ import { BullModule } from '@nestjs/bullmq';
     ProcessCountersService,
     SavedMovementsService,
     LossRevalidationCron,
+    OrphanedProcessCron,
     UpdateLawsuitService,
     BulkUpdateService,
     CreateActivityService,
@@ -156,6 +171,17 @@ import { BullModule } from '@nestjs/bullmq';
     UpdateActivityNotesService,
     MetricsService,
     UploadXLSXService,
+    WebhookNaoEncontradoHandler,
+    WebhookErroHandler,
+    WebhookTstHandler,
+    WebhookTrtHandler,
+    ServiceWebhookGuard,
+    ProcessStateMachineService,
+    InsertProcessWorker,
+    ProcessValidationWorker,
+    SolvencyValidationWorker,
+    ExtractDocumentWorker,
+    InitialPetitionWorker,
   ],
 })
 export class ProcessModule {}

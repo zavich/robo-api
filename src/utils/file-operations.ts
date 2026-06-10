@@ -16,8 +16,8 @@ async function downloadFile(url, localFilePath) {
   const writer = createWriteStream(localFilePath);
   response.data.pipe(writer);
 
-  return new Promise((resolve, reject) => {
-    writer.on('finish', resolve);
+  return new Promise<void>((resolve, reject) => {
+    writer.on('finish', () => resolve());
     writer.on('error', reject);
   });
 }
@@ -31,8 +31,6 @@ async function isPdfEmptyOrCorrupt(filePath: string): Promise<boolean> {
 
     // Verifica se há páginas no PDF
     if (pdfDoc.getPageCount() === 0) {
-      console.log(pdfDoc.getPageCount());
-      console.log('PDF está vazio.');
       return true;
     }
 
@@ -45,8 +43,7 @@ async function isPdfEmptyOrCorrupt(filePath: string): Promise<boolean> {
     // }
 
     return false; // PDF não está vazio e não é inválido
-  } catch (error) {
-    console.error('Erro ao carregar o PDF:', error.message);
+  } catch {
     return true; // Considera como inválido em caso de erro
   }
 }

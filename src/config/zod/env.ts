@@ -17,6 +17,11 @@ export const envSchema = z.object({
   AUTH_COOKIE_DOMAIN: z.string().optional(),
   // origens extras de CORS p/ dev/local (comma-separated); vazio em produção
   CORS_EXTRA_ORIGINS: z.string().optional(),
+  // sobrescreve a lista base de CORS (comma-separated); ver main.ts
+  CORS_ORIGINS: z.string().optional(),
+  // auditoria de roles no bootstrap (ver RoleAuditService)
+  AUTH_STRICT_ROLE_AUDIT: z.string().optional(),
+  AUTH_AUDIT_SKIP: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

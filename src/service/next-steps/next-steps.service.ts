@@ -1,78 +1,77 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Queue } from 'bullmq';
 
 @Injectable()
 export class NextStepsService {
+  private readonly logger = new Logger(NextStepsService.name);
+
   constructor(
-    @InjectQueue('process-queue')
-    private readonly processQueue: Queue,
+    @InjectQueue('process-validation-queue')
+    private readonly processValidationQueue: Queue,
+    @InjectQueue('solvency-validation-queue')
+    private readonly solvencyValidationQueue: Queue,
+    @InjectQueue('extract-document-queue')
+    private readonly extractDocumentQueue: Queue,
+    @InjectQueue('initial-petition-queue')
+    private readonly initialPetitionQueue: Queue,
   ) {}
-  async execute(step: string, data: any) {
-    switch (true) {
-      case step === 'step-1':
-        await this.processQueue.add('process-validation', data);
+
+  private async checkBackpressure(queue: Queue, queueName: string): Promise<void> {
+    const { waiting, delayed, active } = await queue.getJobCounts();
+    const pending = waiting + delayed + active;
+    const rawThreshold = Number(process.env.MAX_QUEUE_PENDING ?? 500);
+    const threshold = Number.isNaN(rawThreshold) ? 500 : rawThreshold;
+
+    if (pending >= threshold) {
+      this.logger.warn(
+        `Backpressure: fila '${queueName}' tem ${pending} jobs pendentes (max ${threshold}). Job rejeitado.`,
+      );
+      throw new ServiceUnavailableException(
+        `Backpressure: fila '${queueName}' tem ${pending} jobs pendentes (max ${threshold}). Job rejeitado.`,
+      );
+    }
+  }
+
+  async execute(step: string, data: unknown) {
+    switch (step) {
+      case 'step-1':
+        await this.checkBackpressure(this.processValidationQueue, 'process-validation-queue');
+        await this.processValidationQueue.add('process-validation', data);
         break;
-      case step === 'step-2':
-        await this.processQueue.add('solvency-validation', data);
+      case 'step-2':
+        await this.checkBackpressure(this.solvencyValidationQueue, 'solvency-validation-queue');
+        await this.solvencyValidationQueue.add('solvency-validation', data);
         break;
-      case step === 'step-3':
-        await this.processQueue.add('extract-document', data);
+      case 'step-3':
+        await this.checkBackpressure(this.extractDocumentQueue, 'extract-document-queue');
+        await this.extractDocumentQueue.add('extract-document', data);
         break;
-      case step === 'step-4':
-        await this.processQueue.add('initial-petition', data);
-        break;
-      case step === 'step-5':
-        await this.processQueue.add('filter-value', data);
-        break;
-      case step === 'step-6':
-        await this.processQueue.add('liberation', data);
-        break;
-      case step === 'step-7':
-        await this.processQueue.add('parameters', data);
-        break;
-      case step === 'step-8':
-        await this.processQueue.add('resources', data);
-        break;
-      case step === 'step-9':
-        await this.processQueue.add('simple-calc', data);
+      case 'step-4':
+        await this.checkBackpressure(this.initialPetitionQueue, 'initial-petition-queue');
+        await this.initialPetitionQueue.add('initial-petition', data);
         break;
       default:
         break;
     }
   }
 
-  getQueueByStep(step: string) {
-    switch (true) {
-      case step === 'step-1':
-        return 'process-validation';
-        break;
-      case step === 'step-2':
-        return 'solvency-validation';
-        break;
-      case step === 'step-3':
-        return 'extract-document';
-        break;
-      case step === 'step-4':
-        return 'initial-petition';
-        break;
-      case step === 'step-5':
-        return 'filter-value';
-        break;
-      case step === 'step-6':
-        return 'liberation';
-        break;
-      case step === 'step-7':
-        return 'parameters';
-        break;
-      case step === 'step-8':
-        return 'resources';
-        break;
-      case step === 'step-9':
-        return 'simple-calc';
-        break;
+  getQueueByStep(step: string): string | undefined {
+    switch (step) {
+      case 'step-1':
+        return 'process-validation-queue';
+      case 'step-2':
+        return 'solvency-validation-queue';
+      case 'step-3':
+        return 'extract-document-queue';
+      case 'step-4':
+        return 'initial-petition-queue';
       default:
-        break;
+        return undefined;
     }
   }
 }

@@ -36,7 +36,7 @@ const formPipedriveSchema = z
       activitySubject: z.string().optional(),
       activityDone: z.boolean().optional(),
     })
-  .catchall(z.any());
+  .catchall(z.unknown());
 
 const updateProcessSchema = z
   .object({
@@ -45,7 +45,7 @@ const updateProcessSchema = z
     stageLabel: z.string().optional(),
     formPipedrive: formPipedriveSchema.optional(),
   })
-  .catchall(z.any()); // Aceita qualquer campo adicional
+  .catchall(z.unknown()); // Aceita qualquer campo adicional
 type UpdateProcessDTO = z.infer<typeof updateProcessSchema>;
 class UpdateProcessSchemaBody extends createZodDto(updateProcessSchema) {}
 const updateProcessSchemaPipe = new ZodValidationPipe(updateProcessSchema);

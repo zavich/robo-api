@@ -30,6 +30,7 @@ Base URL: `process.env.SCRAPING_BASE_URL`
 ```typescript
 {
   id: number,
+  webhookId?: string,
   created_at: { date: string, timezone_type: number, timezone: string },
   enviar_callback: string,
   link_api: string,
@@ -60,6 +61,10 @@ Base URL: `process.env.SCRAPING_BASE_URL`
   uuid: string
 }
 ```
+
+**Headers obrigatorios**:
+- `x-service-key`: segredo compartilhado (`WEBHOOK_SERVICE_KEY`) validado por `ServiceWebhookGuard`
+- `x-correlation-id`: correlacao cross-service propagada para logs e jobs BullMQ
 
 **Instancia** (dentro de `resposta.instancias[]`):
 ```typescript

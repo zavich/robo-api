@@ -5,7 +5,7 @@
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -13,26 +13,46 @@ import * as bodyParser from 'body-parser';
 import { Queue } from 'bullmq';
 import * as cookieParser from 'cookie-parser';
 import { setMaxListeners } from 'events';
-import { patchNestJsSwagger } from 'nestjs-zod';
+import { patchNestJsSwagger, ZodValidationPipe } from 'nestjs-zod';
 import { AppModule } from './app.module';
 import { Env } from './config/zod/env';
+import { BaseAdapter } from '@bull-board/api/dist/src/queueAdapters/base';
+
+const bootstrapLogger = new Logger('Bootstrap');
+
+process.on('unhandledRejection', (reason) => {
+  bootstrapLogger.error('Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  bootstrapLogger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const httpAdapter = app.getHttpAdapter();
-  httpAdapter.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok' });
-  });
+  // ZodValidationPipe valida DTOs criados com createZodDto (nestjs-zod).
+  // ValidationPipe(transform) mantém coerção de tipos para DTOs class-validator.
+  // whitelist/forbidNonWhitelisted omitidos: whitelist zeraria todos os campos Zod.
+  app.useGlobalPipes(
+    new ZodValidationPipe(),
+    new ValidationPipe({
+      transform: true,
+    }),
+  );
 
-  app.setGlobalPrefix('v1');
+  app.setGlobalPrefix('v1', { exclude: ['health'] });
   patchNestJsSwagger();
   // Origens de produção (fronts que consomem esta API com cookie/credenciais).
-  const corsOrigins = [
-    'https://scraping-api.juri.capital',
-    'https://painel-robo.juri.capital',
-    'https://app.juri.capital', // front da juri-api (SSO cross-origin)
-  ];
+  // `CORS_ORIGINS` (do refactor) sobrescreve a lista base quando definido.
+  const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+    : [
+        'https://scraping-api.juri.capital',
+        'https://painel-robo.juri.capital',
+        'https://app.juri.capital', // front da juri-api (SSO cross-origin)
+      ];
   const isLocal = process.env.NODE_ENV === 'local';
   const localOrigins = isLocal
     ? ['http://localhost:3000', 'http://localhost:5173']
@@ -75,25 +95,50 @@ async function bootstrap() {
 
     const redisClient = app.get('REDIS_CLIENT');
 
-    const aQueue = new Queue('process-queue', {
+    const insertProcessQueue = new Queue('insert-process-queue', {
+      connection: redisClient,
+    });
+    const processValidationQueue = new Queue('process-validation-queue', {
+      connection: redisClient,
+    });
+    const solvencyValidationQueue = new Queue('solvency-validation-queue', {
+      connection: redisClient,
+    });
+    const extractDocumentQueue = new Queue('extract-document-queue', {
+      connection: redisClient,
+    });
+    const initialPetitionQueue = new Queue('initial-petition-queue', {
       connection: redisClient,
     });
 
     createBullBoard({
-      queues: [new BullMQAdapter(aQueue) as unknown as any], // Força a compatibilidade de tipos
+      queues: [
+        new BullMQAdapter(insertProcessQueue) as BaseAdapter,
+        new BullMQAdapter(processValidationQueue) as BaseAdapter,
+        new BullMQAdapter(solvencyValidationQueue) as BaseAdapter,
+        new BullMQAdapter(extractDocumentQueue) as BaseAdapter,
+        new BullMQAdapter(initialPetitionQueue) as BaseAdapter,
+      ],
       serverAdapter,
     });
 
     app.use('/bull-board', serverAdapter.getRouter());
-    console.log('[BOOT] REDIS_URL:', process.env.REDIS_URL);
-    console.log('✅ Bull Board carregado com a fila process-queue');
+    const maskedRedisUrl = (process.env.REDIS_URL ?? '').replace(
+      /\/\/[^:]*:[^@]*@/,
+      '//*:*@',
+    );
+    bootstrapLogger.log(`[BOOT] REDIS_URL: ${maskedRedisUrl}`);
+    bootstrapLogger.log(
+      'Bull Board carregado com as filas: insert-process-queue, process-validation-queue, ' +
+        'solvency-validation-queue, extract-document-queue, initial-petition-queue',
+    );
     const logger = new Logger('BullBoard');
 
     logger.warn(
-      `Tentando conectar ao Redis para Bull Board... ${process.env.REDIS_URL}`,
+      `Tentando conectar ao Redis para Bull Board... ${maskedRedisUrl}`,
     );
     try {
-      await aQueue.getJobCounts();
+      await insertProcessQueue.getJobCounts();
       logger.warn('Redis conectado com sucesso!');
     } catch (error) {
       logger.error('Falha ao conectar ao Redis:', error);

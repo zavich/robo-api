@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import Redis from 'ioredis';
 
 @Injectable()
 export class SharePointService {
   private readonly logger = new Logger(SharePointService.name);
+  private readonly tokenCacheKey = 'sharepoint:token';
 
   private readonly siteId = process.env.MICROSOFT_SITE_ID;
 
@@ -11,7 +13,14 @@ export class SharePointService {
 
   private readonly itemId = process.env.MICROSOFT_ITEM_ID;
 
+  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
+
   async getAccessToken(): Promise<string> {
+    const cachedToken = await this.redis.get(this.tokenCacheKey);
+    if (cachedToken) {
+      return cachedToken;
+    }
+
     const params = new URLSearchParams();
     params.append('client_id', process.env.MICROSOFT_CLIENT_ID);
     params.append('client_secret', process.env.MICROSOFT_SECRET_VALUE);
@@ -23,7 +32,13 @@ export class SharePointService {
       params,
     );
 
-    return response.data.access_token;
+    const accessToken = response.data.access_token as string;
+    const expiresInSeconds = Number(response.data.expires_in ?? 3600);
+    const ttl = Math.max(60, expiresInSeconds - 300);
+
+    await this.redis.set(this.tokenCacheKey, accessToken, 'EX', ttl);
+
+    return accessToken;
   }
 
   async downloadSolvenciaXLSX(): Promise<Buffer> {

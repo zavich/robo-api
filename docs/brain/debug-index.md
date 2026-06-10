@@ -85,9 +85,12 @@ Leia:
 Checar:
 
 - `src/modules/authentication/guards/jwt-strategy.guard.ts`.
-- `JWT_SECRET_KEY` e `JWT_EXPIRES_IN` no env.
+- Chaves RS256 no env: `JWT_PRIVATE_KEY_PAINEL_ROBO` (assina) e `JWT_PUBLIC_KEY_PAINEL_ROBO` / `JWT_PUBLIC_KEY_JURI_API` (verificam). Faltando, o bootstrap aborta (fora de `NODE_ENV=test`).
+- `iss` do token reconhecido (`painel-robo` / `api.juri.capital`) — emissor sem chave no mapa = 401.
+- Identidade resolvida por e-mail: o usuário do token (`user.email`) precisa existir e estar ativo na base local.
+- Se o token foi revogado (`jwt:revoked:<jti>` no Redis após logout).
 - Se o token nao expirou.
-- Se o header Authorization esta presente.
+- Token presente no cookie `auth_token` ou no header `Authorization: Bearer`.
 
 ## Cron de revalidacao nao executa
 

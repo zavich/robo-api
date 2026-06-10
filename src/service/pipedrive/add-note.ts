@@ -8,9 +8,9 @@ interface AddNoteParams {
 export async function addNoteToPipedrive({
   content,
   dealId,
-}: AddNoteParams): Promise<any> {
+}: AddNoteParams): Promise<Record<string, unknown>> {
   const url = `${process.env.PIPEDRIVE_PROSOLUTTI_URL}/v1/notes`;
-  const data: Record<string, any> = { content };
+  const data: Record<string, unknown> = { content };
 
   if (dealId) data.deal_id = dealId;
 
@@ -28,9 +28,10 @@ export async function addNoteToPipedrive({
       },
     );
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: { error?: string } }; message?: string };
     throw new Error(
-      `Failed to add note to Pipedrive: ${error.response?.data?.error || error.message}`,
+      `Failed to add note to Pipedrive: ${axiosError.response?.data?.error || axiosError.message}`,
     );
   }
 }

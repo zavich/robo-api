@@ -1,5 +1,7 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import Redis from 'ioredis';
+
+const logger = new Logger('RedisModule');
 
 @Global()
 @Module({
@@ -17,18 +19,31 @@ import Redis from 'ioredis';
           maxRetriesPerRequest: null,
           enableReadyCheck: true,
           lazyConnect: false,
+          retryStrategy: (times: number) => {
+            if (times > 20) {
+              logger.error('[Redis] Máximo de tentativas atingido. Desistindo.');
+              return null;
+            }
+            const delay = Math.min(times * 200, 5000);
+            logger.warn(`[Redis] Tentativa ${times} de reconexão em ${delay}ms`);
+            return delay;
+          },
           reconnectOnError: (err) => {
-            console.error('[Redis reconnect error]', err.message);
+            logger.error('[Redis reconnect error]', err.message);
             return true;
           },
         });
 
-        client.on('connect', () => {
-          console.log('[Redis] connected');
+        client.on('ready', () => {
+          logger.log('[Redis] Conexão estabelecida com sucesso');
+        });
+
+        client.on('reconnecting', () => {
+          logger.warn('[Redis] Reconectando...');
         });
 
         client.on('error', (err) => {
-          console.error('[Redis] error:', err.message);
+          logger.error('[Redis] error:', err.message);
         });
 
         return client;

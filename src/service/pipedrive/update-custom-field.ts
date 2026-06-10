@@ -3,14 +3,14 @@ import axios from 'axios';
 interface UpdatePipedriveCustomField {
   dealId: number;
   fieldKey: string;
-  fieldValue: any;
+  fieldValue: string | number | boolean | null;
 }
 
 export async function updatePipedriveCustomField({
   dealId,
   fieldKey,
   fieldValue,
-}: UpdatePipedriveCustomField): Promise<any> {
+}: UpdatePipedriveCustomField): Promise<Record<string, unknown>> {
   const url = `${process.env.PIPEDRIVE_PROSOLUTTI_URL}/v1/deals/${dealId}`;
   const body = {
     [fieldKey]: fieldValue,
@@ -27,9 +27,10 @@ export async function updatePipedriveCustomField({
     });
 
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as { response?: { data?: { error?: string } }; message?: string };
     throw new Error(
-      `Failed to update Pipedrive custom field: ${error.response?.data?.error || error.message}`,
+      `Failed to update Pipedrive custom field: ${axiosError.response?.data?.error || axiosError.message}`,
     );
   }
 }

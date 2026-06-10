@@ -14,15 +14,12 @@ import {
   NOTIFICATION_DESCRIPTIONS,
   NOTIFICATION_TITLES,
 } from 'src/modules/notification/mocks/notification';
-import { User } from 'src/modules/user/schema/user.schema';
 
 @Injectable()
 export class CreateActivityService {
   constructor(
     @InjectModel(ProcessEntity.name)
     private readonly processModule: Model<ProcessEntity>,
-    @InjectModel(User.name)
-    private readonly userModule: Model<User>,
     private readonly createNotification: CreateNotificationsService,
   ) {}
 
@@ -31,12 +28,6 @@ export class CreateActivityService {
    */
   async execute(assignedBy: string, dto: CreateActivityDTO) {
     const { processes, assignedTo, type } = dto;
-    const findUser = await this.userModule.findById(assignedBy);
-    if (findUser.role !== 'admin') {
-      throw new BadRequestException(
-        'Apenas administradores podem criar atividades.',
-      );
-    }
     if (!processes || processes.length === 0) {
       throw new BadRequestException('Nenhum processo informado.');
     }

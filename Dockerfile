@@ -16,6 +16,8 @@ RUN npm run build
 # STAGE 2 - Runtime
 FROM node:18-alpine
 
+RUN apk add --no-cache curl
+
 WORKDIR /usr/src/app
 
 # apenas produção

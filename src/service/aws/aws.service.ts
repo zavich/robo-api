@@ -4,64 +4,13 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { SendEmailCommand, SendEmailCommandInput } from '@aws-sdk/client-ses';
-import { PublishCommand, PublishCommandInput } from '@aws-sdk/client-sns';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as mimeTypes from 'mime-types';
 
 export class AwsServices {
-  async sendEmail(to: any, subject: any, text: any) {
-    const params: SendEmailCommandInput = {
-      Destination: {
-        ToAddresses: [to],
-      },
-      Message: {
-        Body: {
-          Html: {
-            Charset: 'UTF-8',
-            Data: text,
-          },
-        },
-
-        Subject: { Data: subject },
-      },
-      Source: 'gabriel@paguru.com.br',
-    };
-
-    try {
-      const command = new SendEmailCommand(params);
-      console.log(command);
-
-      // await sesClient.send(command);
-    } catch (error) {
-      console.error('Error sending email', error);
-    }
-  }
-
-  async sendSMS(message: string, phoneNumber: string): Promise<void> {
-    const params: PublishCommandInput = {
-      Message: message,
-      MessageStructure: 'string',
-      PhoneNumber: phoneNumber,
-      MessageAttributes: {
-        'AWS.SNS.SMS.SMSType': {
-          DataType: 'String',
-          StringValue: 'Transactional',
-        },
-      },
-    };
-
-    try {
-      const command = new PublishCommand(params);
-      console.log('command', command);
-      // await snsClient.send(command);
-    } catch (error) {
-      Logger.error('Error sending sms' + error);
-      throw new BadRequestException('Error send sms');
-    }
-  }
+  private readonly logger = new Logger(AwsServices.name);
 
   async deleteImageS3(key: string) {
     const params = {
@@ -73,9 +22,11 @@ export class AwsServices {
 
     try {
       await this.s3Client.send(command);
-      console.log(`Arquivo ${key} excluído com sucesso do S3.`);
+      this.logger.log(`Arquivo ${key} excluído com sucesso do S3.`);
     } catch (error) {
-      Logger.error(`Erro ao excluir o arquivo ${key} do S3:`, error);
+      this.logger.error(
+        `Erro ao excluir o arquivo ${key} do S3: ${error instanceof Error ? error.stack : String(error)}`,
+      );
 
       throw error;
     }
@@ -104,7 +55,9 @@ export class AwsServices {
         type: params.ContentType,
       };
     } catch (error) {
-      Logger.error(`Erro ao realizar upload do arquivo  do S3:`, error);
+      this.logger.error(
+        `Erro ao realizar upload do arquivo do S3: ${error instanceof Error ? error.stack : String(error)}`,
+      );
       throw error;
     }
   }
@@ -120,7 +73,9 @@ export class AwsServices {
       }); // URL válida por 1 hora
       return signedUrl;
     } catch (error) {
-      Logger.error(`Erro ao gerar URL assinada para o arquivo ${key}:`, error);
+      this.logger.error(
+        `Erro ao gerar URL assinada para o arquivo ${key}: ${error instanceof Error ? error.stack : String(error)}`,
+      );
       throw error;
     }
   }

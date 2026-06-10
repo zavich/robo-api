@@ -22,6 +22,6 @@ import { DeleteNotificationsService } from './services/delete.service';
     ReadNotificationService,
     DeleteNotificationsService,
   ],
-  exports: [CreateNotificationsService, ListNotificationsService],
+  exports: [CreateNotificationsService, ListNotificationsService, NotificationsGateway],
 })
 export class NotificationModule {}

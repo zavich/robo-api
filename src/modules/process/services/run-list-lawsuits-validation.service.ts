@@ -1,11 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { HydratedDocument, Model, PipelineStage, Types } from 'mongoose';
+
+interface PopulatedProcessStatus {
+  _id: string;
+  step: { slug: string };
+}
+
+type ProcessWithPopulatedStatus = HydratedDocument<ProcessEntity> & {
+  processStatus: PopulatedProcessStatus;
+};
 import { Process as ProcessEntity } from 'src/modules/process/schema/process.schema';
 import { InsertProcessService } from '../queues/process/services/insert-process.service';
 import { ProcessStatus } from '../schema/process-status.schema';
 import { Step } from '../schema/step.schema';
 import { PROCESSSTATUSENUM } from '../enums/process-status.enum';
+import { ProcessStateMachineService } from './process-state-machine.service';
 
 @Injectable()
 export class RunListLawsuitsValidationService {
@@ -19,6 +29,7 @@ export class RunListLawsuitsValidationService {
     private readonly processStatusService: Model<ProcessStatus>,
     @InjectModel(Step.name)
     private readonly stepService: Model<Step>,
+    private readonly processStateMachine: ProcessStateMachineService,
   ) {}
   async execute(
     lawsuits: string[],
@@ -27,50 +38,9 @@ export class RunListLawsuitsValidationService {
     log?: string,
     errorReason?: string,
   ) {
-    // const response = await this.processModule.aggregate([
-    //   {
-    //     $match: {
-    //       documents: {
-    //         $exists: true,
-    //         $ne: [],
-    //       },
-    //     },
-    //   },
-    //   {
-    //     $lookup: {
-    //       from: 'processstatuses',
-    //       localField: 'processStatus',
-    //       foreignField: '_id',
-    //       as: 'status',
-    //     },
-    //   },
-    //   {
-    //     $unwind: '$status',
-    //   },
-    //   {
-    //     $match: {
-    //       'status.name': 'PROCESSING_WITH_DOCUMENTS',
-    //     },
-    //   },
-    // ]);
-    // console.log(response.length);
-    // for (const process of response) {
-    //   await this.processStatusService.findByIdAndUpdate(
-    //     process.processStatus,
-    //     {
-    //       $set: {
-    //         name: 'EXTRACTION_DOCUMENTS_FINISHED',
-    //         log: 'Extração de documentos finalizada',
-    //         errorReason: '',
-    //       },
-    //     },
-    //     { new: true },
-    //   );
-    // }
-    // return;
-    let process: any[] = [];
+    let process: string[] = [];
     if (lawsuits.length === 0) {
-      const filters = [];
+      const filters: Record<string, string>[] = [];
 
       if (name) {
         filters.push({ 'processStatus.name': name });
@@ -84,7 +54,7 @@ export class RunListLawsuitsValidationService {
         filters.push({ 'processStatus.log': log });
       }
 
-      const pipeline: any[] = [
+      const pipeline: PipelineStage[] = [
         {
           $lookup: {
             from: 'processstatuses',
@@ -144,9 +114,9 @@ export class RunListLawsuitsValidationService {
           return;
         }
 
-        const proc: any = await this.processModule
+        const proc = await this.processModule
           .findOne({ number: numberKey })
-          .populate({ path: 'processStatus', populate: ['step'] });
+          .populate({ path: 'processStatus', populate: ['step'] }) as ProcessWithPopulatedStatus | null;
         if (!proc) {
           this.logger.warn('Process ' + numberKey + ' not found');
           return;
@@ -161,18 +131,16 @@ export class RunListLawsuitsValidationService {
           { new: true },
         );
         const findStep = await this.stepService.findOne({ slug: 'step-1' });
-        await this.processStatusService.findByIdAndUpdate(
+        await this.processStateMachine.transition(
+          this.processStatusService,
           proc.processStatus._id,
           {
-            $set: {
-              name: documents
-                ? PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
-                : PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
-              step: findStep._id,
-              errorReason: '',
-            },
+            name: documents
+              ? PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
+              : PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
+            step: findStep._id,
+            errorReason: '',
           },
-          { new: true },
         );
         return this.insertProcessService.fetchProcessExtract(
           proc.number,

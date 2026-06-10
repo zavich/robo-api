@@ -2,13 +2,13 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  ForbiddenException
+  ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Process, ProcessDocument } from '../schema/process.schema';
 import { ProcessDecisions, ProcessDecisionsDocument } from '../schema/process-decisions.schema';
-import { User, UserDocument, UserRole } from '../../user/schema/user.schema';
 import { ChangeStageDTO } from '../dtos/change-stage.dto';
 import { CLASSPROCESS, StageByCode, STAGEPROCESS } from '../interfaces/enum';
 import { updateStageToPipedrive } from '../../../service/pipedrive/update-stage';
@@ -16,13 +16,13 @@ import { addNoteToPipedrive } from '../../../service/pipedrive/add-note';
 
 @Injectable()
 export class ChangeStageService {
+  private readonly logger = new Logger(ChangeStageService.name);
+
   constructor(
     @InjectModel(Process.name)
     private readonly processModel: Model<ProcessDocument>,
     @InjectModel(ProcessDecisions.name)
     private readonly processDecisionModel: Model<ProcessDecisionsDocument>,
-    @InjectModel(User.name)
-    private readonly userModel: Model<UserDocument>,
   ) { }
 
   async execute(
@@ -30,24 +30,22 @@ export class ChangeStageService {
     userId: string,
   ) {
     try {
-      // 1. Validar se o usuário é admin
-      const user = await this.userModel.findById(userId);
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      if (user.role !== UserRole.ADMIN) {
-        throw new ForbiddenException('Only admin users can change process stages');
-      }
-
-      // 2. Buscar o processo
+      // 1. Buscar o processo
       const process = await this.processModel.findById(changeStageData.processId);
       if (!process) {
         throw new NotFoundException('Process not found');
       }
 
-      // 3. Verificar se o stage realmente mudou
-      if (process.stage === StageByCode[changeStageData.newStageId]) {
+      // 3. Validar mapeamento newStageId -> stage ANTES de qualquer write para
+      //    nao corromper o documento com `stage: undefined`.
+      const nextStage = StageByCode[changeStageData.newStageId];
+      if (!nextStage) {
+        throw new BadRequestException(
+          `newStageId invalido: ${changeStageData.newStageId}`,
+        );
+      }
+
+      if (process.stage === nextStage) {
         throw new BadRequestException('Process is already in the specified stage');
       }
 
@@ -57,11 +55,15 @@ export class ChangeStageService {
       const updatedProcess = await this.processModel.findByIdAndUpdate(
         changeStageData.processId,
         {
-          stage: StageByCode[changeStageData.newStageId],
+          stage: nextStage,
           stageId: changeStageData.newStageId,
         },
         { new: true }
       );
+
+      if (!updatedProcess) {
+        throw new NotFoundException('Process not found');
+      }
 
       // 5. Buscar ou criar registro de decisões do processo
       let processDecision = await this.processDecisionModel.findOne({
@@ -145,7 +147,7 @@ export class ChangeStageService {
   /**
    * Retorna o stage ID padrão baseado no stage e no contexto do processo
    */
-  private getDefaultStageId(stage: STAGEPROCESS, process?: any): number {
+  private getDefaultStageId(stage: STAGEPROCESS, process?: ProcessDocument | null): number {
     if (process?.dealId) {
       const stageIdMap: Record<STAGEPROCESS, number> = {
         [STAGEPROCESS.PRE_ANALISE]: 802,
@@ -219,7 +221,7 @@ export class ChangeStageService {
    * Atualiza o stage no Pipedrive
    */
   private async updatePipedriveStage(
-    process: any,
+    process: ProcessDocument,
     changeStageData: ChangeStageDTO,
     previousStage: STAGEPROCESS
   ): Promise<void> {
@@ -255,7 +257,7 @@ export class ChangeStageService {
 
     } catch (error) {
       // Log do erro mas não falha o processo principal
-      console.error('Erro ao atualizar Pipedrive:', error);
+      this.logger.error('Erro ao atualizar Pipedrive:', error);
       // Opcional: poderia ser melhor usar um logger apropriado
     }
   }

@@ -1,11 +1,13 @@
-import { GenerateContentRequest, Part, VertexAI } from '@google-cloud/vertexai';
-import { BadRequestException } from '@nestjs/common';
+import { FileDataPart, GenerateContentRequest, Part, VertexAI } from '@google-cloud/vertexai';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Prompt } from 'src/modules/process/schema/prompt.schema';
 import { Storage } from '@google-cloud/storage';
 
 export class VertexAIService {
+  private readonly logger = new Logger(VertexAIService.name);
+
   credentials = {
     type: 'service_account',
     project_id: process.env.GOOGLE_PROJECT_ID,
@@ -14,6 +16,7 @@ export class VertexAIService {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
     client_id: process.env.GOOGLE_CLIENT_ID,
   };
+
   constructor(
     @InjectModel(Prompt.name)
     private readonly promptModel: Model<Prompt>,
@@ -35,7 +38,7 @@ export class VertexAIService {
     retries = 3,
     delayMs = 3000,
     cooldownAfterSuccessMs = 3000,
-  ): Promise<any> {
+  ): Promise<Record<string, unknown>> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const result = await this.execute(file_url, prompt, fileMimeType);
@@ -53,7 +56,7 @@ export class VertexAIService {
 
         if (statusCode === 429) {
           const backoff = attempt * delayMs;
-          console.warn(
+          this.logger.warn(
             `[RateLimit] Tentativa ${attempt}/${retries} falhou com 429. Aguardando ${backoff / 1000}s antes da próxima tentativa...`,
           );
 
@@ -73,7 +76,7 @@ export class VertexAIService {
     file_url: string,
     prompt: string,
     fileMimeType = 'application/pdf',
-  ): Promise<any> {
+  ): Promise<Record<string, unknown>> {
     try {
       const vertexAI = new VertexAI({
         project: process.env.GOOGLE_PROJECT_ID,
@@ -94,13 +97,13 @@ export class VertexAIService {
           responseMimeType: 'application/json',
         },
       });
-      const filePart = {
-        file_data: {
-          mime_type: fileMimeType,
-          file_uri: file_url,
+      const filePart: FileDataPart = {
+        fileData: {
+          mimeType: fileMimeType,
+          fileUri: file_url,
         },
       };
-      const textPart = {
+      const textPart: Part = {
         text: prompt,
       };
 
@@ -114,7 +117,7 @@ export class VertexAIService {
         contents: [
           {
             role: 'user',
-            parts: [filePart as unknown as Part, textPart as Part],
+            parts: [filePart, textPart],
           },
         ],
       };
@@ -126,8 +129,8 @@ export class VertexAIService {
       );
       return jsonParsed;
     } catch (error) {
-      console.error('VERTEX ERROR:', error);
-      console.error('VERTEX RESPONSE:', error?.response?.data);
+      const stack = error instanceof Error ? error.stack : String(error);
+      this.logger.error(`VERTEX ERROR: ${stack}`);
       throw error;
     }
   }
