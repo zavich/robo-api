@@ -24,10 +24,14 @@ import { SignUpService } from './services/sign-up.service';
 import { CheckPermissions } from './decorators/check-permissions.decorator';
 import { Public } from './decorators/public.decorator';
 import { getPermissionsForRole } from './constants/permissions.constant';
-import { AUTH_COOKIE_NAME, TOKEN_TTL_SECONDS } from './jwt/jwt.constants';
 import {
-  authCookieBaseOptions,
-  authCookieSetOptions,
+  AUTH_COOKIE_NAME,
+  SELF_COOKIE_NAME,
+  TOKEN_TTL_SECONDS,
+} from './jwt/jwt.constants';
+import {
+  selfCookieBaseOptions,
+  selfCookieSetOptions,
   sharedCookieClearOptions,
 } from './jwt/auth-cookie';
 
@@ -50,10 +54,10 @@ export class AuthenticationController {
   ) {
     const { accessToken } = await this.loginService.execute(loginUserDto);
 
-    // Sessão PRÓPRIA: cookie `auth_token` HOST-ONLY (sem Domain=.juri.capital),
+    // Sessão PRÓPRIA: cookie `robo_auth_token` HOST-ONLY (sem Domain=.juri.capital),
     // então não vaza para a juri-api. O SSO juri-api -> painel-robo continua
     // lendo o `auth_token` que a juri-api seta em `.juri.capital` (ver JwtStrategy).
-    res.cookie(AUTH_COOKIE_NAME, accessToken, authCookieSetOptions());
+    res.cookie(SELF_COOKIE_NAME, accessToken, selfCookieSetOptions());
     return { message: 'Login successful' };
   }
 
@@ -71,7 +75,11 @@ export class AuthenticationController {
   @HttpCode(200)
   @Public()
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const token: string | undefined = req.cookies?.[AUTH_COOKIE_NAME];
+    // Revogação só faz sentido para o token PRÓPRIO (assinado por esta API, com
+    // `jti`). Lê do cookie próprio `robo_auth_token` — determinístico, sem a
+    // ambiguidade de cookies de mesmo nome. O cookie da juri-api (`auth_token`)
+    // não é nosso para revogar; só é limpo abaixo.
+    const token: string | undefined = req.cookies?.[SELF_COOKIE_NAME];
 
     if (token) {
       try {
@@ -96,12 +104,12 @@ export class AuthenticationController {
       }
     }
 
-    // Limpa o `auth_token` nos dois escopos possíveis (mesmas opções do set,
-    // sem maxAge, senão o browser não casa o cookie):
-    //  - host-only: a sessão própria desta API (login direto);
-    //  - `.juri.capital`: o cookie compartilhado setado pela juri-api
+    // Limpa os dois cookies (mesmas opções do set, sem maxAge, senão o browser
+    // não casa o cookie):
+    //  - `robo_auth_token` host-only: a sessão própria desta API (login direto);
+    //  - `auth_token` em `.juri.capital`: o cookie compartilhado da juri-api
     //    (single logout — deslogar aqui encerra a sessão do SSO).
-    res.clearCookie(AUTH_COOKIE_NAME, authCookieBaseOptions());
+    res.clearCookie(SELF_COOKIE_NAME, selfCookieBaseOptions());
     res.clearCookie(AUTH_COOKIE_NAME, sharedCookieClearOptions());
 
     return { message: 'Logout realizado com sucesso' };

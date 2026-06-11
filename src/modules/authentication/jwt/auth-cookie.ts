@@ -2,13 +2,12 @@ import type { CookieOptions } from 'express';
 import { AUTH_COOKIE_DOMAIN, TOKEN_TTL_SECONDS } from './jwt.constants';
 
 /**
- * Opções do cookie `auth_token`.
- *
- * SSO unidirecional juri-api -> painel-robo: esta API LÊ o `auth_token` que a
- * juri-api seta no domínio pai `.juri.capital`, mas ESCREVE o seu próprio
- * `auth_token` (login direto) como HOST-ONLY — sem `Domain=.juri.capital` —
- * para que a sessão da robo-api nunca seja enviada à juri-api (o sentido
- * painel-robo -> juri-api foi descontinuado).
+ * Opções de cookie da autenticação. SSO unidirecional juri-api -> painel-robo:
+ *  - `robo_auth_token` (sessão PRÓPRIA): escrito no login direto como HOST-ONLY
+ *    — sem `Domain=.juri.capital` — para que a sessão da robo-api nunca seja
+ *    enviada à juri-api (o sentido painel-robo -> juri-api foi descontinuado).
+ *  - `auth_token` (COMPARTILHADO da juri-api): esta API só o lê e o limpa no
+ *    logout; ver `sharedCookieClearOptions`.
  *
  * Em produção usa Secure + SameSite=Lax (exige HTTPS). Em local
  * (NODE_ENV=local) o Secure não funciona sobre http, então cai para não seguro.
@@ -21,10 +20,11 @@ function isProd(): boolean {
 }
 
 /**
- * Opções do cookie da sessão PRÓPRIA (host-only). Nunca seta `domain`, então o
- * cookie fica restrito ao host desta API e não vaza para a juri-api.
+ * Opções do cookie da sessão PRÓPRIA (`robo_auth_token`, host-only). Nunca seta
+ * `domain`, então o cookie fica restrito ao host desta API e não vaza para a
+ * juri-api.
  */
-export function authCookieBaseOptions(): CookieOptions {
+export function selfCookieBaseOptions(): CookieOptions {
   return {
     httpOnly: true,
     path: '/',
@@ -35,9 +35,9 @@ export function authCookieBaseOptions(): CookieOptions {
   };
 }
 
-export function authCookieSetOptions(): CookieOptions {
+export function selfCookieSetOptions(): CookieOptions {
   return {
-    ...authCookieBaseOptions(),
+    ...selfCookieBaseOptions(),
     maxAge: TOKEN_TTL_SECONDS * 1000, // express espera ms
   };
 }

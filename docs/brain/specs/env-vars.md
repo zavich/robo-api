@@ -13,7 +13,7 @@
 | `JWT_PRIVATE_KEY_ROBO_API` | string (PEM) | SSO | - | Chave **privada** RS256 que assina os tokens (`iss=painel-robo`) |
 | `JWT_PUBLIC_KEY_ROBO_API` | string (PEM) | SSO | - | Chave **pública** própria; valida tokens emitidos por esta API (`iss=painel-robo`) |
 | `JWT_PUBLIC_KEY_JURI_API` | string (PEM) | SSO | - | Chave **pública** da juri-api; valida tokens dela (`iss=api.juri.capital`) |
-| `AUTH_COOKIE_DOMAIN` | string | Nao | `.juri.capital` (prod) | Domínio do cookie compartilhado da juri-api, usado só na limpeza no logout (override p/ SSO local). O cookie da sessão própria é host-only e ignora esta env |
+| `AUTH_COOKIE_DOMAIN` | string | Nao | `.juri.capital` (prod) | Domínio do cookie `auth_token` da juri-api, usado só na limpeza no logout (override p/ SSO local). O cookie da sessão própria (`robo_auth_token`) é host-only e ignora esta env |
 | `CORS_ORIGINS` | string (csv) | Nao | lista base | Sobrescreve a lista base de origens CORS |
 | `CORS_EXTRA_ORIGINS` | string (csv) | Nao | - | Origens extras de CORS; **só aplicadas em `NODE_ENV=local`** |
 | `AUTH_STRICT_ROLE_AUDIT` | string | Nao | - | `'true'` aborta o bootstrap se houver roles desconhecidas (ver `RoleAuditService`) |

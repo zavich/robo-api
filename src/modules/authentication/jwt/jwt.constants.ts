@@ -23,14 +23,20 @@ export const JWT_ALGORITHM = 'RS256' as const;
 export const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 2; // 172800
 
 /**
- * Nome do cookie `auth_token` (httpOnly). Esta API:
- *  - LÊ o `auth_token` que a juri-api seta no domínio pai `.juri.capital`
- *    (SSO juri-api -> painel-robo); e
- *  - ESCREVE o `auth_token` da própria sessão (login direto) como host-only,
- *    SEM `Domain=.juri.capital`, para não vazar a sessão da robo-api para a
- *    juri-api. Mesmo nome, escopos diferentes. Ver `auth-cookie.ts`.
+ * Cookie compartilhado emitido pela juri-api no domínio pai `.juri.capital`.
+ * Esta API só o LÊ (SSO juri-api -> painel-robo) e o LIMPA no logout; nunca o
+ * escreve.
  */
 export const AUTH_COOKIE_NAME = 'auth_token' as const;
+
+/**
+ * Cookie da sessão PRÓPRIA desta API (login direto no painel-robo). Host-only
+ * (sem `Domain=.juri.capital`), para não vazar a sessão para a juri-api. Nome
+ * distinto do `auth_token` de propósito: evita a colisão do cookie-parser
+ * (dois cookies de mesmo nome colapsariam para um, de forma não determinística).
+ * Ver `auth-cookie.ts`.
+ */
+export const SELF_COOKIE_NAME = 'robo_auth_token' as const;
 
 /** Domínio do cookie compartilhado da juri-api (usado só no logout/limpeza). */
 export const AUTH_COOKIE_DOMAIN = '.juri.capital' as const;

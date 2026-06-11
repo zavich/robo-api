@@ -1,5 +1,9 @@
 import { AuthenticationController } from './authentication.controller';
-import { AUTH_COOKIE_NAME, AUTH_COOKIE_DOMAIN } from './jwt/jwt.constants';
+import {
+  AUTH_COOKIE_NAME,
+  AUTH_COOKIE_DOMAIN,
+  SELF_COOKIE_NAME,
+} from './jwt/jwt.constants';
 
 const makeLoginService = () => ({ execute: jest.fn() });
 const makeSignUpService = () => ({ createUser: jest.fn() });
@@ -39,7 +43,7 @@ describe('AuthenticationController', () => {
   });
 
   describe('login', () => {
-    it('seta o auth_token como HOST-ONLY (sem Domain=.juri.capital)', async () => {
+    it('seta o robo_auth_token (host-only, sem Domain=.juri.capital)', async () => {
       loginService.execute.mockResolvedValue({ accessToken: 'jwt-token' });
       const res = { cookie: jest.fn() };
 
@@ -51,7 +55,8 @@ describe('AuthenticationController', () => {
       expect(result).toEqual({ message: 'Login successful' });
       expect(res.cookie).toHaveBeenCalledTimes(1);
       const [name, value, options] = res.cookie.mock.calls[0];
-      expect(name).toBe(AUTH_COOKIE_NAME);
+      // nome distinto do auth_token da juri-api (evita colisão no cookie-parser)
+      expect(name).toBe(SELF_COOKIE_NAME);
       expect(value).toBe('jwt-token');
       // o ponto central da mudança: a sessão própria não vaza para a juri-api
       expect(options).not.toHaveProperty('domain');
@@ -60,7 +65,7 @@ describe('AuthenticationController', () => {
   });
 
   describe('logout', () => {
-    it('limpa o auth_token nos dois escopos: host-only e .juri.capital', async () => {
+    it('limpa o robo_auth_token (host-only) e o auth_token (.juri.capital)', async () => {
       const req = { cookies: {} };
       const res = { clearCookie: jest.fn() };
 
@@ -69,22 +74,21 @@ describe('AuthenticationController', () => {
       expect(result).toEqual({ message: 'Logout realizado com sucesso' });
       expect(res.clearCookie).toHaveBeenCalledTimes(2);
 
-      const optionsByCall = res.clearCookie.mock.calls.map((c) => c[1]);
-      // todas as chamadas limpam o mesmo nome de cookie
-      res.clearCookie.mock.calls.forEach((c) =>
-        expect(c[0]).toBe(AUTH_COOKIE_NAME),
-      );
-      // um clear host-only (sem domain) e um clear no domínio da juri-api
-      expect(optionsByCall.some((o) => !('domain' in o))).toBe(true);
-      expect(optionsByCall.some((o) => o.domain === AUTH_COOKIE_DOMAIN)).toBe(
-        true,
-      );
+      const calls = res.clearCookie.mock.calls;
+      // sessão própria: robo_auth_token host-only (sem domain)
+      const selfClear = calls.find((c) => c[0] === SELF_COOKIE_NAME);
+      expect(selfClear).toBeDefined();
+      expect(selfClear![1]).not.toHaveProperty('domain');
+      // SSO: auth_token no domínio da juri-api (single logout)
+      const sharedClear = calls.find((c) => c[0] === AUTH_COOKIE_NAME);
+      expect(sharedClear).toBeDefined();
+      expect(sharedClear![1].domain).toBe(AUTH_COOKIE_DOMAIN);
     });
 
     it('revoga o jti quando há um token próprio válido no cookie', async () => {
       const exp = Math.floor(Date.now() / 1000) + 3600;
       jwtService.verify.mockReturnValue({ jti: 'valid-jti-12345', exp });
-      const req = { cookies: { [AUTH_COOKIE_NAME]: 'own-token' } };
+      const req = { cookies: { [SELF_COOKIE_NAME]: 'own-token' } };
       const res = { clearCookie: jest.fn() };
 
       await controller.logout(req as never, res as never);
@@ -100,11 +104,11 @@ describe('AuthenticationController', () => {
       );
     });
 
-    it('não revoga (mas ainda limpa) se a assinatura do token é inválida', async () => {
+    it('não revoga (mas ainda limpa) se a assinatura do token próprio é inválida', async () => {
       jwtService.verify.mockImplementation(() => {
         throw new Error('invalid signature');
       });
-      const req = { cookies: { [AUTH_COOKIE_NAME]: 'token-de-outro-emissor' } };
+      const req = { cookies: { [SELF_COOKIE_NAME]: 'token-malformado' } };
       const res = { clearCookie: jest.fn() };
 
       const result = await controller.logout(req as never, res as never);

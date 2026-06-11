@@ -16,6 +16,7 @@ import {
   AUTH_COOKIE_NAME,
   JURI_ISSUER,
   JWT_ALGORITHM,
+  SELF_COOKIE_NAME,
   SELF_ISSUER,
 } from '../jwt/jwt.constants';
 import { buildPublicKeyMap, readIssuer } from '../jwt/jwt-keys';
@@ -47,14 +48,15 @@ export type iJwtPayload = {
   };
 };
 
-// Lê o `auth_token` do cookie. Existem dois cookies possíveis com este mesmo
-// nome: o host-only da sessão própria (login direto) e o `.juri.capital` setado
-// pela juri-api (SSO). Quando ambos coexistem, o cookie-parser entrega só um
-// (ordem do header, não determinística) — o que é seguro aqui porque os dois
-// são RS256 válidos e a identidade é resolvida por e-mail, resultando no mesmo
-// usuário local.
+// Lê o token do cookie. São dois cookies de nomes DISTINTOS (sem colisão no
+// cookie-parser): `auth_token` (compartilhado, setado pela juri-api no SSO) e
+// `robo_auth_token` (host-only, sessão própria do login direto). Prioriza o da
+// juri-api (sentido canônico juri-api -> painel-robo); cai para o próprio quando
+// não há sessão de SSO. A identidade é resolvida por e-mail na validação.
 const cookieExtractor = (req: Request): string | null => {
-  return req?.cookies?.[AUTH_COOKIE_NAME] || null;
+  return (
+    req?.cookies?.[AUTH_COOKIE_NAME] || req?.cookies?.[SELF_COOKIE_NAME] || null
+  );
 };
 
 @Injectable()

@@ -1,6 +1,6 @@
 import {
-  authCookieBaseOptions,
-  authCookieSetOptions,
+  selfCookieBaseOptions,
+  selfCookieSetOptions,
   sharedCookieClearOptions,
 } from './auth-cookie';
 import { AUTH_COOKIE_DOMAIN, TOKEN_TTL_SECONDS } from './jwt.constants';
@@ -10,7 +10,13 @@ describe('auth-cookie', () => {
   const ORIGINAL_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN;
 
   afterEach(() => {
-    process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    // Restaurar com `delete` quando original era undefined: atribuir undefined
+    // viraria a string 'undefined' em process.env e vazaria estado entre testes.
+    if (ORIGINAL_NODE_ENV === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    }
     if (ORIGINAL_COOKIE_DOMAIN === undefined) {
       delete process.env.AUTH_COOKIE_DOMAIN;
     } else {
@@ -23,18 +29,18 @@ describe('auth-cookie', () => {
       // produção
       process.env.NODE_ENV = 'production';
       process.env.AUTH_COOKIE_DOMAIN = '.juri.capital'; // mesmo com env, ignora
-      expect(authCookieBaseOptions()).not.toHaveProperty('domain');
-      expect(authCookieSetOptions()).not.toHaveProperty('domain');
+      expect(selfCookieBaseOptions()).not.toHaveProperty('domain');
+      expect(selfCookieSetOptions()).not.toHaveProperty('domain');
 
       // local
       process.env.NODE_ENV = 'local';
-      expect(authCookieBaseOptions()).not.toHaveProperty('domain');
-      expect(authCookieSetOptions()).not.toHaveProperty('domain');
+      expect(selfCookieBaseOptions()).not.toHaveProperty('domain');
+      expect(selfCookieSetOptions()).not.toHaveProperty('domain');
     });
 
     it('é httpOnly, path / e SameSite=Lax', () => {
       process.env.NODE_ENV = 'production';
-      expect(authCookieBaseOptions()).toMatchObject({
+      expect(selfCookieBaseOptions()).toMatchObject({
         httpOnly: true,
         path: '/',
         sameSite: 'lax',
@@ -43,14 +49,14 @@ describe('auth-cookie', () => {
 
     it('Secure só fora de NODE_ENV=local', () => {
       process.env.NODE_ENV = 'production';
-      expect(authCookieBaseOptions().secure).toBe(true);
+      expect(selfCookieBaseOptions().secure).toBe(true);
       process.env.NODE_ENV = 'local';
-      expect(authCookieBaseOptions().secure).toBe(false);
+      expect(selfCookieBaseOptions().secure).toBe(false);
     });
 
     it('o set adiciona maxAge (em ms); o base não tem maxAge', () => {
-      expect(authCookieSetOptions().maxAge).toBe(TOKEN_TTL_SECONDS * 1000);
-      expect(authCookieBaseOptions()).not.toHaveProperty('maxAge');
+      expect(selfCookieSetOptions().maxAge).toBe(TOKEN_TTL_SECONDS * 1000);
+      expect(selfCookieBaseOptions()).not.toHaveProperty('maxAge');
     });
   });
 
