@@ -47,6 +47,12 @@ export type iJwtPayload = {
   };
 };
 
+// Lê o `auth_token` do cookie. Existem dois cookies possíveis com este mesmo
+// nome: o host-only da sessão própria (login direto) e o `.juri.capital` setado
+// pela juri-api (SSO). Quando ambos coexistem, o cookie-parser entrega só um
+// (ordem do header, não determinística) — o que é seguro aqui porque os dois
+// são RS256 válidos e a identidade é resolvida por e-mail, resultando no mesmo
+// usuário local.
 const cookieExtractor = (req: Request): string | null => {
   return req?.cookies?.[AUTH_COOKIE_NAME] || null;
 };
