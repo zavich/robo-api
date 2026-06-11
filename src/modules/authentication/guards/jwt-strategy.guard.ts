@@ -70,7 +70,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     // Falha cedo: sem a chave do issuer no mapa, qualquer token daquele emissor
     // é rejeitado com 401 silencioso (inclusive os próprios, emitidos por esta
-    // API). O SSO é bidirecional, então as duas chaves são obrigatórias.
+    // API). As duas chaves são obrigatórias: a própria (JWT_PUBLIC_KEY_ROBO_API)
+    // valida a sessão local do painel-robo, e a da juri-api
+    // (JWT_PUBLIC_KEY_JURI_API) valida o SSO juri-api -> painel-robo.
     // Em testes (NODE_ENV=test) não abortamos: o AppModule sempre importa o
     // AuthenticationModule e a suíte não exercita validação de tokens; tokens
     // ainda são rejeitados em runtime se a chave do issuer não estiver no mapa.

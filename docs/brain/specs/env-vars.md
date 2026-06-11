@@ -13,13 +13,13 @@
 | `JWT_PRIVATE_KEY_ROBO_API` | string (PEM) | SSO | - | Chave **privada** RS256 que assina os tokens (`iss=painel-robo`) |
 | `JWT_PUBLIC_KEY_ROBO_API` | string (PEM) | SSO | - | Chave **pública** própria; valida tokens emitidos por esta API (`iss=painel-robo`) |
 | `JWT_PUBLIC_KEY_JURI_API` | string (PEM) | SSO | - | Chave **pública** da juri-api; valida tokens dela (`iss=api.juri.capital`) |
-| `AUTH_COOKIE_DOMAIN` | string | Nao | `.juri.capital` (prod) | Sobrescreve o domínio do cookie `auth_token` (ex.: SSO local) |
+| `AUTH_COOKIE_DOMAIN` | string | Nao | `.juri.capital` (prod) | Domínio do cookie compartilhado da juri-api, usado só na limpeza no logout (override p/ SSO local). O cookie da sessão própria é host-only e ignora esta env |
 | `CORS_ORIGINS` | string (csv) | Nao | lista base | Sobrescreve a lista base de origens CORS |
 | `CORS_EXTRA_ORIGINS` | string (csv) | Nao | - | Origens extras de CORS; **só aplicadas em `NODE_ENV=local`** |
 | `AUTH_STRICT_ROLE_AUDIT` | string | Nao | - | `'true'` aborta o bootstrap se houver roles desconhecidas (ver `RoleAuditService`) |
 | `AUTH_AUDIT_SKIP` | string | Nao | - | `'true'` pula a auditoria de roles no bootstrap |
 
-> JWT é **RS256** (SSO bidirecional painel-robo ↔ juri-api): não há mais
+> JWT é **RS256** (SSO unidirecional juri-api -> painel-robo): não há mais
 > `JWT_SECRET_KEY`/`JWT_EXPIRES_IN`. As chaves PEM ficam em uma única linha com
 > `\n` literais, desescapados em runtime por `normalizePem()`. As envs marcadas
 > **SSO** são opcionais no schema, mas o bootstrap faz fail-fast se faltarem

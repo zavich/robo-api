@@ -38,7 +38,7 @@
 - **Response**: `{ message: 'Login successful' }`
 - **Throttle**: 5 req/min por IP
 - **Lockout**: 5 falhas por email bloqueiam a conta por 30 min
-- **Side effect**: Set-Cookie `auth_token` (httpOnly, `Secure`+SameSite=Lax+domínio `.juri.capital` em produção; host-only sem `Secure` em local; maxAge=2 dias). Valor = JWT RS256 (`iss=painel-robo`) com `identifier`, `sub`, `jti`, `permissions` e bloco `user` do SSO
+- **Side effect**: Set-Cookie `auth_token` **host-only** (httpOnly, `Secure`+SameSite=Lax em produção; sem `Secure` em local; maxAge=2 dias; **sem** `Domain=.juri.capital`, para a sessão não vazar à juri-api). Valor = JWT RS256 (`iss=painel-robo`) com `identifier`, `sub`, `jti`, `permissions` e `user.email`
 
 ### POST /v1/auth/signup
 

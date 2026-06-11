@@ -1,28 +1,32 @@
 # Auth System
 
-## JWT (RS256 + SSO bidirecional)
+## JWT (RS256 + SSO unidirecional juri-api -> painel-robo)
 
-A assinatura é **RS256** (par de chaves), não HS256. Isso habilita o SSO
-bidirecional painel-robo ↔ juri-api: cada serviço valida tokens do outro pela
-chave **pública** do emissor, sem compartilhar segredo. Ver `src/modules/authentication/jwt/`.
+A assinatura é **RS256** (par de chaves), não HS256. O SSO é **unidirecional**:
+esta API **consome** tokens da juri-api (valida pela chave **pública** dela e
+resolve a identidade por e-mail), mas **não** publica mais a própria sessão para
+a juri-api — o sentido painel-robo -> juri-api foi descontinuado, e a juri-api
+não valida mais tokens emitidos aqui. Ver `src/modules/authentication/jwt/`.
 
 ### Estrutura do payload
 
 ```typescript
+// Token EMITIDO por esta API (sessão própria / login direto):
 {
   identifier: string,   // email normalizado (claim do refactor)
   sub: string,          // user ObjectId local (não usado no lookup; ver validação)
   jti: string,          // id do token p/ revogação
   permissions: string[],// permissões locais resolvidas no login
-  user: {               // bloco do contrato de SSO (lido por robo-api e juri-api)
-    email: string,
-    nome?: string,
-    sobreNome?: string,
-    cargo?: string,
-    permissoes?: string[]
+  user: {               // só `email`: identidade é resolvida por e-mail na validação
+    email: string
   }
 }
 ```
+
+> Tokens **recebidos da juri-api** carregam o bloco `user` completo do contrato
+> (`nome`/`sobreNome`/`cargo`/`permissoes`); esta API só usa `user.email`. Os
+> campos decorativos foram removidos do token emitido aqui pois a juri-api não
+> consome mais (SSO unidirecional).
 
 ### Configuracao
 
@@ -31,9 +35,11 @@ chave **pública** do emissor, sem compartilhar segredo. Ver `src/modules/authen
 - **Verificação (multi-emissor)**: mapa `iss → chave pública` montado em
   `jwt-keys.ts` a partir de `JWT_PUBLIC_KEY_ROBO_API` (iss `painel-robo`) e
   `JWT_PUBLIC_KEY_JURI_API` (iss `api.juri.capital`). Emissor sem chave = 401.
-- **Storage**: cookie httpOnly `auth_token`, compartilhado no domínio pai
-  `.juri.capital` (override via `AUTH_COOKIE_DOMAIN`). Em `NODE_ENV=local` cai
-  para host-only sem `Secure` (http). Ver `auth-cookie.ts`.
+- **Storage**: cookie httpOnly `auth_token`. No **login direto** desta API o
+  cookie é **host-only** (sem `Domain=.juri.capital`), para a sessão não vazar
+  para a juri-api. A API ainda **lê** o `auth_token` que a juri-api seta em
+  `.juri.capital` (SSO juri-api -> painel-robo). Em `NODE_ENV=local`, sem
+  `Secure` (http). Ver `auth-cookie.ts`.
 - **Expiry**: 2 dias (`TOKEN_TTL_SECONDS`), fonte única para cookie e token.
 - **Extração**: cookie `auth_token` **ou** header `Authorization: Bearer`.
 - **Fail-fast**: faltando chave privada (módulo) ou pública (strategy), o
@@ -87,14 +93,14 @@ Arquivo: `src/modules/authentication/guards/apikey-auth.guard.ts`
 1. `POST /v1/auth/login` com `{ email, password }`
 2. `LoginService` valida se o email existe, compara a senha com bcrypt, e verifica se a conta está ativa
 3. Redis aplica throttle/lockout por conta: 5 falhas -> bloqueio de 30 minutos
-4. JWT RS256 gerado com `{ identifier, sub, jti, permissions, user }` (issuer `painel-robo`)
-5. Set-Cookie `auth_token` (httpOnly, `Secure`+domínio `.juri.capital` em produção, host-only em local, maxAge=2d)
+4. JWT RS256 gerado com `{ identifier, sub, jti, permissions, user: { email } }` (issuer `painel-robo`)
+5. Set-Cookie `auth_token` **host-only** (httpOnly, `Secure` em produção, sem `Secure` em local, maxAge=2d) — sem `Domain=.juri.capital`
 6. Response: `{ message: 'Login successful' }`
 
 ## Fluxo de logout
 
 1. `POST /v1/auth/logout`
-2. Verifica a assinatura do token do cookie (RS256, chave pública própria) antes de confiar no `jti`/`exp`
+2. Verifica a assinatura do token do cookie (RS256, chave pública pelo issuer) antes de confiar no `jti`/`exp`
 3. Registra `jwt:revoked:<jti>` em Redis com TTL até a expiração do token (cap em 2 dias)
-4. Clear cookie `auth_token` com as MESMAS opções do set (sem maxAge)
+4. Clear cookie `auth_token` em dois escopos (mesmas opções do set, sem maxAge): host-only (sessão própria) e `.juri.capital` (cookie da juri-api — single logout)
 5. Response: `{ message: 'Logout realizado com sucesso' }`
