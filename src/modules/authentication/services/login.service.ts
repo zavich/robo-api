@@ -64,11 +64,13 @@ export class LoginService {
     const jti = randomUUID();
     const permissions = getPermissionsForRole(user.role);
 
-    // Payload combinado:
-    //  - claims do refactor (`identifier`/`sub`/`jti`/`permissions`) p/ revogação
-    //    e autorização local;
-    //  - bloco `user` no formato do contrato de SSO RS256, pra que tanto esta API
-    //    quanto a juri-api resolvam a identidade por e-mail.
+    // Payload da sessão PRÓPRIA desta API (login direto no painel-robo):
+    //  - `identifier`/`sub`/`jti`/`permissions`: revogação e autorização local;
+    //  - `user.email`: identidade é resolvida por e-mail na validação (o `sub`
+    //    não é usado no lookup), então o e-mail precisa estar no token.
+    // Os demais campos do antigo contrato de SSO (`nome`/`sobreNome`/`cargo`/
+    // `permissoes`) foram removidos: o sentido painel-robo -> juri-api foi
+    // descontinuado e a juri-api não consome mais estes tokens.
     // `algorithm`, `issuer` e `expiresIn` vêm do JwtModule (assinatura RS256).
     const accessToken = this.jwtService.sign({
       identifier: normalizedEmail,
@@ -77,10 +79,6 @@ export class LoginService {
       permissions,
       user: {
         email: user.email,
-        nome: user.name,
-        sobreNome: '', // robo-api não modela sobrenome; mantido por consistência
-        cargo: user.role,
-        permissoes: [], // contrato SSO: robo-api não publica permissões p/ a juri-api
       },
     });
 

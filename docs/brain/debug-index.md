@@ -90,7 +90,7 @@ Checar:
 - Identidade resolvida por e-mail: o usuário do token (`user.email`) precisa existir e estar ativo na base local.
 - Se o token foi revogado (`jwt:revoked:<jti>` no Redis após logout).
 - Se o token nao expirou.
-- Token presente no cookie `auth_token` ou no header `Authorization: Bearer`.
+- Token presente no cookie `auth_token` (SSO) ou `robo_auth_token` (sessão própria) ou no header `Authorization: Bearer`.
 
 ## Cron de revalidacao nao executa
 

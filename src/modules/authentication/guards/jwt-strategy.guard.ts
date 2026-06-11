@@ -16,6 +16,7 @@ import {
   AUTH_COOKIE_NAME,
   JURI_ISSUER,
   JWT_ALGORITHM,
+  SELF_COOKIE_NAME,
   SELF_ISSUER,
 } from '../jwt/jwt.constants';
 import { buildPublicKeyMap, readIssuer } from '../jwt/jwt-keys';
@@ -47,8 +48,15 @@ export type iJwtPayload = {
   };
 };
 
+// Lê o token do cookie. São dois cookies de nomes DISTINTOS (sem colisão no
+// cookie-parser): `auth_token` (compartilhado, setado pela juri-api no SSO) e
+// `robo_auth_token` (host-only, sessão própria do login direto). Prioriza o da
+// juri-api (sentido canônico juri-api -> painel-robo); cai para o próprio quando
+// não há sessão de SSO. A identidade é resolvida por e-mail na validação.
 const cookieExtractor = (req: Request): string | null => {
-  return req?.cookies?.[AUTH_COOKIE_NAME] || null;
+  return (
+    req?.cookies?.[AUTH_COOKIE_NAME] || req?.cookies?.[SELF_COOKIE_NAME] || null
+  );
 };
 
 @Injectable()
@@ -70,7 +78,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     // Falha cedo: sem a chave do issuer no mapa, qualquer token daquele emissor
     // é rejeitado com 401 silencioso (inclusive os próprios, emitidos por esta
-    // API). O SSO é bidirecional, então as duas chaves são obrigatórias.
+    // API). As duas chaves são obrigatórias: a própria (JWT_PUBLIC_KEY_ROBO_API)
+    // valida a sessão local do painel-robo, e a da juri-api
+    // (JWT_PUBLIC_KEY_JURI_API) valida o SSO juri-api -> painel-robo.
     // Em testes (NODE_ENV=test) não abortamos: o AppModule sempre importa o
     // AuthenticationModule e a suíte não exercita validação de tokens; tokens
     // ainda são rejeitados em runtime se a chave do issuer não estiver no mapa.

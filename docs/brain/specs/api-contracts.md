@@ -38,7 +38,7 @@
 - **Response**: `{ message: 'Login successful' }`
 - **Throttle**: 5 req/min por IP
 - **Lockout**: 5 falhas por email bloqueiam a conta por 30 min
-- **Side effect**: Set-Cookie `auth_token` (httpOnly, `Secure`+SameSite=Lax+domínio `.juri.capital` em produção; host-only sem `Secure` em local; maxAge=2 dias). Valor = JWT RS256 (`iss=painel-robo`) com `identifier`, `sub`, `jti`, `permissions` e bloco `user` do SSO
+- **Side effect**: Set-Cookie `robo_auth_token` **host-only** (httpOnly, `Secure`+SameSite=Lax em produção; sem `Secure` em local; maxAge=2 dias; **sem** `Domain=.juri.capital`, para a sessão não vazar à juri-api). Valor = JWT RS256 (`iss=painel-robo`) com `identifier`, `sub`, `jti`, `permissions` e `user.email`
 
 ### POST /v1/auth/signup
 
@@ -49,11 +49,11 @@
 ### POST /v1/auth/logout
 
 - **Auth**: `@Public()` (sem JWT)
-- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie `auth_token` (mesmas opções do set, sem maxAge) + revogação: verifica a assinatura RS256 e grava `jwt:revoked:<jti>` em Redis quando presente
+- **Response**: `{ message: 'Logout realizado com sucesso' }` + clear cookie em dois nomes (mesmas opções do set, sem maxAge): `robo_auth_token` (host-only) e `auth_token` (`.juri.capital`, single logout) + revogação: lê o token próprio de `robo_auth_token`, verifica a assinatura RS256 (chave pública própria) e grava `jwt:revoked:<jti>` em Redis quando presente
 
 ### GET /v1/auth/me
 
-- **Auth**: `ApiKeyAuthGuard` (JWT do cookie `auth_token` ou header `Authorization: Bearer`)
+- **Auth**: `ApiKeyAuthGuard` (JWT do cookie `auth_token`/`robo_auth_token` ou header `Authorization: Bearer`)
 - **Response**: usuário autenticado (`req.user`) + `permissions`
 
 ---
@@ -411,7 +411,7 @@
 ## Auth Guard: ApiKeyAuthGuard
 
 - Apesar do nome, e um JWT guard (`extends AuthGuard('jwt')`); aplicado globalmente, com bypass via `@Public()`
-- JWT extraido do cookie `auth_token` **ou** do header `Authorization: Bearer`
+- JWT extraido do cookie `auth_token` (SSO) ou `robo_auth_token` (sessão própria) **ou** do header `Authorization: Bearer`
 - Algoritmo **RS256**; a chave pública é escolhida pelo `iss` do token (multi-emissor SSO)
 - Validacao: revogação por `jti` (Redis) → `userModel.findOne({ email: payload.user.email })` (identidade por e-mail) → `isActive` → permissões. Throws `UnauthorizedException` se não encontrado/revogado/inativo
 - Seta `req.user` = documento do usuário (sem password) + `id` + `permissions`
