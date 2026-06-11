@@ -42,7 +42,7 @@ não valida mais tokens emitidos aqui. Ver `src/modules/authentication/jwt/`.
   extração prioriza `auth_token` (SSO) e cai para `robo_auth_token`. Em
   `NODE_ENV=local`, sem `Secure` (http). Ver `auth-cookie.ts`.
 - **Expiry**: 2 dias (`TOKEN_TTL_SECONDS`), fonte única para cookie e token.
-- **Extração**: cookie `auth_token` **ou** header `Authorization: Bearer`.
+- **Extração**: cookie `auth_token` (SSO) **ou** `robo_auth_token` (sessão própria) **ou** header `Authorization: Bearer`. A strategy prioriza `auth_token` e cai para `robo_auth_token`.
 - **Fail-fast**: faltando chave privada (módulo) ou pública (strategy), o
   bootstrap aborta — exceto em `NODE_ENV=test`.
 
