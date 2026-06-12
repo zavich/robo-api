@@ -12,7 +12,6 @@ import {
   Query,
   Request,
   Res,
-  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -216,6 +215,7 @@ export class ProcessController {
   @Get('')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
+  @SkipThrottle()
   async listProcess(
     @Query() query: ListProcessFiltersDto,
     @Res() res: Response,
@@ -410,6 +410,8 @@ export class ProcessController {
         body.name,
         body.log,
         body.errorReason,
+        body.startDate,
+        body.endDate,
       );
       return { message: 'Processamento iniciado' };
     } catch (error) {
@@ -610,7 +612,7 @@ export class ProcessController {
   @Get('/documents/*')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
-  async getFile(@Request() req, @Res({ passthrough: true }) res: Response) {
+  async getFile(@Request() req, @Res() res: Response) {
     try {
       const key = decodeURIComponent(req.params[0]);
 
@@ -624,8 +626,8 @@ export class ProcessController {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline',
       });
-
-      return new StreamableFile(response.data);
+      res.send(Buffer.from(response.data));
+      return;
     } catch (error) {
       this.logger.error('Erro ao obter arquivo S3:', error);
       throw new BadRequestException('Erro ao obter arquivo.');
