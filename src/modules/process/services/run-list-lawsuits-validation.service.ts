@@ -39,8 +39,14 @@ export class RunListLawsuitsValidationService {
     errorReason?: string,
     startDate?: string,
     endDate?: string,
+    limit?: number,
   ) {
     let process: string[] = [];
+    const normalizedLimit =
+      typeof limit === 'number' && Number.isFinite(limit)
+        ? Math.max(1, Math.floor(limit))
+        : undefined;
+
     if (lawsuits.length === 0) {
       const filters: Record<string, string>[] = [];
       const createdAtFilter: Record<string, Date> = {};
@@ -113,10 +119,15 @@ export class RunListLawsuitsValidationService {
           number: 1,
         },
       });
+
+      if (normalizedLimit) {
+        pipeline.push({ $limit: normalizedLimit });
+      }
+
       const result = await this.processModule.aggregate(pipeline);
       process = result.map((item) => item.number);
     } else {
-      process = lawsuits;
+      process = normalizedLimit ? lawsuits.slice(0, normalizedLimit) : lawsuits;
     }
     await Promise.all(
       process.map(async (lawsuit) => {
