@@ -412,6 +412,7 @@ export class ProcessController {
         body.errorReason,
         body.startDate,
         body.endDate,
+        body.limit,
       );
       return { message: 'Processamento iniciado' };
     } catch (error) {
