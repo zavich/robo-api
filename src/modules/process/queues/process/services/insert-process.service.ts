@@ -154,14 +154,27 @@ export class InsertProcessService {
           },
         );
       } else {
+        const responseData = axiosError.response?.data as
+          | { error?: string; message?: string }
+          | string
+          | undefined;
+        const responseErrorMessage =
+          typeof responseData === 'string'
+            ? responseData
+            : responseData?.error || responseData?.message;
+        const errorDetail =
+          responseErrorMessage ||
+          axiosError.message ||
+          'Erro não detalhado pelo serviço de extração';
+
         this.logger.error(
-          `Erro ao enviar processo ${processNumber} para a extração`,
+          `Erro ao enviar processo ${processNumber} para a extração: ${errorDetail}`,
         );
         await this.processStateMachine.transition(
           this.processStatusModule,
           processCreate.processStatus,
           {
-            log: `Erro ao enviar processo para a extração: ${(axiosError.response?.data as { error: string })?.error}`,
+            log: `Erro ao enviar processo para a extração: ${errorDetail}`,
             name: PROCESSSTATUSENUM.ERROR,
           },
         );

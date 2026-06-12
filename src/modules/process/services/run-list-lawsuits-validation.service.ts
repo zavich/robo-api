@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { HydratedDocument, Model, PipelineStage, Types } from 'mongoose';
+import { HydratedDocument, Model, PipelineStage } from 'mongoose';
 
 interface PopulatedProcessStatus {
   _id: string;
@@ -37,10 +37,21 @@ export class RunListLawsuitsValidationService {
     name?: string,
     log?: string,
     errorReason?: string,
+    startDate?: string,
+    endDate?: string,
   ) {
     let process: string[] = [];
     if (lawsuits.length === 0) {
       const filters: Record<string, string>[] = [];
+      const createdAtFilter: Record<string, Date> = {};
+
+      if (startDate) {
+        createdAtFilter.$gte = this.toBoundaryDate(startDate, true);
+      }
+
+      if (endDate) {
+        createdAtFilter.$lte = this.toBoundaryDate(endDate, false);
+      }
 
       if (name) {
         filters.push({ 'processStatus.name': name });
@@ -69,6 +80,9 @@ export class RunListLawsuitsValidationService {
           $match: {
             $and: [
               { documents: { $exists: true } },
+              ...(Object.keys(createdAtFilter).length > 0
+                ? [{ createdAt: createdAtFilter }]
+                : []),
               {
                 $expr: {
                   $eq: [
@@ -114,9 +128,14 @@ export class RunListLawsuitsValidationService {
           return;
         }
 
-        const proc = await this.processModule
+        const procQuery = this.processModule
           .findOne({ number: numberKey })
-          .populate({ path: 'processStatus', populate: ['step'] }) as ProcessWithPopulatedStatus | null;
+          .populate({
+            path: 'processStatus',
+            populate: ['step'],
+          });
+        const proc =
+          (await procQuery) as unknown as ProcessWithPopulatedStatus | null;
         if (!proc) {
           this.logger.warn('Process ' + numberKey + ' not found');
           return;
@@ -149,5 +168,22 @@ export class RunListLawsuitsValidationService {
         );
       }),
     );
+  }
+
+  private toBoundaryDate(value: string, isStart: boolean): Date {
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const parsed = new Date(
+      isDateOnly
+        ? `${value}T${isStart ? '00:00:00.000' : '23:59:59.999'}-03:00`
+        : value,
+    );
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error(
+        `Data inválida para ${isStart ? 'startDate' : 'endDate'}: ${value}`,
+      );
+    }
+
+    return parsed;
   }
 }

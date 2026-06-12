@@ -26,6 +26,24 @@ describe('ProcessStateMachineService', () => {
       ).toBe(true);
     });
 
+    it('allows requeue from error to waiting extraction documents', () => {
+      expect(
+        service.canTransition(
+          PROCESSSTATUSENUM.ERROR,
+          PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS,
+        ),
+      ).toBe(true);
+    });
+
+    it('allows retry from waiting extraction documents to processing with documents', () => {
+      expect(
+        service.canTransition(
+          PROCESSSTATUSENUM.PROCESS_WAITING_EXTRACTION_DOCUMENTS,
+          PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS,
+        ),
+      ).toBe(true);
+    });
+
     it('rejects invalid transitions', () => {
       expect(
         service.canTransition(
