@@ -7,6 +7,7 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -21,11 +22,15 @@ import {
   createUserSchemaPipe,
 } from './dto/create-user.dto';
 import { SignUpService } from './services/sign-up.service';
+import { SsoProvisioningService } from './services/sso-provisioning.service';
+import { SsoTokenVerifierService } from './services/sso-token-verifier.service';
+import { buildUserProfile } from './services/user-profile.util';
 import { CheckPermissions } from './decorators/check-permissions.decorator';
 import { Public } from './decorators/public.decorator';
 import { getPermissionsForRole } from './constants/permissions.constant';
 import {
   AUTH_COOKIE_NAME,
+  JURI_ISSUER,
   SELF_COOKIE_NAME,
   TOKEN_TTL_SECONDS,
 } from './jwt/jwt.constants';
@@ -34,6 +39,7 @@ import {
   selfCookieSetOptions,
   sharedCookieClearOptions,
 } from './jwt/auth-cookie';
+import { extractAuthToken } from './jwt/extract-token';
 
 @Controller('auth')
 export class AuthenticationController {
@@ -42,6 +48,8 @@ export class AuthenticationController {
     private readonly signUpService: SignUpService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly jwtService: JwtService,
+    private readonly ssoTokenVerifier: SsoTokenVerifierService,
+    private readonly ssoProvisioning: SsoProvisioningService,
   ) {}
 
   @Post('login')
@@ -113,6 +121,44 @@ export class AuthenticationController {
     res.clearCookie(AUTH_COOKIE_NAME, sharedCookieClearOptions());
 
     return { message: 'Logout realizado com sucesso' };
+  }
+
+  /**
+   * Bootstrap do SSO juri-api -> painel-robo. O front chama UMA vez logo após o
+   * redirect do SSO. Aqui (e só aqui) o provisionamento JIT é permitido: a
+   * robo-api tem banco próprio, então usuários reais da juri-api podem ainda não
+   * existir localmente — em vez de criá-los um a um, criamos on-the-fly.
+   *
+   * É `@Public()` para não passar pelo guard global (que exige usuário já
+   * existente): faz a verificação RS256 do token da juri por conta própria, sem
+   * efeito colateral na camada de auth. `POST` porque a operação NÃO é safe
+   * (escreve) — diferente do `GET /auth/me`, que voltou a ser somente leitura.
+   */
+  @Post('sso/session')
+  @HttpCode(200)
+  @Public()
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
+  async ssoSession(@Req() req: Request) {
+    const token = extractAuthToken(req);
+    if (!token) {
+      throw new UnauthorizedException();
+    }
+
+    // Verifica assinatura/emissor/expiração (lança 401 se inválido).
+    const payload = this.ssoTokenVerifier.verify(token);
+
+    // Só tokens da juri-api provisionam sessão de SSO. Token próprio
+    // (painel-robo) chegando aqui é anômalo — o usuário dele já existe.
+    if (payload.iss !== JURI_ISSUER) {
+      throw new UnauthorizedException();
+    }
+
+    const user = await this.ssoProvisioning.provisionFromSso(payload);
+    if (!user.isActive) {
+      throw new UnauthorizedException('Conta desativada');
+    }
+
+    return buildUserProfile(user);
   }
 
   @Get('me')

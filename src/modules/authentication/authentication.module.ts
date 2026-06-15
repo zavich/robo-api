@@ -9,12 +9,15 @@ import { LoginService } from './services/login.service';
 import { AuthenticationController } from './authentication.controller';
 import { SignUpService } from './services/sign-up.service';
 import { RoleAuditService } from './services/role-audit.service';
+import { SsoProvisioningService } from './services/sso-provisioning.service';
+import { SsoTokenVerifierService } from './services/sso-token-verifier.service';
 import {
   JWT_ALGORITHM,
   SELF_ISSUER,
   TOKEN_TTL_SECONDS,
 } from './jwt/jwt.constants';
 import { normalizePem } from './jwt/jwt-keys';
+import { ssoPublicKeysProvider } from './jwt/sso-public-keys.provider';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -65,6 +68,14 @@ import { normalizePem } from './jwt/jwt-keys';
   ],
   controllers: [AuthenticationController],
   exports: [JwtStrategy, PassportModule],
-  providers: [JwtStrategy, LoginService, SignUpService, RoleAuditService],
+  providers: [
+    JwtStrategy,
+    LoginService,
+    SignUpService,
+    RoleAuditService,
+    SsoProvisioningService,
+    SsoTokenVerifierService,
+    ssoPublicKeysProvider,
+  ],
 })
 export class AuthenticationModule {}
