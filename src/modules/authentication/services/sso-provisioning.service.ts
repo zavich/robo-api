@@ -17,11 +17,12 @@ const JURI_ADMIN_CARGO = 'admin';
  * Provisionamento JIT (just-in-time) de usuários do SSO.
  *
  * A robo-api usa um banco próprio, separado da juri-api: muitos usuários reais
- * da juri-api ainda não têm registro local. Em vez de criar um a um, quando um
- * token JÁ VALIDADO da juri-api (assinatura RS256 conferida) chega no `/auth/me`
- * e não há usuário local com aquele e-mail, criamos o registro on-the-fly para
- * o SSO funcionar. Só é chamado depois da validação da assinatura — nunca cria
- * usuário a partir de token não confiável.
+ * da juri-api ainda não têm registro local. Em vez de criar um a um, no bootstrap
+ * do SSO (`POST /auth/sso/session`), quando um token JÁ VALIDADO da juri-api
+ * (assinatura RS256 conferida) não tem usuário local com aquele e-mail, criamos
+ * o registro on-the-fly para o SSO funcionar. Só é chamado depois da validação
+ * da assinatura — nunca cria usuário a partir de token não confiável. O
+ * `JwtStrategy` (auth das demais rotas) NÃO provisiona: usuário inexistente = 401.
  */
 @Injectable()
 export class SsoProvisioningService {

@@ -153,6 +153,12 @@ export class AuthenticationController {
       throw new UnauthorizedException();
     }
 
+    // Mesmo verificado, o token precisa carregar a identidade do contrato (email).
+    // Sem isso o provisionamento estouraria TypeError -> 500; preferimos 401 limpo.
+    if (!payload.user?.email) {
+      throw new UnauthorizedException();
+    }
+
     const user = await this.ssoProvisioning.provisionFromSso(payload);
     if (!user.isActive) {
       throw new UnauthorizedException('Conta desativada');

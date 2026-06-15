@@ -170,6 +170,19 @@ describe('AuthenticationController', () => {
       expect(ssoProvisioning.provisionFromSso).not.toHaveBeenCalled();
     });
 
+    it('401 e NÃO provisiona quando o token verificado não tem user.email', async () => {
+      ssoTokenVerifier.verify.mockReturnValue({
+        iss: JURI_ISSUER,
+        user: { cargo: 'admin' }, // sem email
+      });
+      const req = { headers: {}, cookies: { [AUTH_COOKIE_NAME]: 'juri-jwt' } };
+
+      await expect(controller.ssoSession(req as never)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(ssoProvisioning.provisionFromSso).not.toHaveBeenCalled();
+    });
+
     it('401 e NÃO provisiona quando o token não é da juri-api', async () => {
       ssoTokenVerifier.verify.mockReturnValue({
         iss: 'painel-robo',
