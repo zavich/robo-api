@@ -4,11 +4,6 @@ import { FilterQuery, Model, PipelineStage } from 'mongoose';
 import { Process as ProcessEntity } from '../../schema/process.schema';
 import { ListProcessFiltersDto } from '../../dtos/list-process-filters.dto';
 
-interface RequestUser {
-  _id?: string;
-  role?: string;
-}
-
 @Injectable()
 export class ListLawsuitService {
   constructor(
@@ -16,7 +11,7 @@ export class ListLawsuitService {
     private readonly lawsuitModule: Model<ProcessEntity>,
   ) {}
 
-  async execute(query: ListProcessFiltersDto, user?: RequestUser) {
+  async execute(query: ListProcessFiltersDto) {
     const {
       page = 1,
       limit = 10,
@@ -35,24 +30,18 @@ export class ListLawsuitService {
     const skip = (page - 1) * Number(limit);
     const limitNum = Number(limit);
 
-    const isAdvogado = user?.role === 'advogado';
-    const isAdmin = user?.role === 'admin';
-    const userId = user?._id?.toString();
-
     const match: FilterQuery<ProcessEntity> = {};
 
-    // 🔹 Filtro de data
-    if (!isAdvogado) {
-      const dateFilter: Record<string, Date> = {};
-      if (startDate) dateFilter.$gte = new Date(startDate);
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        dateFilter.$lte = end;
-      }
-      if (Object.keys(dateFilter).length) {
-        match.createdAt = dateFilter;
-      }
+    // 🔹 Filtro de data (createdAt do processo) — visualização igual para todos
+    const dateFilter: Record<string, Date> = {};
+    if (startDate) dateFilter.$gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.$lte = end;
+    }
+    if (Object.keys(dateFilter).length) {
+      match.createdAt = dateFilter;
     }
     const andConditions: FilterQuery<ProcessEntity>[] = [];
     // 🔹 Busca
@@ -93,35 +82,6 @@ export class ListLawsuitService {
           ...(lossReason && { lossReason }),
         },
       };
-    }
-
-    // 🔹 Filtros de advogado
-    if (isAdvogado) {
-      match['activities.assignedTo'] = userId;
-
-      if (startDate || endDate) {
-        const activityDateFilter: Record<string, Date> = {};
-        if (startDate) activityDateFilter.$gte = new Date(startDate);
-        if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          activityDateFilter.$lte = end;
-        }
-
-        match.activities = {
-          $elemMatch: {
-            assignedTo: userId,
-            createdAt: activityDateFilter,
-          },
-        };
-      }
-    }
-
-    // 🔹 Admin
-    if (isAdmin) {
-      andConditions.push({
-        $or: [{ activities: { $exists: false } }, { activities: { $size: 0 } }],
-      });
     }
 
     // aplicar filtros finais antes de montar o pipeline

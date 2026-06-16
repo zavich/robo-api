@@ -221,9 +221,7 @@ export class ProcessController {
     @Res() res: Response,
   ) {
     try {
-      const user = res.req.user;
-
-      const result = await this.listLawsuitService.execute(query, user);
+      const result = await this.listLawsuitService.execute(query);
       return res.json(result);
     } catch (error) {
       return res.status(500).json({
