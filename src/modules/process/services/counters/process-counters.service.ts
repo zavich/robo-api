@@ -7,8 +7,8 @@ import { LossReasonsService } from '../loss-reasons-service';
 interface ProcessCountersQuery {
   search?: string;
   status?: string;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string | Date;
+  endDate?: string | Date;
   lossReason?: string | string[];
   emptyDocuments?: boolean;
   emptyInstances?: boolean;
