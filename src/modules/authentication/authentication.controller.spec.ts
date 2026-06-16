@@ -1,7 +1,9 @@
+import { UnauthorizedException } from '@nestjs/common';
 import { AuthenticationController } from './authentication.controller';
 import {
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_DOMAIN,
+  JURI_ISSUER,
   SELF_COOKIE_NAME,
 } from './jwt/jwt.constants';
 
@@ -9,6 +11,8 @@ const makeLoginService = () => ({ execute: jest.fn() });
 const makeSignUpService = () => ({ createUser: jest.fn() });
 const makeRedis = () => ({ set: jest.fn(), exists: jest.fn() });
 const makeJwtService = () => ({ verify: jest.fn() });
+const makeSsoTokenVerifier = () => ({ verify: jest.fn() });
+const makeSsoProvisioning = () => ({ provisionFromSso: jest.fn() });
 
 describe('AuthenticationController', () => {
   let controller: AuthenticationController;
@@ -16,6 +20,8 @@ describe('AuthenticationController', () => {
   let signUpService: ReturnType<typeof makeSignUpService>;
   let redis: ReturnType<typeof makeRedis>;
   let jwtService: ReturnType<typeof makeJwtService>;
+  let ssoTokenVerifier: ReturnType<typeof makeSsoTokenVerifier>;
+  let ssoProvisioning: ReturnType<typeof makeSsoProvisioning>;
 
   const ORIGINAL_COOKIE_DOMAIN = process.env.AUTH_COOKIE_DOMAIN;
 
@@ -26,11 +32,15 @@ describe('AuthenticationController', () => {
     signUpService = makeSignUpService();
     redis = makeRedis();
     jwtService = makeJwtService();
+    ssoTokenVerifier = makeSsoTokenVerifier();
+    ssoProvisioning = makeSsoProvisioning();
     controller = new AuthenticationController(
       loginService as never,
       signUpService as never,
       redis as never,
       jwtService as never,
+      ssoTokenVerifier as never,
+      ssoProvisioning as never,
     );
   });
 
@@ -116,6 +126,86 @@ describe('AuthenticationController', () => {
       expect(redis.set).not.toHaveBeenCalled();
       expect(res.clearCookie).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ message: 'Logout realizado com sucesso' });
+    });
+  });
+
+  describe('ssoSession (bootstrap JIT)', () => {
+    const juriPayload = {
+      iss: JURI_ISSUER,
+      user: { email: 'pedro@juri.capital', cargo: 'admin' },
+    };
+    const makeUserDoc = ({ isActive = true }: { isActive?: boolean } = {}) => ({
+      isActive,
+      role: 'admin',
+      toObject: () => ({
+        _id: 'abc123',
+        email: 'pedro@juri.capital',
+        name: 'Pedro Ribeiro',
+        role: 'admin',
+        password: 'hash-secreto',
+        isActive,
+      }),
+    });
+
+    it('verifica o token, provisiona e retorna o profile (sem password)', async () => {
+      ssoTokenVerifier.verify.mockReturnValue(juriPayload);
+      ssoProvisioning.provisionFromSso.mockResolvedValue(makeUserDoc());
+      const req = { headers: {}, cookies: { [AUTH_COOKIE_NAME]: 'juri-jwt' } };
+
+      const result = await controller.ssoSession(req as never);
+
+      expect(ssoTokenVerifier.verify).toHaveBeenCalledWith('juri-jwt');
+      expect(ssoProvisioning.provisionFromSso).toHaveBeenCalledWith(juriPayload);
+      expect(result).not.toHaveProperty('password');
+      expect(result.id).toBe('abc123');
+      // admin deriva as permissões do role local
+      expect(result.permissions).toContain('user_management');
+    });
+
+    it('401 quando não há token na requisição', async () => {
+      const req = { headers: {}, cookies: {} };
+      await expect(controller.ssoSession(req as never)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(ssoProvisioning.provisionFromSso).not.toHaveBeenCalled();
+    });
+
+    it('401 e NÃO provisiona quando o token verificado não tem user.email', async () => {
+      ssoTokenVerifier.verify.mockReturnValue({
+        iss: JURI_ISSUER,
+        user: { cargo: 'admin' }, // sem email
+      });
+      const req = { headers: {}, cookies: { [AUTH_COOKIE_NAME]: 'juri-jwt' } };
+
+      await expect(controller.ssoSession(req as never)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(ssoProvisioning.provisionFromSso).not.toHaveBeenCalled();
+    });
+
+    it('401 e NÃO provisiona quando o token não é da juri-api', async () => {
+      ssoTokenVerifier.verify.mockReturnValue({
+        iss: 'painel-robo',
+        user: { email: 'x@y.com' },
+      });
+      const req = { headers: {}, cookies: { [SELF_COOKIE_NAME]: 'own-jwt' } };
+
+      await expect(controller.ssoSession(req as never)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+      expect(ssoProvisioning.provisionFromSso).not.toHaveBeenCalled();
+    });
+
+    it('401 quando a conta provisionada está inativa', async () => {
+      ssoTokenVerifier.verify.mockReturnValue(juriPayload);
+      ssoProvisioning.provisionFromSso.mockResolvedValue(
+        makeUserDoc({ isActive: false }),
+      );
+      const req = { headers: {}, cookies: { [AUTH_COOKIE_NAME]: 'juri-jwt' } };
+
+      await expect(controller.ssoSession(req as never)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
     });
   });
 });

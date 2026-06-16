@@ -4,7 +4,6 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { PassportStrategy } from '@nestjs/passport';
 import { Model } from 'mongoose';
@@ -12,19 +11,15 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { Request } from 'express';
 import Redis from 'ioredis';
 import { User, UserDocument } from 'src/modules/user/schema/user.schema';
+import { JWT_ALGORITHM, SELF_ISSUER } from '../jwt/jwt.constants';
+import { readIssuer } from '../jwt/jwt-keys';
+import { extractAuthToken } from '../jwt/extract-token';
 import {
-  AUTH_COOKIE_NAME,
-  JURI_ISSUER,
-  JWT_ALGORITHM,
-  SELF_COOKIE_NAME,
-  SELF_ISSUER,
-} from '../jwt/jwt.constants';
-import { buildPublicKeyMap, readIssuer } from '../jwt/jwt-keys';
-import {
-  getPermissionsForRole,
-  isKnownRole,
-  Permission,
-} from '../constants/permissions.constant';
+  SSO_PUBLIC_KEYS,
+  SsoPublicKeys,
+} from '../jwt/sso-public-keys.provider';
+import { isKnownRole, Permission } from '../constants/permissions.constant';
+import { buildUserProfile } from '../services/user-profile.util';
 
 /**
  * Payload combinado SSO + refactor.
@@ -48,17 +43,6 @@ export type iJwtPayload = {
   };
 };
 
-// Lê o token do cookie. São dois cookies de nomes DISTINTOS (sem colisão no
-// cookie-parser): `auth_token` (compartilhado, setado pela juri-api no SSO) e
-// `robo_auth_token` (host-only, sessão própria do login direto). Prioriza o da
-// juri-api (sentido canônico juri-api -> painel-robo); cai para o próprio quando
-// não há sessão de SSO. A identidade é resolvida por e-mail na validação.
-const cookieExtractor = (req: Request): string | null => {
-  return (
-    req?.cookies?.[AUTH_COOKIE_NAME] || req?.cookies?.[SELF_COOKIE_NAME] || null
-  );
-};
-
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   private readonly logger = new Logger(JwtStrategy.name);
@@ -66,40 +50,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     @InjectModel(User.name)
     private userModel: Model<UserDocument>,
-    configService: ConfigService,
+    @Inject(SSO_PUBLIC_KEYS) publicKeys: SsoPublicKeys,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {
-    const publicKeys = buildPublicKeyMap({
-      publicKeyPainelRobo: configService.get<string>(
-        'JWT_PUBLIC_KEY_ROBO_API',
-      ),
-      publicKeyApi: configService.get<string>('JWT_PUBLIC_KEY_JURI_API'),
-    });
-
-    // Falha cedo: sem a chave do issuer no mapa, qualquer token daquele emissor
-    // é rejeitado com 401 silencioso (inclusive os próprios, emitidos por esta
-    // API). As duas chaves são obrigatórias: a própria (JWT_PUBLIC_KEY_ROBO_API)
-    // valida a sessão local do painel-robo, e a da juri-api
-    // (JWT_PUBLIC_KEY_JURI_API) valida o SSO juri-api -> painel-robo.
-    // Em testes (NODE_ENV=test) não abortamos: o AppModule sempre importa o
-    // AuthenticationModule e a suíte não exercita validação de tokens; tokens
-    // ainda são rejeitados em runtime se a chave do issuer não estiver no mapa.
-    const missing: string[] = [];
-    if (!publicKeys[SELF_ISSUER]) missing.push('JWT_PUBLIC_KEY_ROBO_API');
-    if (!publicKeys[JURI_ISSUER]) missing.push('JWT_PUBLIC_KEY_JURI_API');
-    if (missing.length && process.env.NODE_ENV !== 'test') {
-      throw new Error(
-        `Chave(s) pública(s) de SSO ausente(s): ${missing.join(', ')}. ` +
-          'Sem elas a validação de tokens RS256 retorna 401. Configure a(s) env(s).',
-      );
-    }
-
     super({
       // aceita o token tanto via header Authorization: Bearer quanto via cookie
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        ExtractJwt.fromAuthHeaderAsBearerToken(),
-        cookieExtractor,
-      ]),
+      // (`auth_token` da juri-api ou `robo_auth_token` da sessão própria).
+      jwtFromRequest: ExtractJwt.fromExtractors([extractAuthToken]),
       ignoreExpiration: false,
       algorithms: [JWT_ALGORITHM],
       // escolhe a chave pública pelo issuer do token (validação multi-emissor)
@@ -118,6 +75,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
+  /**
+   * Autenticação PURA: resolve o principal a partir de um token já validado e
+   * NUNCA muta estado. Usuário do SSO que ainda não existe localmente é criado
+   * pelo endpoint explícito `POST /auth/sso/session` (provisionamento JIT), não
+   * aqui — um guard não deve ter efeito colateral de escrita.
+   */
   async validate(payload: iJwtPayload) {
     // Revogação por jti (refactor): token cujo jti está na blocklist do Redis
     // (ex.: após logout) é recusado mesmo dentro da validade.
@@ -154,11 +117,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // Autorização sempre a partir do papel LOCAL. Só confiamos na lista de
     // permissões do payload quando o token foi emitido por esta própria API;
     // de um token de outro serviço (juri-api) derivamos do role local.
-    const permissions =
-      payload.iss === SELF_ISSUER && payload.permissions
-        ? payload.permissions
-        : getPermissionsForRole(user.role);
-    const { password: _pw, ...userObj } = user.toObject();
-    return { ...userObj, id: String(userObj._id), permissions };
+    const ownPermissions =
+      payload.iss === SELF_ISSUER ? payload.permissions : undefined;
+    return buildUserProfile(user, ownPermissions);
   }
 }
