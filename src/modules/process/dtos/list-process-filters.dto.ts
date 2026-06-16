@@ -14,9 +14,13 @@ const boolQuery = () =>
 
 const strictDateQuery = () =>
   z
-    .string()
-    .datetime()
-    .transform((value) => new Date(value))
+    .preprocess((val) => {
+      if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        const [year, month, day] = val.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      }
+      return val;
+    }, z.coerce.date())
     .optional();
 
 const ListProcessFiltersSchema = z.object({
