@@ -4,7 +4,7 @@ import { z } from 'zod';
 const runLawsuitsSchema = z.object({
   lawsuits: z.array(z.string().min(1)).default([]),
   documents: z.boolean().optional().default(false),
-  step: z.string().min(1).optional().default('step-1'),
+  step: z.string().min(1).default('step-1'),
   name: z.string().optional(),
   log: z.string().optional(),
   errorReason: z.string().optional(),

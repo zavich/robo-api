@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { HydratedDocument, Model, PipelineStage } from 'mongoose';
 
@@ -130,6 +130,11 @@ export class RunListLawsuitsValidationService {
     } else {
       process = normalizedLimit ? lawsuits.slice(0, normalizedLimit) : lawsuits;
     }
+    const findStep = await this.stepService.findOne({ slug: step });
+    if (!findStep) {
+      throw new BadRequestException('Step inválido');
+    }
+
     await Promise.all(
       process.map(async (lawsuit) => {
         const numberKey = (lawsuit ?? '').toString().trim();
@@ -161,11 +166,6 @@ export class RunListLawsuitsValidationService {
           },
           { new: true },
         );
-        const findStep = await this.stepService.findOne({ slug: step });
-        if (!findStep) {
-          this.logger.warn('Step not found: ' + step);
-          return;
-        }
         await this.processStateMachine.transition(
           this.processStatusService,
           proc.processStatus._id,
