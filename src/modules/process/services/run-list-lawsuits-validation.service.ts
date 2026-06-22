@@ -130,9 +130,12 @@ export class RunListLawsuitsValidationService {
     } else {
       process = normalizedLimit ? lawsuits.slice(0, normalizedLimit) : lawsuits;
     }
-    const findStep = await this.stepService.findOne({ slug: step });
+    const findStep = await this.stepService
+      .findOne({ slug: step })
+      .select('_id')
+      .lean();
     if (!findStep) {
-      throw new BadRequestException('Step inválido');
+      throw new BadRequestException(`Step inválido: ${step}`);
     }
 
     await Promise.all(
