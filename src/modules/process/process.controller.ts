@@ -407,6 +407,7 @@ export class ProcessController {
       await this.runListLawsuitsValidationService.execute(
         body.lawsuits,
         body.documents,
+        body.step,
         body.name,
         body.log,
         body.errorReason,

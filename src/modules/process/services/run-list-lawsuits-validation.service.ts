@@ -34,6 +34,7 @@ export class RunListLawsuitsValidationService {
   async execute(
     lawsuits: string[],
     documents: boolean = false,
+    step: string = 'step-1',
     name?: string,
     log?: string,
     errorReason?: string,
@@ -160,7 +161,11 @@ export class RunListLawsuitsValidationService {
           },
           { new: true },
         );
-        const findStep = await this.stepService.findOne({ slug: 'step-1' });
+        const findStep = await this.stepService.findOne({ slug: step });
+        if (!findStep) {
+          this.logger.warn('Step not found: ' + step);
+          return;
+        }
         await this.processStateMachine.transition(
           this.processStatusService,
           proc.processStatus._id,
