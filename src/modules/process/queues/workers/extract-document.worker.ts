@@ -7,7 +7,9 @@ import { LawsuitNumber, Root } from '../../interfaces/process.interface';
 import { Process as ProcessSchema } from '../../schema/process.schema';
 import { ExtractDocumentsInfoService } from '../process/services/extract-documents-info.service';
 
-@Processor('extract-document-queue')
+@Processor('extract-document-queue', {
+  concurrency: 2,
+})
 export class ExtractDocumentWorker extends WorkerHost {
   private readonly logger = new Logger(ExtractDocumentWorker.name);
 
@@ -23,7 +25,8 @@ export class ExtractDocumentWorker extends WorkerHost {
     const body = job.data;
     this.logger.log('Iniciando extração de documentos');
     try {
-      const processNumber = 'resposta' in body ? body?.resposta?.numero_unico : body?.processNumber;
+      const processNumber =
+        'resposta' in body ? body?.resposta?.numero_unico : body?.processNumber;
       if (!processNumber) {
         throw new Error('Número do processo ausente no payload do job');
       }
