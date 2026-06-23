@@ -43,6 +43,8 @@ export class RunListLawsuitsValidationService {
     limit?: number,
   ) {
     let process: string[] = [];
+    const requiresDocuments = step === 'step-3';
+    const shouldProcessDocuments = documents || requiresDocuments;
     const normalizedLimit =
       typeof limit === 'number' && Number.isFinite(limit)
         ? Math.max(1, Math.floor(limit))
@@ -72,6 +74,24 @@ export class RunListLawsuitsValidationService {
         filters.push({ 'processStatus.log': log });
       }
 
+      const documentsSizeExpression = {
+        $size: {
+          $cond: [{ $isArray: '$documents' }, '$documents', []],
+        },
+      };
+
+      const documentsCondition = requiresDocuments
+        ? {
+            $expr: {
+              $gt: [documentsSizeExpression, 0],
+            },
+          }
+        : {
+            $expr: {
+              $eq: [documentsSizeExpression, 0],
+            },
+          };
+
       const pipeline: PipelineStage[] = [
         {
           $lookup: {
@@ -82,7 +102,7 @@ export class RunListLawsuitsValidationService {
           },
         },
         { $unwind: '$processStatus' },
-        // Filtrar apenas processos com campo `documents` presente e que seja um array vazio
+        // Para step-3 exige documentos; nos demais mantém filtro por documentos vazios
         {
           $match: {
             $and: [
@@ -90,18 +110,7 @@ export class RunListLawsuitsValidationService {
               ...(Object.keys(createdAtFilter).length > 0
                 ? [{ createdAt: createdAtFilter }]
                 : []),
-              {
-                $expr: {
-                  $eq: [
-                    {
-                      $size: {
-                        $cond: [{ $isArray: '$documents' }, '$documents', []],
-                      },
-                    },
-                    0,
-                  ],
-                },
-              },
+              documentsCondition,
             ],
           },
         },
@@ -160,6 +169,17 @@ export class RunListLawsuitsValidationService {
           this.logger.warn('Process ' + numberKey + ' not found');
           return;
         }
+
+        const hasDocuments =
+          Array.isArray((proc as any).documents) &&
+          (proc as any).documents.length > 0;
+        if (requiresDocuments && !hasDocuments) {
+          this.logger.warn(
+            `Processo ${numberKey} ignorado: step-3 exige documents`,
+          );
+          return;
+        }
+
         await this.processModule.findByIdAndUpdate(
           proc._id,
           {
@@ -173,7 +193,7 @@ export class RunListLawsuitsValidationService {
           this.processStatusService,
           proc.processStatus._id,
           {
-            name: documents
+            name: shouldProcessDocuments
               ? PROCESSSTATUSENUM.PROCESSING_WITH_DOCUMENTS
               : PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
             step: findStep._id,
@@ -183,7 +203,7 @@ export class RunListLawsuitsValidationService {
         return this.insertProcessService.fetchProcessExtract(
           proc.number,
           proc,
-          documents,
+          shouldProcessDocuments,
         );
       }),
     );
