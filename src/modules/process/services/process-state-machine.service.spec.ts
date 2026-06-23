@@ -17,6 +17,15 @@ describe('ProcessStateMachineService', () => {
   });
 
   describe('canTransition', () => {
+    it('allows transition from processing with moviments to documents finished', () => {
+      expect(
+        service.canTransition(
+          PROCESSSTATUSENUM.PROCESSING_WITH_MOVIMENTS,
+          PROCESSSTATUSENUM.EXTRACTION_DOCUMENTS_FINISHED,
+        ),
+      ).toBe(true);
+    });
+
     it('allows the TRT flow from moviments to documents finished', () => {
       expect(
         service.canTransition(
