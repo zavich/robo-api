@@ -43,6 +43,14 @@
         {
           "name": "PORT",
           "value": "8080"
+        },
+        {
+          "name": "ATHENA_REGION",
+          "value": "sa-east-1"
+        },
+        {
+          "name": "ATHENA_OUTPUT_LOCATION",
+          "value": "s3://main-prd-lawsuit-frame/athena-results/"
         }
       ],
       "secrets": [
@@ -73,6 +81,18 @@
         {
           "name": "DATABASE_URL",
           "valueFrom": "<SECRET_ARN_PREFIX>:DATABASE_URL::"
+        },
+        {
+          "name": "ATHENA_DATABASE",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_DATABASE::"
+        },
+        {
+          "name": "ATHENA_ACCESS_KEY_ID",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_ACCESS_KEY_ID::"
+        },
+        {
+          "name": "ATHENA_SECRET_ACCESS_KEY",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_SECRET_ACCESS_KEY::"
         },
         { "name": "REDIS_URL", "valueFrom": "<SECRET_ARN_PREFIX>:REDIS_URL::" },
         {

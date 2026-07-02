@@ -47,6 +47,7 @@ import { CreateProcessService } from './services/create-process.service';
 import { DeleteInsightsDocumentService } from './services/documents/delete-insights.service';
 import { FindInsightsService } from './services/documents/find-insights.service';
 import { FindOneDocumentService } from './services/documents/find-one.service';
+import { FindMovementInsightsService } from './services/documents/find-movement-insights.service';
 import { InsertExecutionService } from './services/insert-execution.service';
 import { FindProcessService } from './services/lawsuit/find-lawsuit';
 import { ListLawsuitService } from './services/lawsuit/list-lawsuit';
@@ -84,6 +85,10 @@ import {
   RunDocumentsInsightsSchemaBody,
   runDocumentsInsightsSchemaPipe,
 } from './dtos/run-documents-insights.dto';
+import {
+  RunMovementInsightsSchemaBody,
+  runMovementInsightsSchemaPipe,
+} from './dtos/run-movement-insights.dto';
 import {
   RunLawsuitsSchemaBody,
   runLawsuitsSchemaPipe,
@@ -130,6 +135,7 @@ export class ProcessController {
     private readonly findInsightsService: FindInsightsService,
     private readonly deleteInsightsDocumentService: DeleteInsightsDocumentService,
     private readonly findOneDocumentService: FindOneDocumentService,
+    private readonly findMovementInsightsService: FindMovementInsightsService,
     private readonly lossReasonsService: LossReasonsService,
     private readonly insertExecutionService: InsertExecutionService,
     private readonly changeStageService: ChangeStageService,
@@ -393,6 +399,23 @@ export class ProcessController {
         body.prompt,
       );
       return { message: 'Processamento iniciado' };
+    } catch (error) {
+      throw error;
+    }
+  }
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
+  @Post('run-movement-insights')
+  async runMovementInsights(
+    @Body(runMovementInsightsSchemaPipe)
+    body: RunMovementInsightsSchemaBody,
+  ) {
+    try {
+      return await this.findMovementInsightsService.execute(
+        body.texto,
+        body.prompt,
+      );
     } catch (error) {
       throw error;
     }

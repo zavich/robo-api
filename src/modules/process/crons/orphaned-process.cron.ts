@@ -46,7 +46,7 @@ export class OrphanedProcessCron {
     private readonly processStateMachine: ProcessStateMachineService,
   ) {}
 
-  @Cron('0 */30 * * * *') // A cada 30 minutos
+  // @Cron('0 */30 * * * *') // A cada 30 minutos
   async execute() {
     try {
       const threshold = new Date(Date.now() - ORPHAN_THRESHOLD_MS);

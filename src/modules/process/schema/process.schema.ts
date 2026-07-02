@@ -95,6 +95,7 @@ export interface RestrictedDocument extends Document {
   instancia?: string;
   status?: StatusExtractionInsight;
 }
+
 export interface ProcessPartsDTO extends Document {
   nome: string;
   tipo: string;

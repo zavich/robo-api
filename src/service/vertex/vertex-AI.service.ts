@@ -72,31 +72,110 @@ export class VertexAIService {
     }
   }
 
+  private getGenerativeModel() {
+    const vertexAI = new VertexAI({
+      project: process.env.GOOGLE_PROJECT_ID,
+      location: process.env.GOOGLE_VERTEX_LOCATION,
+      googleAuthOptions: {
+        credentials: {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        },
+      },
+    });
+    return vertexAI.getGenerativeModel({
+      model: process.env.GOOGLE_VERTEX_MODEL,
+      generationConfig: {
+        temperature: 0.1,
+        topP: 0.95,
+        responseMimeType: 'application/json',
+      },
+    });
+  }
+
+  async executeTextWithRetry(
+    sourceText: string,
+    prompt: string,
+    retries = 3,
+    delayMs = 3000,
+    cooldownAfterSuccessMs = 3000,
+  ): Promise<Record<string, unknown>> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const result = await this.executeText(sourceText, prompt);
+
+        if (cooldownAfterSuccessMs > 0) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, cooldownAfterSuccessMs),
+          );
+        }
+
+        return result;
+      } catch (error) {
+        const statusCode = error?.response?.status || error?.status;
+
+        if (statusCode === 429) {
+          const backoff = attempt * delayMs;
+          this.logger.warn(
+            `[RateLimit] Tentativa ${attempt}/${retries} falhou com 429. Aguardando ${backoff / 1000}s antes da próxima tentativa...`,
+          );
+
+          if (attempt < retries) {
+            await new Promise((resolve) => setTimeout(resolve, backoff));
+            continue;
+          }
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  async executeText(
+    sourceText: string,
+    prompt: string,
+  ): Promise<Record<string, unknown>> {
+    try {
+      if (!prompt || !sourceText) {
+        throw new BadRequestException(
+          'The prompt and the source text are required',
+        );
+      }
+
+      const generativeModel = this.getGenerativeModel();
+      const sourcePart: Part = { text: sourceText };
+      const textPart: Part = { text: prompt };
+
+      const request: GenerateContentRequest = {
+        contents: [
+          {
+            role: 'user',
+            parts: [sourcePart, textPart],
+          },
+        ],
+      };
+
+      const resp = await generativeModel.generateContent(request);
+      const contentResponse = await resp.response;
+      const jsonParsed = JSON.parse(
+        contentResponse.candidates[0].content.parts[0].text,
+      );
+      return jsonParsed;
+    } catch (error) {
+      const stack = error instanceof Error ? error.stack : String(error);
+      this.logger.error(`VERTEX ERROR (text): ${stack}`);
+      throw error;
+    }
+  }
+
   async execute(
     file_url: string,
     prompt: string,
     fileMimeType = 'application/pdf',
   ): Promise<Record<string, unknown>> {
     try {
-      const vertexAI = new VertexAI({
-        project: process.env.GOOGLE_PROJECT_ID,
-        location: process.env.GOOGLE_VERTEX_LOCATION,
-        googleAuthOptions: {
-          credentials: {
-            client_email: process.env.GOOGLE_CLIENT_EMAIL,
-            client_id: process.env.GOOGLE_CLIENT_ID,
-            private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-          },
-        },
-      });
-      const generativeModel = vertexAI.getGenerativeModel({
-        model: process.env.GOOGLE_VERTEX_MODEL,
-        generationConfig: {
-          temperature: 0.1,
-          topP: 0.95,
-          responseMimeType: 'application/json',
-        },
-      });
+      const generativeModel = this.getGenerativeModel();
       const filePart: FileDataPart = {
         fileData: {
           mimeType: fileMimeType,

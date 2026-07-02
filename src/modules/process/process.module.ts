@@ -55,6 +55,7 @@ import { ProcessCountersService } from './services/counters/process-counters.ser
 import { DeleteInsightsDocumentService } from './services/documents/delete-insights.service';
 import { FindInsightsService } from './services/documents/find-insights.service';
 import { FindOneDocumentService } from './services/documents/find-one.service';
+import { FindMovementInsightsService } from './services/documents/find-movement-insights.service';
 import { InsertExecutionService } from './services/insert-execution.service';
 import { ListLawsuitService } from './services/lawsuit/list-lawsuit';
 import { UpdateLawsuitService } from './services/lawsuit/update-lawsuit';
@@ -154,6 +155,7 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     FindInsightsService,
     DeleteInsightsDocumentService,
     FindOneDocumentService,
+    FindMovementInsightsService,
     MarkProcessAsReadService,
     LossReasonsService,
     InsertExecutionService,
