@@ -3,7 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import type { SchemaDefinition } from '@dsnp/parquetjs';
-import { Instancia, Root } from 'src/modules/process/interfaces/process.interface';
+import {
+  Instancia,
+  Root,
+} from 'src/modules/process/interfaces/process.interface';
 import { parseCnj } from '../utils/cnj.util';
 import { ParquetWriterService } from './parquet-writer.service';
 
@@ -82,9 +85,7 @@ function toDateFromBrOrNull(value: string | undefined | null): Date | null {
   }
 
   const [, day, month, year] = match;
-  const date = new Date(
-    Date.UTC(Number(year), Number(month) - 1, Number(day)),
-  );
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -150,9 +151,7 @@ export class SaveWebhookToAthenaService {
         : {}),
     });
 
-    this.dataLocation =
-      this.configService.get<string>('LAWSUIT_DATA_LOCATION') ||
-      's3://main-prd-lawsuit-frame/pje-enriquecimento/v1';
+    this.dataLocation = this.configService.get<string>('LAWSUIT_DATA_LOCATION');
   }
 
   async execute(body: Root): Promise<void> {
@@ -183,8 +182,7 @@ export class SaveWebhookToAthenaService {
     const processoRow = {
       cnj_number: body.numero_processo,
       status_coleta: body.status ?? null,
-      motivo_erro:
-        body.motivo_erro != null ? String(body.motivo_erro) : null,
+      motivo_erro: body.motivo_erro != null ? String(body.motivo_erro) : null,
       enriquecido_em: new Date(),
       origem: body.resposta?.origem ?? null,
       num_instancias: instancias.length > 0 ? instancias.length : -1,
@@ -243,8 +241,20 @@ export class SaveWebhookToAthenaService {
     );
 
     await Promise.all([
-      this.writeTable('processos', PROCESSOS_SCHEMA, [processoRow], trt, anoProcesso),
-      this.writeTable('instancias', INSTANCIAS_SCHEMA, instanciaRows, trt, anoProcesso),
+      this.writeTable(
+        'processos',
+        PROCESSOS_SCHEMA,
+        [processoRow],
+        trt,
+        anoProcesso,
+      ),
+      this.writeTable(
+        'instancias',
+        INSTANCIAS_SCHEMA,
+        instanciaRows,
+        trt,
+        anoProcesso,
+      ),
       this.writeTable('partes', PARTES_SCHEMA, parteRows, trt, anoProcesso),
       this.writeTable(
         'movimentacoes',

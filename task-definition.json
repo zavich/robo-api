@@ -43,18 +43,6 @@
         {
           "name": "PORT",
           "value": "8080"
-        },
-        {
-          "name": "ATHENA_REGION",
-          "value": "sa-east-1"
-        },
-        {
-          "name": "ATHENA_OUTPUT_LOCATION",
-          "value": "s3://main-prd-lawsuit-frame/athena-results/"
-        },
-        {
-          "name": "LAWSUIT_DATA_LOCATION",
-          "value": "s3://main-prd-lawsuit-frame/pje-enriquecimento/v1"
         }
       ],
       "secrets": [
@@ -97,6 +85,18 @@
         {
           "name": "ATHENA_SECRET_ACCESS_KEY",
           "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_SECRET_ACCESS_KEY::"
+        },
+        {
+          "name": "ATHENA_REGION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_REGION::"
+        },
+        {
+          "name": "ATHENA_OUTPUT_LOCATION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_OUTPUT_LOCATION::"
+        },
+        {
+          "name": "LAWSUIT_DATA_LOCATION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:LAWSUIT_DATA_LOCATION::"
         },
         { "name": "REDIS_URL", "valueFrom": "<SECRET_ARN_PREFIX>:REDIS_URL::" },
         {
