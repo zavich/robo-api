@@ -7,7 +7,7 @@ const makeRedis = () => ({
   script: jest.fn(),
 });
 
-const makeSaveWebhookToAthenaService = () => ({
+const makeSaveWebhookToComunicacaoSpotService = () => ({
   execute: jest.fn(),
 });
 
@@ -35,19 +35,21 @@ const makeBody = (overrides: Record<string, unknown> = {}) =>
 describe('WebhookService', () => {
   let service: WebhookService;
   let redis: ReturnType<typeof makeRedis>;
-  let saveWebhookToAthenaService: ReturnType<
-    typeof makeSaveWebhookToAthenaService
+  let saveWebhookToComunicacaoSpotService: ReturnType<
+    typeof makeSaveWebhookToComunicacaoSpotService
   >;
   let gateway: { processUpdated: jest.Mock };
 
   beforeEach(() => {
     redis = makeRedis();
-    saveWebhookToAthenaService = makeSaveWebhookToAthenaService();
+    saveWebhookToComunicacaoSpotService =
+      makeSaveWebhookToComunicacaoSpotService();
+    saveWebhookToComunicacaoSpotService.execute.mockResolvedValue(undefined);
     gateway = { processUpdated: jest.fn() };
 
     service = new WebhookService(
       redis as any,
-      saveWebhookToAthenaService as any,
+      saveWebhookToComunicacaoSpotService as any,
       gateway as any,
     );
   });
@@ -66,7 +68,7 @@ describe('WebhookService', () => {
     await service.execute(makeBody(), 'corr-1');
 
     expect(redis.evalsha).toHaveBeenCalled();
-    expect(saveWebhookToAthenaService.execute).not.toHaveBeenCalled();
+    expect(saveWebhookToComunicacaoSpotService.execute).not.toHaveBeenCalled();
   });
 
   it('ignores duplicate webhook when state is PROCESSING (in-flight)', async () => {
@@ -75,18 +77,17 @@ describe('WebhookService', () => {
 
     await service.execute(makeBody(), 'corr-1');
 
-    expect(saveWebhookToAthenaService.execute).not.toHaveBeenCalled();
+    expect(saveWebhookToComunicacaoSpotService.execute).not.toHaveBeenCalled();
   });
 
   it('reacquires lock when previous state is FAILED and reprocesses', async () => {
     redis.script.mockResolvedValue('sha-1');
     redis.evalsha.mockResolvedValue('FAILED');
     redis.set.mockResolvedValue('OK');
-    saveWebhookToAthenaService.execute.mockResolvedValue(undefined);
 
     await service.execute(makeBody(), 'corr-retry');
 
-    expect(saveWebhookToAthenaService.execute).toHaveBeenCalled();
+    expect(saveWebhookToComunicacaoSpotService.execute).toHaveBeenCalled();
     expect(redis.set).toHaveBeenLastCalledWith(
       'webhook:wh-123',
       'DONE',
@@ -95,16 +96,17 @@ describe('WebhookService', () => {
     );
   });
 
-  it('marks webhook as DONE and notifica o gateway após gravar no Athena', async () => {
+  it('marks webhook as DONE and notifica o gateway após atualizar comunicacao-spot', async () => {
     redis.script.mockResolvedValue('sha-1');
     redis.evalsha.mockResolvedValue('NEW');
     redis.set.mockResolvedValue('OK');
-    saveWebhookToAthenaService.execute.mockResolvedValue(undefined);
 
     const body = makeBody();
     await service.execute(body, 'corr-3');
 
-    expect(saveWebhookToAthenaService.execute).toHaveBeenCalledWith(body);
+    expect(saveWebhookToComunicacaoSpotService.execute).toHaveBeenCalledWith(
+      body,
+    );
     expect(gateway.processUpdated).toHaveBeenCalledWith(body.numero_processo);
     expect(redis.set).toHaveBeenLastCalledWith(
       'webhook:wh-123',
@@ -118,7 +120,9 @@ describe('WebhookService', () => {
     redis.script.mockResolvedValue('sha-1');
     redis.evalsha.mockResolvedValue('NEW');
     redis.set.mockResolvedValue('OK');
-    saveWebhookToAthenaService.execute.mockRejectedValue(new Error('boom'));
+    saveWebhookToComunicacaoSpotService.execute.mockRejectedValue(
+      new Error('boom'),
+    );
 
     await expect(service.execute(makeBody(), 'corr-4')).rejects.toThrow(
       'boom',

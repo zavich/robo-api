@@ -8,6 +8,7 @@ import {
   Root,
 } from 'src/modules/process/interfaces/process.interface';
 import { parseCnj } from '../utils/cnj.util';
+import { decideWebhookPersist } from '../utils/webhook-persist.util';
 import { ParquetWriterService } from './parquet-writer.service';
 
 // Schemas espelhando exatamente o `SHOW CREATE TABLE` das 4 tabelas no Glue
@@ -155,16 +156,10 @@ export class SaveWebhookToAthenaService {
   }
 
   async execute(body: Root): Promise<void> {
-    if (body.status === 'NAO_ENCONTRADO') {
+    const decision = decideWebhookPersist(body);
+    if (!decision.persist) {
       this.logger.log(
-        `Processo ${body.numero_processo} retornou NAO_ENCONTRADO — nada será gravado no Parquet.`,
-      );
-      return;
-    }
-
-    if (body.status === 'ERRO' && body.motivo_erro != null) {
-      this.logger.log(
-        `Processo ${body.numero_processo} retornou ERRO (motivo_erro=${JSON.stringify(body.motivo_erro)}) — nada será gravado no Parquet.`,
+        `Processo ${body.numero_processo} retornou ${decision.reason} — nada será gravado no Parquet.`,
       );
       return;
     }
@@ -232,11 +227,9 @@ export class SaveWebhookToAthenaService {
         movimentacao_id: mov.id,
         data_mov: toDateFromBrOrNull(mov.data),
         conteudo: mov.conteudo ?? null,
-        // pje_doc_id (id numérico) não vem no payload do webhook — só no JSON
-        // mais rico do coletor Python (communication-ingestor-juri).
-        pje_doc_id: null,
+        pje_doc_id: mov.pje_doc_id ?? null,
         texto: mov.texto ?? null,
-        unique_name_documento: mov.idUnicoDocumento ?? null,
+        unique_name_documento: mov.uniqueNameDocumento ?? null,
       })),
     );
 

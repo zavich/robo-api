@@ -132,7 +132,11 @@ export interface Movimentacoes {
   id: number;
   data: string;
   conteudo: string;
-  idUnicoDocumento?: string;
+  // Campo real do payload é `uniqueNameDocumento` (confirmado no JSON cru do
+  // webhook) — `idUnicoDocumento` é o nome interno no scraper, renomeado por
+  // ele mesmo em normalizeResponse.ts antes de sair pela rede.
+  uniqueNameDocumento?: string;
+  pje_doc_id?: number | null;
   texto?: string;
 }
 

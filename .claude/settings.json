@@ -7,7 +7,9 @@
       "Bash(npx jest *)",
       "Bash(node -e ' *)",
       "Bash(:)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(node -e \"const s3 = require\\('@aws-sdk/client-s3'\\); console.log\\(typeof s3.NoSuchKey\\);\")",
+      "Bash(echo \"TSC EXIT:$?\")"
     ],
     "additionalDirectories": [
       "/Users/rafaelnicacio/Desktop/robo/scraping-robo-api/src/modules/pje",

@@ -8,7 +8,7 @@ import { Inject } from '@nestjs/common';
 import Redis from 'ioredis';
 import { Root } from '../interfaces/process.interface';
 import { NotificationsGateway } from 'src/gateway/notifications.gateway';
-import { SaveWebhookToAthenaService } from 'src/modules/lawsuits/services/save-webhook-to-athena.service';
+import { SaveWebhookToComunicacaoSpotService } from 'src/modules/lawsuits/services/save-webhook-to-comunicacao-spot.service';
 
 type IdempotencyAcquisition =
   | {
@@ -37,7 +37,7 @@ export class WebhookService implements OnModuleInit {
   constructor(
     @Inject('REDIS_CLIENT')
     private readonly redis: Redis,
-    private readonly saveWebhookToAthenaService: SaveWebhookToAthenaService,
+    private readonly saveWebhookToComunicacaoSpotService: SaveWebhookToComunicacaoSpotService,
     private readonly gateway: NotificationsGateway,
   ) {}
 
@@ -76,9 +76,10 @@ export class WebhookService implements OnModuleInit {
     }
 
     try {
-      // Sem Mongo: o webhook grava direto no Parquet/Athena (pje_enriquecimento),
-      // independente de existir ou não um registro prévio pra esse processo.
-      await this.saveWebhookToAthenaService.execute(body);
+      // Sem Mongo, sem Parquet: o webhook busca o JSON existente em
+      // comunicacao-spot (usado por outras ferramentas/pipeline fora do
+      // robo-api) e mescla as instâncias novas nele.
+      await this.saveWebhookToComunicacaoSpotService.execute(body);
 
       await this.redis.set(idempotencyKey, 'DONE', 'EX', 60 * 60 * 24);
       this.gateway.processUpdated(body.numero_processo);

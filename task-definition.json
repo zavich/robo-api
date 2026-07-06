@@ -98,6 +98,10 @@
           "name": "LAWSUIT_DATA_LOCATION",
           "valueFrom": "<SECRET_ARN_PREFIX>:LAWSUIT_DATA_LOCATION::"
         },
+        {
+          "name": "COMUNICACAO_SPOT_LOCATION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:COMUNICACAO_SPOT_LOCATION::"
+        },
         { "name": "REDIS_URL", "valueFrom": "<SECRET_ARN_PREFIX>:REDIS_URL::" },
         {
           "name": "AWS_S3_REGION",

@@ -5,6 +5,7 @@ import { FindProcessoService } from './services/find-processo.service';
 import { TriggerScrapingService } from './services/trigger-scraping.service';
 import { ParquetWriterService } from './services/parquet-writer.service';
 import { SaveWebhookToAthenaService } from './services/save-webhook-to-athena.service';
+import { SaveWebhookToComunicacaoSpotService } from './services/save-webhook-to-comunicacao-spot.service';
 
 @Module({
   controllers: [LawsuitsController],
@@ -14,7 +15,12 @@ import { SaveWebhookToAthenaService } from './services/save-webhook-to-athena.se
     TriggerScrapingService,
     ParquetWriterService,
     SaveWebhookToAthenaService,
+    SaveWebhookToComunicacaoSpotService,
   ],
-  exports: [FindProcessoService, SaveWebhookToAthenaService],
+  exports: [
+    FindProcessoService,
+    SaveWebhookToAthenaService,
+    SaveWebhookToComunicacaoSpotService,
+  ],
 })
 export class LawsuitsModule {}

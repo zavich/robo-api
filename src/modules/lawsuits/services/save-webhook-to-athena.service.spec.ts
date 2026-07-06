@@ -44,7 +44,10 @@ describe('SaveWebhookToAthenaService', () => {
 
     parquetWriter = { writeRows: jest.fn().mockResolvedValue(Buffer.from('')) };
     const configService = {
-      get: () => undefined,
+      get: (key: string) =>
+        key === 'LAWSUIT_DATA_LOCATION'
+          ? 's3://main-prd-lawsuit-frame/pje-enriquecimento/v1'
+          : undefined,
     } as unknown as ConfigService;
 
     service = new SaveWebhookToAthenaService(
@@ -134,7 +137,8 @@ describe('SaveWebhookToAthenaService', () => {
                   // como MM/DD/YYYY) antes do parser dedicado pt-BR.
                   data: '31/12/2026',
                   conteudo: 'Sentença',
-                  idUnicoDocumento: 'doc-abc',
+                  pje_doc_id: 187030984,
+                  uniqueNameDocumento: 'doc-abc',
                   texto: 'Conteúdo integral do documento',
                 },
               ],
@@ -158,6 +162,7 @@ describe('SaveWebhookToAthenaService', () => {
     const [, rows] = movimentacoesCall!;
     expect(rows[0].texto).toBe('Conteúdo integral do documento');
     expect(rows[0].unique_name_documento).toBe('doc-abc');
+    expect(rows[0].pje_doc_id).toBe(187030984);
     expect(rows[0].data_mov).toBeInstanceOf(Date);
     expect((rows[0].data_mov as Date).toISOString().slice(0, 10)).toBe(
       '2026-12-31',
