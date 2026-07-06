@@ -1,13 +1,17 @@
-import { Controller, Get, Param, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
 import { FindProcessoService } from './services/find-processo.service';
+import { TriggerScrapingService } from './services/trigger-scraping.service';
 
 @ApiTags('Lawsuits')
 @Controller('lawsuits')
 export class LawsuitsController {
-  constructor(private readonly findProcessoService: FindProcessoService) {}
+  constructor(
+    private readonly findProcessoService: FindProcessoService,
+    private readonly triggerScrapingService: TriggerScrapingService,
+  ) {}
 
   @Get(':numeroCnj')
   @ApiBearerAuth()
@@ -27,5 +31,12 @@ export class LawsuitsController {
         error: error.message,
       });
     }
+  }
+
+  @Post(':numeroCnj/sync')
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
+  async sync(@Param('numeroCnj') numeroCnj: string) {
+    return this.triggerScrapingService.execute(numeroCnj);
   }
 }

@@ -1,23 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
 import { WebhookService } from './webhook.service';
 
-const makeProcessModel = () => ({
-  findOne: jest.fn().mockReturnThis(),
-  populate: jest.fn(),
-});
-
-const makeStepModel = () => ({
-  findById: jest.fn(),
-});
-
 const makeRedis = () => ({
   evalsha: jest.fn(),
   set: jest.fn(),
   script: jest.fn(),
 });
 
-const makeHandler = () => ({
-  handle: jest.fn(),
+const makeSaveWebhookToAthenaService = () => ({
+  execute: jest.fn(),
 });
 
 const makeBody = (overrides: Record<string, unknown> = {}) =>
@@ -43,32 +34,21 @@ const makeBody = (overrides: Record<string, unknown> = {}) =>
 
 describe('WebhookService', () => {
   let service: WebhookService;
-  let processModel: ReturnType<typeof makeProcessModel>;
-  let stepModel: ReturnType<typeof makeStepModel>;
   let redis: ReturnType<typeof makeRedis>;
-  let naoEncontradoHandler: ReturnType<typeof makeHandler>;
-  let erroHandler: ReturnType<typeof makeHandler>;
-  let tstHandler: ReturnType<typeof makeHandler>;
-  let trtHandler: ReturnType<typeof makeHandler>;
+  let saveWebhookToAthenaService: ReturnType<
+    typeof makeSaveWebhookToAthenaService
+  >;
+  let gateway: { processUpdated: jest.Mock };
 
   beforeEach(() => {
-    processModel = makeProcessModel();
-    stepModel = makeStepModel();
     redis = makeRedis();
-    naoEncontradoHandler = makeHandler();
-    erroHandler = makeHandler();
-    tstHandler = makeHandler();
-    trtHandler = makeHandler();
+    saveWebhookToAthenaService = makeSaveWebhookToAthenaService();
+    gateway = { processUpdated: jest.fn() };
 
     service = new WebhookService(
-      processModel as any,
-      stepModel as any,
       redis as any,
-      naoEncontradoHandler as any,
-      erroHandler as any,
-      tstHandler as any,
-      trtHandler as any,
-      { processUpdated: jest.fn() } as any,
+      saveWebhookToAthenaService as any,
+      gateway as any,
     );
   });
 
@@ -86,7 +66,7 @@ describe('WebhookService', () => {
     await service.execute(makeBody(), 'corr-1');
 
     expect(redis.evalsha).toHaveBeenCalled();
-    expect(processModel.findOne).not.toHaveBeenCalled();
+    expect(saveWebhookToAthenaService.execute).not.toHaveBeenCalled();
   });
 
   it('ignores duplicate webhook when state is PROCESSING (in-flight)', async () => {
@@ -95,23 +75,18 @@ describe('WebhookService', () => {
 
     await service.execute(makeBody(), 'corr-1');
 
-    expect(processModel.findOne).not.toHaveBeenCalled();
+    expect(saveWebhookToAthenaService.execute).not.toHaveBeenCalled();
   });
 
   it('reacquires lock when previous state is FAILED and reprocesses', async () => {
     redis.script.mockResolvedValue('sha-1');
     redis.evalsha.mockResolvedValue('FAILED');
     redis.set.mockResolvedValue('OK');
-    const process = {
-      _id: 'proc-id',
-      processStatus: { step: 'step-id' },
-    };
-    processModel.populate.mockResolvedValue(process);
-    stepModel.findById.mockResolvedValue({ slug: 'step-3' });
+    saveWebhookToAthenaService.execute.mockResolvedValue(undefined);
 
     await service.execute(makeBody(), 'corr-retry');
 
-    expect(trtHandler.handle).toHaveBeenCalled();
+    expect(saveWebhookToAthenaService.execute).toHaveBeenCalled();
     expect(redis.set).toHaveBeenLastCalledWith(
       'webhook:wh-123',
       'DONE',
@@ -120,43 +95,17 @@ describe('WebhookService', () => {
     );
   });
 
-  it('stores FAILED_PROCESS_NOT_FOUND when process does not exist', async () => {
+  it('marks webhook as DONE and notifica o gateway após gravar no Athena', async () => {
     redis.script.mockResolvedValue('sha-1');
     redis.evalsha.mockResolvedValue('NEW');
     redis.set.mockResolvedValue('OK');
-    processModel.populate.mockResolvedValue(null);
+    saveWebhookToAthenaService.execute.mockResolvedValue(undefined);
 
-    await service.execute(makeBody(), 'corr-2');
+    const body = makeBody();
+    await service.execute(body, 'corr-3');
 
-    expect(redis.set).toHaveBeenCalledWith(
-      'webhook:wh-123',
-      'FAILED_PROCESS_NOT_FOUND',
-      'EX',
-      5 * 60,
-    );
-  });
-
-  it('marks webhook as DONE after successful TRT handling', async () => {
-    const process = {
-      _id: 'proc-id',
-      processStatus: { step: 'step-id' },
-    };
-    const step = { slug: 'step-3' };
-
-    redis.script.mockResolvedValue('sha-1');
-    redis.evalsha.mockResolvedValue('NEW');
-    redis.set.mockResolvedValue('OK');
-    processModel.populate.mockResolvedValue(process);
-    stepModel.findById.mockResolvedValue(step);
-
-    await service.execute(makeBody(), 'corr-3');
-
-    expect(trtHandler.handle).toHaveBeenCalledWith(
-      expect.objectContaining({ webhookId: 'wh-123' }),
-      process,
-      step,
-      'corr-3',
-    );
+    expect(saveWebhookToAthenaService.execute).toHaveBeenCalledWith(body);
+    expect(gateway.processUpdated).toHaveBeenCalledWith(body.numero_processo);
     expect(redis.set).toHaveBeenLastCalledWith(
       'webhook:wh-123',
       'DONE',
@@ -165,20 +114,15 @@ describe('WebhookService', () => {
     );
   });
 
-  it('marks webhook as FAILED and rethrows when handler crashes', async () => {
-    const process = {
-      _id: 'proc-id',
-      processStatus: { step: 'step-id' },
-    };
-
+  it('marks webhook as FAILED and rethrows when a gravação falha', async () => {
     redis.script.mockResolvedValue('sha-1');
     redis.evalsha.mockResolvedValue('NEW');
     redis.set.mockResolvedValue('OK');
-    processModel.populate.mockResolvedValue(process);
-    stepModel.findById.mockResolvedValue({ slug: 'step-3' });
-    trtHandler.handle.mockRejectedValue(new Error('boom'));
+    saveWebhookToAthenaService.execute.mockRejectedValue(new Error('boom'));
 
-    await expect(service.execute(makeBody(), 'corr-4')).rejects.toThrow('boom');
+    await expect(service.execute(makeBody(), 'corr-4')).rejects.toThrow(
+      'boom',
+    );
 
     expect(redis.set).toHaveBeenLastCalledWith(
       'webhook:wh-123',

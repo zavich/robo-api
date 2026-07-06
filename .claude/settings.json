@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(NODE_PATH=/Users/rafaelnicacio/Desktop/robo/robo-api/node_modules node -e \"require\\('module'\\).globalPaths.push\\(process.env.NODE_PATH\\); require\\('/private/tmp/claude-501/-Users-rafaelnicacio-Desktop-robo-robo-api/afc08b05-0d3f-447e-b172-adf8a0a6c5c3/scratchpad/athena-count.js'\\)\")",
+      "Bash(npx jest *)",
+      "Bash(node -e ' *)",
+      "Bash(:)",
+      "Bash(python3 -c ' *)"
+    ],
+    "additionalDirectories": [
+      "/Users/rafaelnicacio/Desktop/robo/scraping-robo-api/src/modules/pje",
+      "/tmp"
+    ]
+  }
+}

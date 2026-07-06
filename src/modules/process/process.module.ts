@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { LawsuitsModule } from 'src/modules/lawsuits/lawsuits.module';
 import { AwsAppModule } from 'src/service/aws/aws.module';
 import { BrapiService } from 'src/service/brapi/brapi.service';
 import { NextStepsModule } from 'src/service/next-steps/next-steps.module';
@@ -65,10 +66,6 @@ import { RunListLawsuitsValidationService } from './services/run-list-lawsuits-v
 import { SavedMovementsService } from './services/saved-movements.service';
 import { MetricsService } from './services/metrics.service';
 import { UploadXLSXService } from './services/upload-xlsx.service';
-import { WebhookNaoEncontradoHandler } from './services/handlers/webhook-nao-encontrado.handler';
-import { WebhookErroHandler } from './services/handlers/webhook-erro.handler';
-import { WebhookTstHandler } from './services/handlers/webhook-tst.handler';
-import { WebhookTrtHandler } from './services/handlers/webhook-trt.handler';
 import { InsertProcessWorker } from './queues/workers/insert-process.worker';
 import { ProcessValidationWorker } from './queues/workers/process-validation.worker';
 import { SolvencyValidationWorker } from './queues/workers/solvency-validation.worker';
@@ -134,6 +131,7 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     NextStepsModule,
     ScheduleModule.forRoot(),
     NotificationModule,
+    LawsuitsModule,
   ],
   controllers: [ProcessController],
   providers: [
@@ -173,10 +171,6 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     UpdateActivityNotesService,
     MetricsService,
     UploadXLSXService,
-    WebhookNaoEncontradoHandler,
-    WebhookErroHandler,
-    WebhookTstHandler,
-    WebhookTrtHandler,
     ServiceWebhookGuard,
     ProcessStateMachineService,
     InsertProcessWorker,

@@ -51,6 +51,10 @@
         {
           "name": "ATHENA_OUTPUT_LOCATION",
           "value": "s3://main-prd-lawsuit-frame/athena-results/"
+        },
+        {
+          "name": "LAWSUIT_DATA_LOCATION",
+          "value": "s3://main-prd-lawsuit-frame/pje-enriquecimento/v1"
         }
       ],
       "secrets": [

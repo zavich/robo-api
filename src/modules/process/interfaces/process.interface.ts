@@ -77,7 +77,11 @@ export interface Instancia {
   segredo: boolean;
   numero: string | number | null;
   numeros_alternativos: (string | number)[];
-  assunto: string;
+  // O scraper manda um array de `{codigo, descricao, principal}` aqui, não
+  // uma string — confirmado no payload real do webhook.
+  assunto:
+    | string
+    | { codigo?: string | number; descricao?: string; principal?: boolean }[];
   classe: string;
   area: string;
   data_distribuicao: string;
@@ -129,6 +133,7 @@ export interface Movimentacoes {
   data: string;
   conteudo: string;
   idUnicoDocumento?: string;
+  texto?: string;
 }
 
 export interface Audiencia {

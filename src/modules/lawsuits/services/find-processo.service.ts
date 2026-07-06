@@ -1,10 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AthenaQueryService } from './athena-query.service';
-
-// Formato CNJ: NNNNNNN-DD.AAAA.J.TR.OOOO — grupos: sequencial, dígito
-// verificador, ano, segmento do judiciário, tribunal, unidade de origem.
-const NUMERO_CNJ_PATTERN =
-  /^\d{7}-\d{2}\.(\d{4})\.\d\.(\d{2})\.\d{4}$/;
+import { parseCnj } from '../utils/cnj.util';
 
 interface ProcessoRow {
   cnj_number: string;
@@ -59,22 +55,47 @@ export class FindProcessoService {
   constructor(private readonly athenaQueryService: AthenaQueryService) {}
 
   async execute(numeroCnj: string) {
-    const match = NUMERO_CNJ_PATTERN.exec(numeroCnj);
-    if (!match) {
+    const parsed = parseCnj(numeroCnj);
+    if (!parsed) {
       throw new BadRequestException('Número de processo inválido');
     }
 
     // pje_processos/pje_partes/pje_movimentacoes são particionadas por trt e
     // ano_processo. Sem filtrar por elas, o Athena varre todas as partições.
     // O número CNJ já contém os dois valores, então extraímos direto dele.
-    const [, anoProcesso, tribunalCodigo] = match;
-    const trt = `TRT${parseInt(tribunalCodigo, 10)}`;
+    const { trt, anoProcesso } = parsed;
 
     // Queries separadas (em paralelo) em vez de um join único: partes,
     // movimentações e instâncias não têm relação entre si, então juntar
     // todas de uma vez geraria produto cartesiano entre elas.
     const [processoRows, movimentacaoRows, instanciaRows] = await Promise.all([
       this.athenaQueryService.query<ProcessoRow>(`
+        WITH processo_priorizado AS (
+          -- pje_processos é append-only (cada webhook grava uma linha nova) —
+          -- pode ter mais de uma linha pro mesmo cnj_number. Prioriza a mais
+          -- recente com status_coleta = 'SUCESSO'; sem nenhuma SUCESSO, cai
+          -- pra mais recente de qualquer status.
+          SELECT *
+          FROM pje_processos
+          WHERE trt = '${trt}'
+            AND ano_processo = ${anoProcesso}
+            AND cnj_number = '${numeroCnj}'
+          ORDER BY
+            CASE WHEN status_coleta = 'SUCESSO' THEN 0 ELSE 1 END,
+            enriquecido_em DESC
+          LIMIT 1
+        ),
+        partes_sem_duplicata AS (
+          -- pje_partes também é append-only — dedupe pra não listar a mesma
+          -- parte várias vezes quando o processo foi sincronizado mais de uma vez.
+          SELECT DISTINCT
+            instancia_id, parte_id, tipo, polo, nome,
+            doc_tipo, doc_numero, advogado_de, principal
+          FROM pje_partes
+          WHERE trt = '${trt}'
+            AND ano_processo = ${anoProcesso}
+            AND cnj_number = '${numeroCnj}'
+        )
         SELECT
           p.cnj_number AS cnj_number,
           p.status_coleta AS status_coleta,
@@ -93,14 +114,9 @@ export class FindProcessoService {
           pt.doc_numero AS parte_doc_numero,
           pt.advogado_de AS parte_advogado_de,
           pt.principal AS parte_principal
-        FROM pje_processos p
-        LEFT JOIN pje_partes pt
-          ON pt.cnj_number = p.cnj_number
-          AND pt.trt = '${trt}'
-          AND pt.ano_processo = ${anoProcesso}
-        WHERE p.trt = '${trt}'
-          AND p.ano_processo = ${anoProcesso}
-          AND p.cnj_number = '${numeroCnj}'
+        FROM processo_priorizado p
+        LEFT JOIN partes_sem_duplicata pt
+          ON true
       `),
       this.athenaQueryService.query<MovimentacaoRow>(`
         SELECT

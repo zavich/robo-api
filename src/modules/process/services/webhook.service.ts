@@ -5,27 +5,17 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import Redis from 'ioredis';
-import { HydratedDocument, Model, Types } from 'mongoose';
 import { Root } from '../interfaces/process.interface';
-import { ProcessStatus } from '../schema/process-status.schema';
-import { Process as ProcessEntity } from '../schema/process.schema';
-import { Step } from '../schema/step.schema';
 import { NotificationsGateway } from 'src/gateway/notifications.gateway';
-import { WebhookErroHandler } from './handlers/webhook-erro.handler';
-import { WebhookNaoEncontradoHandler } from './handlers/webhook-nao-encontrado.handler';
-import { WebhookTrtHandler } from './handlers/webhook-trt.handler';
-import { WebhookTstHandler } from './handlers/webhook-tst.handler';
+import { SaveWebhookToAthenaService } from 'src/modules/lawsuits/services/save-webhook-to-athena.service';
 
 type IdempotencyAcquisition =
-  | { acquired: true; previousState: 'NEW' | 'FAILED' | 'FAILED_PROCESS_NOT_FOUND' }
+  | {
+      acquired: true;
+      previousState: 'NEW' | 'FAILED' | 'FAILED_PROCESS_NOT_FOUND';
+    }
   | { acquired: false; currentState: string };
-
-type PopulatedProcessStatus = { _id: string; step: string };
-type WebhookProcess = HydratedDocument<ProcessEntity> & {
-  processStatus: PopulatedProcessStatus;
-};
 
 const ACQUIRE_IDEMPOTENCY_SCRIPT = `
 local key = KEYS[1]
@@ -45,16 +35,9 @@ export class WebhookService implements OnModuleInit {
   private idempotencyScriptSha: string | null = null;
 
   constructor(
-    @InjectModel(ProcessEntity.name)
-    private readonly processModel: Model<ProcessEntity>,
-    @InjectModel(Step.name)
-    private readonly stepModel: Model<Step>,
     @Inject('REDIS_CLIENT')
     private readonly redis: Redis,
-    private readonly naoEncontradoHandler: WebhookNaoEncontradoHandler,
-    private readonly erroHandler: WebhookErroHandler,
-    private readonly tstHandler: WebhookTstHandler,
-    private readonly trtHandler: WebhookTrtHandler,
+    private readonly saveWebhookToAthenaService: SaveWebhookToAthenaService,
     private readonly gateway: NotificationsGateway,
   ) {}
 
@@ -70,7 +53,12 @@ export class WebhookService implements OnModuleInit {
     this.logger.log(
       `Recebendo webhook de ${body.numero_processo} (correlationId=${correlationId ?? 'n/a'})`,
     );
+    const interruped = false;
+    if (interruped) {
+      console.log(body.resposta.instancias[0].movimentacoes);
 
+      return;
+    }
     const idempotencyKey = this.buildIdempotencyKey(body);
     const acquisition = await this.acquireIdempotencyLock(idempotencyKey);
 
@@ -88,67 +76,17 @@ export class WebhookService implements OnModuleInit {
     }
 
     try {
-      const findProcess = await this.processModel
-        .findOne({ number: body.numero_processo })
-        .populate(['processStatus']);
-
-      if (!findProcess) {
-        this.logger.error(
-          `Processo de número ${body.numero_processo} não encontrado!`,
-        );
-        await this.redis
-          .set(idempotencyKey, 'FAILED_PROCESS_NOT_FOUND', 'EX', 5 * 60)
-          .catch(() => undefined);
-        return;
-      }
-
-      const webhookProcess = findProcess as WebhookProcess;
-
-      const step = await this.stepModel.findById(
-        webhookProcess.processStatus.step,
-      );
-
-      if (body.status === 'NAO_ENCONTRADO') {
-        await this.naoEncontradoHandler.handle(
-          body,
-          webhookProcess as ProcessEntity & {
-            _id: Types.ObjectId;
-            processStatus: { _id: string | Types.ObjectId };
-          },
-          step,
-          correlationId,
-        );
-      } else if (body.status === 'ERRO') {
-        await this.erroHandler.handle(
-          body,
-          webhookProcess as ProcessEntity & {
-            _id: Types.ObjectId;
-            processStatus: { _id: string | Types.ObjectId };
-          },
-          correlationId,
-        );
-      } else {
-        const origem = body.tribunal.sigla.toLowerCase();
-        if (origem.includes('tst')) {
-          await this.tstHandler.handle(
-            body,
-            webhookProcess as ProcessEntity & { _id: Types.ObjectId },
-          );
-        } else if (origem.includes('trt')) {
-          await this.trtHandler.handle(
-            body,
-            webhookProcess,
-            step,
-            correlationId,
-          );
-        }
-      }
+      // Sem Mongo: o webhook grava direto no Parquet/Athena (pje_enriquecimento),
+      // independente de existir ou não um registro prévio pra esse processo.
+      await this.saveWebhookToAthenaService.execute(body);
 
       await this.redis.set(idempotencyKey, 'DONE', 'EX', 60 * 60 * 24);
       this.gateway.processUpdated(body.numero_processo);
     } catch (error) {
       this.logger.error(`Erro ao processar a requisição: ${error.message}`);
-      await this.redis.set(idempotencyKey, 'FAILED', 'EX', 60 * 60).catch(() => undefined);
+      await this.redis
+        .set(idempotencyKey, 'FAILED', 'EX', 60 * 60)
+        .catch(() => undefined);
       throw error;
     }
   }
@@ -203,12 +141,7 @@ export class WebhookService implements OnModuleInit {
     const sha = await this.loadIdempotencyScript();
 
     try {
-      return await this.redis.evalsha(
-        sha,
-        1,
-        idempotencyKey,
-        ttlSeconds,
-      );
+      return await this.redis.evalsha(sha, 1, idempotencyKey, ttlSeconds);
     } catch (error: unknown) {
       if (!String((error as Error)?.message ?? error).includes('NOSCRIPT')) {
         throw error;
