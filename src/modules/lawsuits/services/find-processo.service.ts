@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import Redis from 'ioredis';
 import { AthenaQueryService } from './athena-query.service';
 import { parseCnj } from '../utils/cnj.util';
+import { redisKeyForProcesso } from './cache-processo-to-redis.service';
 
 interface ProcessoRow {
   cnj_number: string;
@@ -52,7 +54,13 @@ interface InstanciaRow {
 
 @Injectable()
 export class FindProcessoService {
-  constructor(private readonly athenaQueryService: AthenaQueryService) {}
+  private readonly logger = new Logger(FindProcessoService.name);
+
+  constructor(
+    private readonly athenaQueryService: AthenaQueryService,
+    @Inject('REDIS_CLIENT')
+    private readonly redis: Redis,
+  ) {}
 
   async execute(numeroCnj: string) {
     const parsed = parseCnj(numeroCnj);
@@ -60,11 +68,73 @@ export class FindProcessoService {
       throw new BadRequestException('Número de processo inválido');
     }
 
-    // pje_processos/pje_partes/pje_movimentacoes são particionadas por trt e
-    // ano_processo. Sem filtrar por elas, o Athena varre todas as partições.
-    // O número CNJ já contém os dois valores, então extraímos direto dele.
     const { trt, anoProcesso } = parsed;
+    const redisKey = redisKeyForProcesso(numeroCnj);
 
+    // Redis é atualizado direto no ato do webhook (sempre a versão mais
+    // recente); o Athena só reflete o que foi processado em batch e pode
+    // estar bem mais atrasado. Consulta os dois em paralelo: se o Athena já
+    // alcançou (ou superou) a data do cache, ele virou a versão mais atual —
+    // apaga o cache (não serve mais pra nada) e devolve o Athena. Enquanto o
+    // Athena não alcançar, o cache continua sendo a resposta.
+    const [cachedRaw, athenaResult] = await Promise.all([
+      this.redis.get(redisKey),
+      this.queryAthena(numeroCnj, trt, anoProcesso),
+    ]);
+
+    const cached = this.parseCache(cachedRaw, numeroCnj);
+    if (cached) {
+      if (this.athenaCaughtUp(athenaResult, cached.enriquecidoEm)) {
+        await this.redis.del(redisKey).catch(() => undefined);
+        return athenaResult;
+      }
+      return cached;
+    }
+
+    return athenaResult;
+  }
+
+  private parseCache(raw: string | null, numeroCnj: string): any | null {
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      this.logger.warn(
+        `Cache inválido no Redis pra ${numeroCnj}, ignorando: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  // Timestamp do Athena e do cache vêm no mesmo formato hoje
+  // ("YYYY-MM-DD HH:mm:ss.SSS", sem timezone — UTC implícito), mas trata os
+  // dois do mesmo jeito por segurança: sem "Z"/offset explícito, o
+  // `new Date(...)` do V8 interpreta como horário LOCAL, não UTC — o que
+  // desalinha a comparação se rodar num processo Node fora de UTC.
+  private parseUtcTimestamp(value: string): Date {
+    return new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}Z`);
+  }
+
+  private athenaCaughtUp(
+    athenaResult: { enriquecidoEm?: string | null } | null,
+    cachedEnriquecidoEm: unknown,
+  ): boolean {
+    if (!athenaResult?.enriquecidoEm || !cachedEnriquecidoEm) return false;
+
+    const athenaDate = this.parseUtcTimestamp(athenaResult.enriquecidoEm);
+    const cachedDate = this.parseUtcTimestamp(cachedEnriquecidoEm as string);
+
+    if (Number.isNaN(athenaDate.getTime()) || Number.isNaN(cachedDate.getTime())) {
+      return false;
+    }
+
+    return athenaDate.getTime() >= cachedDate.getTime();
+  }
+
+  private async queryAthena(numeroCnj: string, trt: string, anoProcesso: number) {
     // Queries separadas (em paralelo) em vez de um join único: partes,
     // movimentações e instâncias não têm relação entre si, então juntar
     // todas de uma vez geraria produto cartesiano entre elas.

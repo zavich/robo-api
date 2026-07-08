@@ -6,6 +6,7 @@ import { TriggerScrapingService } from './services/trigger-scraping.service';
 import { ParquetWriterService } from './services/parquet-writer.service';
 import { SaveWebhookToAthenaService } from './services/save-webhook-to-athena.service';
 import { SaveWebhookToComunicacaoSpotService } from './services/save-webhook-to-comunicacao-spot.service';
+import { CacheProcessoToRedisService } from './services/cache-processo-to-redis.service';
 
 @Module({
   controllers: [LawsuitsController],
@@ -16,11 +17,13 @@ import { SaveWebhookToComunicacaoSpotService } from './services/save-webhook-to-
     ParquetWriterService,
     SaveWebhookToAthenaService,
     SaveWebhookToComunicacaoSpotService,
+    CacheProcessoToRedisService,
   ],
   exports: [
     FindProcessoService,
     SaveWebhookToAthenaService,
     SaveWebhookToComunicacaoSpotService,
+    CacheProcessoToRedisService,
   ],
 })
 export class LawsuitsModule {}

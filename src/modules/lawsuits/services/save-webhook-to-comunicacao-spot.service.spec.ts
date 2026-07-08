@@ -233,7 +233,18 @@ describe('SaveWebhookToComunicacaoSpotService', () => {
       last_update_time: '2026-01-01 00:00:00',
       situacoes: [],
       partes: [],
-      movimentacoes: [{ id: 1, data: '01/01/2026', conteudo: 'Despacho' }],
+      movimentacoes: [
+        { id: 1, data: '01/01/2026', conteudo: 'Despacho' },
+        {
+          id: 2,
+          data: '02/01/2026',
+          conteudo: 'Despacho | Despacho',
+          pje_doc_id: 12345,
+          publico: false,
+          uniqueNameDocumento: 'abc123',
+          texto: 'conteúdo do documento',
+        },
+      ],
     };
 
     await service.execute(
@@ -255,9 +266,14 @@ describe('SaveWebhookToComunicacaoSpotService', () => {
     expect(instancia.documentos_restritos).toEqual([]);
     expect(instancia.documentos).toEqual([]);
 
-    const movimentacao = instancia.movimentacoes[0];
-    expect(movimentacao).toHaveProperty('pje_doc_id', null);
-    expect(movimentacao).toHaveProperty('texto', null);
+    const movimentacaoSemDocumento = instancia.movimentacoes[0];
+    expect(movimentacaoSemDocumento).toHaveProperty('pje_doc_id', null);
+    expect(movimentacaoSemDocumento).toHaveProperty('texto', null);
+    expect(movimentacaoSemDocumento).not.toHaveProperty('publico');
+
+    const movimentacaoComDocumento = instancia.movimentacoes[1];
+    expect(movimentacaoComDocumento.pje_doc_id).toBe(12345);
+    expect(movimentacaoComDocumento.publico).toBe(false);
   });
 
   it('normaliza opcoes.autos (formato de documentos restritos) pro padrão {documento: boolean}', async () => {

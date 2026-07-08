@@ -11,6 +11,10 @@ const makeSaveWebhookToComunicacaoSpotService = () => ({
   execute: jest.fn(),
 });
 
+const makeCacheProcessoToRedisService = () => ({
+  execute: jest.fn(),
+});
+
 const makeBody = (overrides: Record<string, unknown> = {}) =>
   ({
     numero_processo: '0000001-00.2024.5.03.0001',
@@ -38,6 +42,9 @@ describe('WebhookService', () => {
   let saveWebhookToComunicacaoSpotService: ReturnType<
     typeof makeSaveWebhookToComunicacaoSpotService
   >;
+  let cacheProcessoToRedisService: ReturnType<
+    typeof makeCacheProcessoToRedisService
+  >;
   let gateway: { processUpdated: jest.Mock };
 
   beforeEach(() => {
@@ -45,11 +52,14 @@ describe('WebhookService', () => {
     saveWebhookToComunicacaoSpotService =
       makeSaveWebhookToComunicacaoSpotService();
     saveWebhookToComunicacaoSpotService.execute.mockResolvedValue(undefined);
+    cacheProcessoToRedisService = makeCacheProcessoToRedisService();
+    cacheProcessoToRedisService.execute.mockResolvedValue(undefined);
     gateway = { processUpdated: jest.fn() };
 
     service = new WebhookService(
       redis as any,
       saveWebhookToComunicacaoSpotService as any,
+      cacheProcessoToRedisService as any,
       gateway as any,
     );
   });
@@ -107,6 +117,7 @@ describe('WebhookService', () => {
     expect(saveWebhookToComunicacaoSpotService.execute).toHaveBeenCalledWith(
       body,
     );
+    expect(cacheProcessoToRedisService.execute).toHaveBeenCalledWith(body);
     expect(gateway.processUpdated).toHaveBeenCalledWith(body.numero_processo);
     expect(redis.set).toHaveBeenLastCalledWith(
       'webhook:wh-123',

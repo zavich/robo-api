@@ -33,6 +33,12 @@ function normalizeMovimentacao(mov: Movimentacoes): Record<string, unknown> {
     normalized.uniqueNameDocumento = mov.uniqueNameDocumento;
   }
 
+  // Só existe pra itens que são documento (o scraper só calcula isso quando
+  // `item.documento` é true) — mesma regra do `uniqueNameDocumento`.
+  if (mov.publico != null) {
+    normalized.publico = mov.publico;
+  }
+
   return normalized;
 }
 

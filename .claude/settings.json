@@ -9,7 +9,13 @@
       "Bash(:)",
       "Bash(python3 -c ' *)",
       "Bash(node -e \"const s3 = require\\('@aws-sdk/client-s3'\\); console.log\\(typeof s3.NoSuchKey\\);\")",
-      "Bash(echo \"TSC EXIT:$?\")"
+      "Bash(echo \"TSC EXIT:$?\")",
+      "Bash(lsof -i :3001 -sTCP:LISTEN)",
+      "Bash(grep -rn \"tokenDesafio\\\\|imagem\" src/interfaces/)",
+      "Bash(grep -rln \"ProcessosResponse\" src/interfaces/)",
+      "Bash(grep -n 'pje\\\\.trt\\\\${regionTRT}\\\\|pje\\\\.\\\\${regionTRT}' /Users/rafaelnicacio/Desktop/robo/scraping-robo-api/src/modules/pje/services/fetch-url.service.ts)",
+      "Bash(grep -rln \"docsWithStatus\\\\|documents.uniqueName\\\\|documents\\\\.\\\\$\\\\.data\" --include=\"*.ts\" -r .)",
+      "Bash(git stash *)"
     ],
     "additionalDirectories": [
       "/Users/rafaelnicacio/Desktop/robo/scraping-robo-api/src/modules/pje",

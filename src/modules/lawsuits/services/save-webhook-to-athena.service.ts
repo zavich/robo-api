@@ -9,6 +9,8 @@ import {
 } from 'src/modules/process/interfaces/process.interface';
 import { parseCnj } from '../utils/cnj.util';
 import { decideWebhookPersist } from '../utils/webhook-persist.util';
+import { extractAssuntos, toNumberOrNull } from '../utils/assunto.util';
+import { toDateFromBrOrNull, toDateOrNull } from '../utils/date.util';
 import { ParquetWriterService } from './parquet-writer.service';
 
 // Schemas espelhando exatamente o `SHOW CREATE TABLE` das 4 tabelas no Glue
@@ -65,70 +67,6 @@ const MOVIMENTACOES_SCHEMA: SchemaDefinition = {
   texto: { type: 'UTF8', optional: true },
   unique_name_documento: { type: 'UTF8', optional: true },
 };
-
-function toDateOrNull(value: string | undefined | null): Date | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-// `Movimentacoes.data` chega formatado como DD/MM/YYYY (pt-BR) — `new Date(...)`
-// interpreta isso como MM/DD/YYYY e vira "Invalid Date" pra qualquer dia > 12,
-// perdendo a data silenciosamente. Faz o parse manual do formato brasileiro.
-const BR_DATE_PATTERN = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-
-function toDateFromBrOrNull(value: string | undefined | null): Date | null {
-  if (!value) return null;
-
-  const match = BR_DATE_PATTERN.exec(value.trim());
-  if (!match) {
-    return toDateOrNull(value);
-  }
-
-  const [, day, month, year] = match;
-  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function toNumberOrNull(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') return null;
-  const num = Number(value);
-  return Number.isNaN(num) ? null : num;
-}
-
-interface AssuntoRaw {
-  codigo?: string | number;
-  descricao?: string;
-  principal?: boolean;
-}
-
-// `Instancia.assunto` está tipado como `string`, mas o payload real do
-// webhook manda um array de `{codigo, descricao, principal}` (confirmado no
-// JSON cru do PJe) — passar isso direto pro campo UTF8 do Parquet quebrava a
-// escrita de `pje_instancias` inteira (Promise.all rejeitava e as outras 3
-// tabelas já tinham sido gravadas, mascarando o erro).
-function extractAssuntos(assunto: unknown): {
-  principal: string | null;
-  principalCodigo: number | null;
-  json: string | null;
-} {
-  if (typeof assunto === 'string') {
-    return { principal: assunto || null, principalCodigo: null, json: null };
-  }
-
-  if (!Array.isArray(assunto) || assunto.length === 0) {
-    return { principal: null, principalCodigo: null, json: null };
-  }
-
-  const lista = assunto as AssuntoRaw[];
-  const principal = lista.find((a) => a?.principal) ?? lista[0];
-
-  return {
-    principal: principal?.descricao ?? null,
-    principalCodigo: toNumberOrNull(principal?.codigo),
-    json: JSON.stringify(lista),
-  };
-}
 
 @Injectable()
 export class SaveWebhookToAthenaService {

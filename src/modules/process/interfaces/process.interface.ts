@@ -137,6 +137,9 @@ export interface Movimentacoes {
   // ele mesmo em normalizeResponse.ts antes de sair pela rede.
   uniqueNameDocumento?: string;
   pje_doc_id?: number | null;
+  // Só vem quando o item é um documento (pje_doc_id presente) — combina
+  // `publico` e `documentoSigiloso` do PJe, já calculado no scraper.
+  publico?: boolean;
   texto?: string;
 }
 
