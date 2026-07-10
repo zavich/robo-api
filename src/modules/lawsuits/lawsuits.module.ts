@@ -7,6 +7,8 @@ import { ParquetWriterService } from './services/parquet-writer.service';
 import { SaveWebhookToAthenaService } from './services/save-webhook-to-athena.service';
 import { SaveWebhookToComunicacaoSpotService } from './services/save-webhook-to-comunicacao-spot.service';
 import { CacheProcessoToRedisService } from './services/cache-processo-to-redis.service';
+import { SearchNewLawsuitService } from './services/search-new-lawsuit.service';
+import { InsertLawsuitPlaceholderService } from './services/insert-lawsuit-placeholder.service';
 
 @Module({
   controllers: [LawsuitsController],
@@ -18,6 +20,8 @@ import { CacheProcessoToRedisService } from './services/cache-processo-to-redis.
     SaveWebhookToAthenaService,
     SaveWebhookToComunicacaoSpotService,
     CacheProcessoToRedisService,
+    SearchNewLawsuitService,
+    InsertLawsuitPlaceholderService,
   ],
   exports: [
     FindProcessoService,

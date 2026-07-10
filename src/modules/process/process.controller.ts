@@ -50,7 +50,6 @@ import { FindOneDocumentService } from './services/documents/find-one.service';
 import { FindMovementInsightsService } from './services/documents/find-movement-insights.service';
 import { InsertExecutionService } from './services/insert-execution.service';
 import { FindProcessService } from './services/lawsuit/find-lawsuit';
-import { ListLawsuitService } from './services/lawsuit/list-lawsuit';
 import { MarkProcessAsReadService } from './services/mark-process-as-read.service';
 
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -130,7 +129,6 @@ export class ProcessController {
     private readonly findProcessService: FindProcessService,
     private readonly lawsuitValidationService: LawsuitValidationService,
     private readonly webhookPipedriveService: WebhookPipedriveService,
-    private readonly listLawsuitService: ListLawsuitService,
     private readonly runListLawsuitsValidationService: RunListLawsuitsValidationService,
     private readonly findInsightsService: FindInsightsService,
     private readonly deleteInsightsDocumentService: DeleteInsightsDocumentService,
@@ -210,27 +208,6 @@ export class ProcessController {
     try {
       const counters = await this.processCountersService.execute(query);
       return res.json(counters);
-    } catch (error) {
-      return res.status(500).json({
-        message: 'Erro interno do servidor',
-        error: error.message,
-      });
-    }
-  }
-
-  @Get('')
-  @ApiBearerAuth()
-  @UseGuards(ApiKeyAuthGuard)
-  @SkipThrottle()
-  async listProcess(
-    @Query() query: ListProcessFiltersDto,
-    @Res() res: Response,
-  ) {
-    try {
-      const user = res.req.user;
-
-      const result = await this.listLawsuitService.execute(query, user);
-      return res.json(result);
     } catch (error) {
       return res.status(500).json({
         message: 'Erro interno do servidor',

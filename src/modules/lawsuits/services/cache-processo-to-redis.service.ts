@@ -12,7 +12,7 @@ import { toDateFromBrOrNull } from '../utils/date.util';
 // TTL generoso — o Redis aqui funciona como cache de "última leitura
 // conhecida", não como fonte de verdade; expira sozinho se o processo
 // nunca mais receber webhook, em vez de crescer pra sempre.
-const CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
+export const CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 export function redisKeyForProcesso(numeroCnj: string): string {
   return `lawsuit:processo:${numeroCnj}`;
@@ -24,7 +24,7 @@ function toStringOrNull(value: unknown): string | null {
 
 // Formata igual ao TIMESTAMP do Athena quando serializado em resultado de
 // query: "YYYY-MM-DD HH:mm:ss.SSS", sem "T" nem "Z".
-function toAthenaTimestampString(date: Date): string {
+export function toAthenaTimestampString(date: Date): string {
   return date.toISOString().replace('T', ' ').replace('Z', '');
 }
 

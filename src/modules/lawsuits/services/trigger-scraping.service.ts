@@ -1,5 +1,11 @@
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Inject, Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
+import Redis from 'ioredis';
+import {
+  CACHE_TTL_SECONDS,
+  redisKeyForProcesso,
+  toAthenaTimestampString,
+} from './cache-processo-to-redis.service';
 
 // Dispara a extração no scraping-robo-api direto pelo número do processo, sem
 // nenhuma leitura/escrita no Mongo (Process/ProcessStatus) — o módulo lawsuits
@@ -9,11 +15,15 @@ import axios, { AxiosError } from 'axios';
 export class TriggerScrapingService {
   private readonly logger = new Logger(TriggerScrapingService.name);
 
-  async execute(numeroCnj: string) {
+  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
+
+  async execute(numeroCnj: string, options?: { documents?: boolean }) {
+    await this.markAsSincronizando(numeroCnj);
+
     try {
       await axios.post(
         `${process.env.SCRAPING_BASE_URL}/processos/${numeroCnj}`,
-        { documents: true, priority: true },
+        { documents: options?.documents ?? true, priority: true },
         {
           headers: {
             Authorization: `Bearer ${process.env.SCRAPING_API_KEY}`,
@@ -40,6 +50,44 @@ export class TriggerScrapingService {
       );
       throw new BadGatewayException(
         'Erro ao disparar extração no scraping-robo-api',
+      );
+    }
+  }
+
+  // Marca o processo como "SINCRONIZANDO" no cache do Redis antes mesmo de
+  // chamar o scraping-robo-api — só troca `statusColeta`/`enriquecidoEm`,
+  // preservando partes/movimentações/instâncias já cacheadas. Quem consome
+  // via `FindProcessoService` continua vendo o último dado bom, só com o
+  // status indicando que uma nova sincronização está em andamento, sem
+  // esperar o webhook real chegar. Se ainda não existir nada no cache
+  // (processo nunca teve webhook), não faz nada — não tem dado prévio pra
+  // preservar, e falha aqui nunca deve impedir o disparo da extração real.
+  private async markAsSincronizando(numeroCnj: string): Promise<void> {
+    try {
+      const key = redisKeyForProcesso(numeroCnj);
+      const raw = await this.redis.get(key);
+      if (!raw) {
+        return;
+      }
+
+      const cached = JSON.parse(raw) as Record<string, unknown>;
+      const updated = {
+        ...cached,
+        statusColeta: 'SINCRONIZANDO',
+        enriquecidoEm: toAthenaTimestampString(new Date()),
+      };
+
+      await this.redis.set(
+        key,
+        JSON.stringify(updated),
+        'EX',
+        CACHE_TTL_SECONDS,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao marcar ${numeroCnj} como SINCRONIZANDO no Redis, seguindo sem isso: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }

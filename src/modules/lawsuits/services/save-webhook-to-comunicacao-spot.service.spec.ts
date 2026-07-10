@@ -91,18 +91,93 @@ describe('SaveWebhookToComunicacaoSpotService', () => {
     s3Send.mockRestore();
   });
 
-  it('não faz nada no S3 quando o status é NAO_ENCONTRADO', async () => {
+  it('não sobrescreve quando o status é NAO_ENCONTRADO e já existe dado real (instâncias) anterior', async () => {
+    const existente = makeBody({
+      status: 'SUCESSO',
+      resposta: { instancias: [makeInstancia(1)] } as any,
+    });
+
+    s3Send.mockImplementation(async (command) => {
+      if (command instanceof GetObjectCommand) {
+        return { Body: bodyToStream(existente) };
+      }
+      throw new Error('não devia chamar PutObjectCommand aqui');
+    });
+
     await service.execute(makeBody({ status: 'NAO_ENCONTRADO' }));
 
-    expect(s3Send).not.toHaveBeenCalled();
+    expect(
+      s3Send.mock.calls.some(([command]) => command instanceof PutObjectCommand),
+    ).toBe(false);
   });
 
-  it('não faz nada no S3 quando o status é ERRO com motivo_erro preenchido', async () => {
+  it('não sobrescreve quando o status é ERRO com motivo_erro e já existe dado real anterior', async () => {
+    const existente = makeBody({
+      status: 'SUCESSO',
+      resposta: { instancias: [makeInstancia(1)] } as any,
+    });
+
+    s3Send.mockImplementation(async (command) => {
+      if (command instanceof GetObjectCommand) {
+        return { Body: bodyToStream(existente) };
+      }
+      throw new Error('não devia chamar PutObjectCommand aqui');
+    });
+
     await service.execute(
       makeBody({ status: 'ERRO', motivo_erro: 'SEM_DADOS_ORGAO_ZERO' }),
     );
 
-    expect(s3Send).not.toHaveBeenCalled();
+    expect(
+      s3Send.mock.calls.some(([command]) => command instanceof PutObjectCommand),
+    ).toBe(false);
+  });
+
+  it('atualiza o status pra NAO_ENCONTRADO quando só existe o marcador BUSCANDO (sem dado real) anterior', async () => {
+    const placeholder = makeBody({
+      status: 'BUSCANDO',
+      resposta: { instancias: [] } as any,
+    });
+
+    s3Send.mockImplementation(async (command) => {
+      if (command instanceof GetObjectCommand) {
+        return { Body: bodyToStream(placeholder) };
+      }
+      if (command instanceof PutObjectCommand) {
+        return {};
+      }
+      throw new Error('comando inesperado');
+    });
+
+    await service.execute(makeBody({ status: 'NAO_ENCONTRADO' }));
+
+    const putCommand = s3Send.mock.calls.find(
+      ([command]) => command instanceof PutObjectCommand,
+    )![0] as PutObjectCommand;
+    const savedBody = JSON.parse(putCommand.input.Body as string) as Root;
+
+    expect(savedBody.status).toBe('NAO_ENCONTRADO');
+  });
+
+  it('grava normalmente quando o status é NAO_ENCONTRADO e não existe nenhum arquivo prévio', async () => {
+    s3Send.mockImplementation(async (command) => {
+      if (command instanceof GetObjectCommand) {
+        throw new NoSuchKey({ message: 'not found', $metadata: {} });
+      }
+      if (command instanceof PutObjectCommand) {
+        return {};
+      }
+      throw new Error('comando inesperado');
+    });
+
+    await service.execute(makeBody({ status: 'NAO_ENCONTRADO' }));
+
+    const putCommand = s3Send.mock.calls.find(
+      ([command]) => command instanceof PutObjectCommand,
+    )![0] as PutObjectCommand;
+    const savedBody = JSON.parse(putCommand.input.Body as string) as Root;
+
+    expect(savedBody.status).toBe('NAO_ENCONTRADO');
   });
 
   it('cria o JSON quando não existe nenhum arquivo prévio', async () => {

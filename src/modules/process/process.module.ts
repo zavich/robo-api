@@ -58,7 +58,6 @@ import { FindInsightsService } from './services/documents/find-insights.service'
 import { FindOneDocumentService } from './services/documents/find-one.service';
 import { FindMovementInsightsService } from './services/documents/find-movement-insights.service';
 import { InsertExecutionService } from './services/insert-execution.service';
-import { ListLawsuitService } from './services/lawsuit/list-lawsuit';
 import { UpdateLawsuitService } from './services/lawsuit/update-lawsuit';
 import { LossReasonsService } from './services/loss-reasons-service';
 import { RemoveProvisionalLawsuitNumberService } from './services/remove-provisional-lawsuit-number.service';
@@ -146,7 +145,6 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     LawsuitValidationService,
     WebhookPipedriveService,
     PipedriveService,
-    ListLawsuitService,
     RunListLawsuitsValidationService,
     NextStepsService,
     ExtractDocumentsInfoService,

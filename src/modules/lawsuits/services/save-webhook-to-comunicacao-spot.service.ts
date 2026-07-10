@@ -11,8 +11,8 @@ import {
   Movimentacoes,
   Root,
 } from 'src/modules/process/interfaces/process.interface';
-import { parseCnj } from '../utils/cnj.util';
-import { decideWebhookPersist } from '../utils/webhook-persist.util';
+import { decideComunicacaoSpotPersist } from '../utils/webhook-persist.util';
+import { resolveComunicacaoSpotObject } from '../utils/comunicacao-spot-object.util';
 
 // O payload que o webhook manda é mais enxuto que o JSON que o coletor Python
 // (communication-ingestor-juri) grava em comunicacao-spot — faltam campos
@@ -152,7 +152,25 @@ export class SaveWebhookToComunicacaoSpotService {
   }
 
   async execute(body: Root): Promise<void> {
-    const decision = decideWebhookPersist(body);
+    const ref = resolveComunicacaoSpotObject(this.location, body.numero_processo);
+    if (!ref) {
+      this.logger.warn(
+        `Número de processo inválido no webhook: ${body.numero_processo}`,
+      );
+      return;
+    }
+
+    const { bucket, key } = ref;
+
+    // Busca o que já existe ANTES de decidir se grava — um NAO_ENCONTRADO/
+    // ERRO só é bloqueado quando já existe dado real ali (ex.: um resultado
+    // SUCESSO anterior). Se o que existe é só o marcador "BUSCANDO" (sem
+    // instâncias) ou nada, esse resultado É a informação nova de verdade e
+    // deve atualizar o status — senão o arquivo fica preso em "BUSCANDO"
+    // pra sempre mesmo com a busca real já tendo terminado.
+    const oldBody = await this.fetchExisting(bucket, key);
+
+    const decision = decideComunicacaoSpotPersist(body, oldBody);
     if (!decision.persist) {
       this.logger.log(
         `Processo ${body.numero_processo} retornou ${decision.reason} — nada será atualizado em comunicacao-spot.`,
@@ -160,18 +178,6 @@ export class SaveWebhookToComunicacaoSpotService {
       return;
     }
 
-    const parsed = parseCnj(body.numero_processo);
-    if (!parsed) {
-      this.logger.warn(
-        `Número de processo inválido no webhook: ${body.numero_processo}`,
-      );
-      return;
-    }
-
-    const bucket = this.bucketName();
-    const key = this.objectKey(body.numero_processo, parsed.trt, parsed.anoProcesso);
-
-    const oldBody = await this.fetchExisting(bucket, key);
     const merged = mergeInstancias(oldBody, body);
 
     await this.s3Client.send(
@@ -212,24 +218,5 @@ export class SaveWebhookToComunicacaoSpotService {
       );
       return null;
     }
-  }
-
-  private bucketName(): string {
-    return this.location.replace('s3://', '').split('/')[0];
-  }
-
-  // O CNJ tribunal "00" (Justiça do Trabalho -> TST) tem pasta própria
-  // "TST", separada de "TRT90" (CSJT) — confirmado direto no S3, já que
-  // `parseCnj` (usado pro particionamento do Parquet) não distingue os dois.
-  private objectKey(numeroCnj: string, trt: string, anoProcesso: number): string {
-    const prefixWithoutBucket = this.location
-      .replace('s3://', '')
-      .split('/')
-      .slice(1)
-      .join('/');
-    const pasta = trt === 'TRT0' ? 'TST' : trt;
-    const cnjSemPontuacao = numeroCnj.replace(/\D/g, '');
-
-    return `${prefixWithoutBucket}/${pasta}/${anoProcesso}/${cnjSemPontuacao}.json`;
   }
 }
