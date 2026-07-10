@@ -95,26 +95,48 @@ export class AthenaQueryService {
   }
 
   private async fetchResults<T>(queryExecutionId: string): Promise<T[]> {
-    const { ResultSet } = await this.client.send(
-      new GetQueryResultsCommand({ QueryExecutionId: queryExecutionId }),
-    );
+    let columns: string[] | null = null;
+    const records: T[] = [];
+    let nextToken: string | undefined;
 
-    const rows = ResultSet?.Rows || [];
-    if (rows.length === 0) {
-      return [];
-    }
+    do {
+      const { ResultSet, NextToken } = await this.client.send(
+        new GetQueryResultsCommand({
+          QueryExecutionId: queryExecutionId,
+          NextToken: nextToken,
+        }),
+      );
 
-    // A primeira linha do resultado do Athena é sempre o cabeçalho com os
-    // nomes das colunas, não um registro de dados.
-    const [headerRow, ...dataRows] = rows;
-    const columns = (headerRow.Data || []).map((col) => col.VarCharValue || '');
+      const rows = ResultSet?.Rows || [];
+      // Só a PRIMEIRA página vem com o cabeçalho (nomes das colunas) como
+      // primeira linha — páginas seguintes (via NextToken) já vêm só com
+      // linhas de dados. Sem tratar isso, paginar sem essa distinção faria
+      // a primeira linha de cada página extra ser tratada como cabeçalho
+      // novo em vez de um registro de dados.
+      let dataRows = rows;
+      if (columns === null) {
+        if (rows.length === 0) {
+          columns = [];
+        } else {
+          const [headerRow, ...rest] = rows;
+          columns = (headerRow.Data || []).map(
+            (col) => col.VarCharValue || '',
+          );
+          dataRows = rest;
+        }
+      }
 
-    return dataRows.map((row) => {
-      const record: Record<string, string | null> = {};
-      (row.Data || []).forEach((cell, index) => {
-        record[columns[index]] = cell.VarCharValue ?? null;
-      });
-      return record as T;
-    });
+      for (const row of dataRows) {
+        const record: Record<string, string | null> = {};
+        (row.Data || []).forEach((cell, index) => {
+          record[columns[index]] = cell.VarCharValue ?? null;
+        });
+        records.push(record as T);
+      }
+
+      nextToken = NextToken;
+    } while (nextToken);
+
+    return records;
   }
 }

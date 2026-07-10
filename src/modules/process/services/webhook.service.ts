@@ -55,12 +55,6 @@ export class WebhookService implements OnModuleInit {
     this.logger.log(
       `Recebendo webhook de ${body.numero_processo} (correlationId=${correlationId ?? 'n/a'})`,
     );
-    const interruped = false;
-    if (interruped) {
-      console.log(body.resposta.instancias[0].movimentacoes);
-
-      return;
-    }
     const idempotencyKey = this.buildIdempotencyKey(body);
     const acquisition = await this.acquireIdempotencyLock(idempotencyKey);
 
@@ -90,8 +84,10 @@ export class WebhookService implements OnModuleInit {
 
       await this.redis.set(idempotencyKey, 'DONE', 'EX', 60 * 60 * 24);
       this.gateway.processUpdated(body.numero_processo);
-    } catch (error) {
-      this.logger.error(`Erro ao processar a requisição: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Erro ao processar a requisição: ${error instanceof Error ? error.message : String(error)}`,
+      );
       await this.redis
         .set(idempotencyKey, 'FAILED', 'EX', 60 * 60)
         .catch(() => undefined);

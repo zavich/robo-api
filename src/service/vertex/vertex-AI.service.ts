@@ -70,6 +70,12 @@ export class VertexAIService {
         throw error;
       }
     }
+
+    // Só chega aqui se `retries` < 1 — o for não executa nenhuma iteração,
+    // e sem isso o método retornava undefined apesar do tipo de retorno.
+    throw new Error(
+      `executeWithRetry chamado com retries=${retries}, nenhuma tentativa foi executada`,
+    );
   }
 
   private getGenerativeModel() {
@@ -80,7 +86,7 @@ export class VertexAIService {
         credentials: {
           client_email: process.env.GOOGLE_CLIENT_EMAIL,
           client_id: process.env.GOOGLE_CLIENT_ID,
-          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
         },
       },
     });
@@ -130,6 +136,12 @@ export class VertexAIService {
         throw error;
       }
     }
+
+    // Só chega aqui se `retries` < 1 — o for não executa nenhuma iteração,
+    // e sem isso o método retornava undefined apesar do tipo de retorno.
+    throw new Error(
+      `executeTextWithRetry chamado com retries=${retries}, nenhuma tentativa foi executada`,
+    );
   }
 
   async executeText(
