@@ -74,6 +74,34 @@
           "name": "DATABASE_URL",
           "valueFrom": "<SECRET_ARN_PREFIX>:DATABASE_URL::"
         },
+        {
+          "name": "ATHENA_DATABASE",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_DATABASE::"
+        },
+        {
+          "name": "ATHENA_ACCESS_KEY_ID",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_ACCESS_KEY_ID::"
+        },
+        {
+          "name": "ATHENA_SECRET_ACCESS_KEY",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_SECRET_ACCESS_KEY::"
+        },
+        {
+          "name": "ATHENA_REGION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_REGION::"
+        },
+        {
+          "name": "ATHENA_OUTPUT_LOCATION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:ATHENA_OUTPUT_LOCATION::"
+        },
+        {
+          "name": "LAWSUIT_DATA_LOCATION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:LAWSUIT_DATA_LOCATION::"
+        },
+        {
+          "name": "COMUNICACAO_SPOT_LOCATION",
+          "valueFrom": "<SECRET_ARN_PREFIX>:COMUNICACAO_SPOT_LOCATION::"
+        },
         { "name": "REDIS_URL", "valueFrom": "<SECRET_ARN_PREFIX>:REDIS_URL::" },
         {
           "name": "AWS_S3_REGION",

@@ -14,6 +14,7 @@ import { PermissionsGuard } from './modules/authentication/guards/permissions.gu
 import { DatabaseModule } from './database/database.module';
 import { AuthenticationModule } from './modules/authentication/authentication.module';
 import { CompanyModule } from './modules/company/company.module';
+import { LawsuitsModule } from './modules/lawsuits/lawsuits.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { ObservationModule } from './modules/observation/observation.module';
 import { PipedriveModule } from './modules/pipedrive/pipedrive.module';
@@ -63,6 +64,7 @@ import { RedisHealthService } from './service/redis-health.service';
     ReasonLossModule,
     NotificationModule,
     UserModule,
+    LawsuitsModule,
   ],
   controllers: [AppController],
   providers: [

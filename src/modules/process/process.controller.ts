@@ -47,9 +47,9 @@ import { CreateProcessService } from './services/create-process.service';
 import { DeleteInsightsDocumentService } from './services/documents/delete-insights.service';
 import { FindInsightsService } from './services/documents/find-insights.service';
 import { FindOneDocumentService } from './services/documents/find-one.service';
+import { FindMovementInsightsService } from './services/documents/find-movement-insights.service';
 import { InsertExecutionService } from './services/insert-execution.service';
 import { FindProcessService } from './services/lawsuit/find-lawsuit';
-import { ListLawsuitService } from './services/lawsuit/list-lawsuit';
 import { MarkProcessAsReadService } from './services/mark-process-as-read.service';
 
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -84,6 +84,10 @@ import {
   RunDocumentsInsightsSchemaBody,
   runDocumentsInsightsSchemaPipe,
 } from './dtos/run-documents-insights.dto';
+import {
+  RunMovementInsightsSchemaBody,
+  runMovementInsightsSchemaPipe,
+} from './dtos/run-movement-insights.dto';
 import {
   RunLawsuitsSchemaBody,
   runLawsuitsSchemaPipe,
@@ -125,11 +129,11 @@ export class ProcessController {
     private readonly findProcessService: FindProcessService,
     private readonly lawsuitValidationService: LawsuitValidationService,
     private readonly webhookPipedriveService: WebhookPipedriveService,
-    private readonly listLawsuitService: ListLawsuitService,
     private readonly runListLawsuitsValidationService: RunListLawsuitsValidationService,
     private readonly findInsightsService: FindInsightsService,
     private readonly deleteInsightsDocumentService: DeleteInsightsDocumentService,
     private readonly findOneDocumentService: FindOneDocumentService,
+    private readonly findMovementInsightsService: FindMovementInsightsService,
     private readonly lossReasonsService: LossReasonsService,
     private readonly insertExecutionService: InsertExecutionService,
     private readonly changeStageService: ChangeStageService,
@@ -204,27 +208,6 @@ export class ProcessController {
     try {
       const counters = await this.processCountersService.execute(query);
       return res.json(counters);
-    } catch (error) {
-      return res.status(500).json({
-        message: 'Erro interno do servidor',
-        error: error.message,
-      });
-    }
-  }
-
-  @Get('')
-  @ApiBearerAuth()
-  @UseGuards(ApiKeyAuthGuard)
-  @SkipThrottle()
-  async listProcess(
-    @Query() query: ListProcessFiltersDto,
-    @Res() res: Response,
-  ) {
-    try {
-      const user = res.req.user;
-
-      const result = await this.listLawsuitService.execute(query, user);
-      return res.json(result);
     } catch (error) {
       return res.status(500).json({
         message: 'Erro interno do servidor',
@@ -393,6 +376,23 @@ export class ProcessController {
         body.prompt,
       );
       return { message: 'Processamento iniciado' };
+    } catch (error) {
+      throw error;
+    }
+  }
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
+  @CheckPermissions('process_insertion')
+  @Post('run-movement-insights')
+  async runMovementInsights(
+    @Body(runMovementInsightsSchemaPipe)
+    body: RunMovementInsightsSchemaBody,
+  ) {
+    try {
+      return await this.findMovementInsightsService.execute(
+        body.texto,
+        body.prompt,
+      );
     } catch (error) {
       throw error;
     }

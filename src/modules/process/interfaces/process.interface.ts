@@ -77,7 +77,11 @@ export interface Instancia {
   segredo: boolean;
   numero: string | number | null;
   numeros_alternativos: (string | number)[];
-  assunto: string;
+  // O scraper manda um array de `{codigo, descricao, principal}` aqui, não
+  // uma string — confirmado no payload real do webhook.
+  assunto:
+    | string
+    | { codigo?: string | number; descricao?: string; principal?: boolean }[];
   classe: string;
   area: string;
   data_distribuicao: string;
@@ -128,7 +132,15 @@ export interface Movimentacoes {
   id: number;
   data: string;
   conteudo: string;
-  idUnicoDocumento?: string;
+  // Campo real do payload é `uniqueNameDocumento` (confirmado no JSON cru do
+  // webhook) — `idUnicoDocumento` é o nome interno no scraper, renomeado por
+  // ele mesmo em normalizeResponse.ts antes de sair pela rede.
+  uniqueNameDocumento?: string;
+  pje_doc_id?: number | null;
+  // Só vem quando o item é um documento (pje_doc_id presente) — combina
+  // `publico` e `documentoSigiloso` do PJe, já calculado no scraper.
+  publico?: boolean;
+  texto?: string;
 }
 
 export interface Audiencia {

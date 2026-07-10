@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { LawsuitsModule } from 'src/modules/lawsuits/lawsuits.module';
 import { AwsAppModule } from 'src/service/aws/aws.module';
 import { BrapiService } from 'src/service/brapi/brapi.service';
 import { NextStepsModule } from 'src/service/next-steps/next-steps.module';
@@ -55,8 +56,8 @@ import { ProcessCountersService } from './services/counters/process-counters.ser
 import { DeleteInsightsDocumentService } from './services/documents/delete-insights.service';
 import { FindInsightsService } from './services/documents/find-insights.service';
 import { FindOneDocumentService } from './services/documents/find-one.service';
+import { FindMovementInsightsService } from './services/documents/find-movement-insights.service';
 import { InsertExecutionService } from './services/insert-execution.service';
-import { ListLawsuitService } from './services/lawsuit/list-lawsuit';
 import { UpdateLawsuitService } from './services/lawsuit/update-lawsuit';
 import { LossReasonsService } from './services/loss-reasons-service';
 import { RemoveProvisionalLawsuitNumberService } from './services/remove-provisional-lawsuit-number.service';
@@ -64,10 +65,6 @@ import { RunListLawsuitsValidationService } from './services/run-list-lawsuits-v
 import { SavedMovementsService } from './services/saved-movements.service';
 import { MetricsService } from './services/metrics.service';
 import { UploadXLSXService } from './services/upload-xlsx.service';
-import { WebhookNaoEncontradoHandler } from './services/handlers/webhook-nao-encontrado.handler';
-import { WebhookErroHandler } from './services/handlers/webhook-erro.handler';
-import { WebhookTstHandler } from './services/handlers/webhook-tst.handler';
-import { WebhookTrtHandler } from './services/handlers/webhook-trt.handler';
 import { InsertProcessWorker } from './queues/workers/insert-process.worker';
 import { ProcessValidationWorker } from './queues/workers/process-validation.worker';
 import { SolvencyValidationWorker } from './queues/workers/solvency-validation.worker';
@@ -133,6 +130,7 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     NextStepsModule,
     ScheduleModule.forRoot(),
     NotificationModule,
+    LawsuitsModule,
   ],
   controllers: [ProcessController],
   providers: [
@@ -147,13 +145,13 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     LawsuitValidationService,
     WebhookPipedriveService,
     PipedriveService,
-    ListLawsuitService,
     RunListLawsuitsValidationService,
     NextStepsService,
     ExtractDocumentsInfoService,
     FindInsightsService,
     DeleteInsightsDocumentService,
     FindOneDocumentService,
+    FindMovementInsightsService,
     MarkProcessAsReadService,
     LossReasonsService,
     InsertExecutionService,
@@ -171,10 +169,6 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     UpdateActivityNotesService,
     MetricsService,
     UploadXLSXService,
-    WebhookNaoEncontradoHandler,
-    WebhookErroHandler,
-    WebhookTstHandler,
-    WebhookTrtHandler,
     ServiceWebhookGuard,
     ProcessStateMachineService,
     InsertProcessWorker,
