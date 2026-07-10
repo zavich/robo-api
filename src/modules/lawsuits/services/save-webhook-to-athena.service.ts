@@ -90,7 +90,9 @@ export class SaveWebhookToAthenaService {
         : {}),
     });
 
-    this.dataLocation = this.configService.get<string>('LAWSUIT_DATA_LOCATION');
+    this.dataLocation = this.configService.getOrThrow<string>(
+      'LAWSUIT_DATA_LOCATION',
+    );
   }
 
   async execute(body: Root): Promise<void> {

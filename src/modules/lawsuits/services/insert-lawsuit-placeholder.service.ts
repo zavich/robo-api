@@ -45,7 +45,7 @@ export class InsertLawsuitPlaceholderService {
         : {}),
     });
 
-    this.location = this.configService.get<string>(
+    this.location = this.configService.getOrThrow<string>(
       'COMUNICACAO_SPOT_LOCATION',
     );
   }

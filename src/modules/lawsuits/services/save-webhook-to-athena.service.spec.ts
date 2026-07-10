@@ -43,11 +43,13 @@ describe('SaveWebhookToAthenaService', () => {
       .mockResolvedValue({} as never);
 
     parquetWriter = { writeRows: jest.fn().mockResolvedValue(Buffer.from('')) };
+    const get = (key: string) =>
+      key === 'LAWSUIT_DATA_LOCATION'
+        ? 's3://main-prd-lawsuit-frame/pje-enriquecimento/v1'
+        : undefined;
     const configService = {
-      get: (key: string) =>
-        key === 'LAWSUIT_DATA_LOCATION'
-          ? 's3://main-prd-lawsuit-frame/pje-enriquecimento/v1'
-          : undefined,
+      get,
+      getOrThrow: get,
     } as unknown as ConfigService;
 
     service = new SaveWebhookToAthenaService(

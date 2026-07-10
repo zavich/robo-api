@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpException,
+  Param,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
@@ -29,10 +37,21 @@ export class LawsuitsController {
       }
 
       return res.json(processo);
-    } catch (error) {
+    } catch (error: unknown) {
+      // Preserva o status/response de exceptions do Nest (ex.:
+      // BadRequestException/NotFoundException lançadas pelo service) — sem
+      // isso, todo erro virava 500 e mascarava o motivo real pro cliente.
+      if (error instanceof HttpException) {
+        const status = error.getStatus();
+        const response = error.getResponse();
+        return res
+          .status(status)
+          .json(typeof response === 'string' ? { message: response } : response);
+      }
+
       return res.status(500).json({
         message: 'Erro interno do servidor',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }

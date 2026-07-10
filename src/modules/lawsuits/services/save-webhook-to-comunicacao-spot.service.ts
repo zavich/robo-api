@@ -146,7 +146,7 @@ export class SaveWebhookToComunicacaoSpotService {
         : {}),
     });
 
-    this.location = this.configService.get<string>(
+    this.location = this.configService.getOrThrow<string>(
       'COMUNICACAO_SPOT_LOCATION',
     );
   }

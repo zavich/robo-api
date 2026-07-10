@@ -13,17 +13,19 @@ describe('InsertLawsuitPlaceholderService', () => {
     s3Send = jest.spyOn(S3Client.prototype, 'send');
     s3Send.mockReset();
 
+    const get = (key: string) => {
+      const values: Record<string, string> = {
+        ATHENA_ACCESS_KEY_ID: 'key',
+        ATHENA_SECRET_ACCESS_KEY: 'secret',
+        ATHENA_REGION: 'sa-east-1',
+        COMUNICACAO_SPOT_LOCATION:
+          's3://main-prd-lawsuit-frame/comunicacao-spot',
+      };
+      return values[key];
+    };
     const configService = {
-      get: (key: string) => {
-        const values: Record<string, string> = {
-          ATHENA_ACCESS_KEY_ID: 'key',
-          ATHENA_SECRET_ACCESS_KEY: 'secret',
-          ATHENA_REGION: 'sa-east-1',
-          COMUNICACAO_SPOT_LOCATION:
-            's3://main-prd-lawsuit-frame/comunicacao-spot',
-        };
-        return values[key];
-      },
+      get,
+      getOrThrow: get,
     } as unknown as ConfigService;
 
     cacheProcessoToRedisService = { execute: jest.fn() };

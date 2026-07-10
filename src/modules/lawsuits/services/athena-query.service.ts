@@ -34,8 +34,8 @@ export class AthenaQueryService {
         ? { credentials: { accessKeyId, secretAccessKey } }
         : {}),
     });
-    this.database = this.configService.get<string>('ATHENA_DATABASE');
-    this.outputLocation = this.configService.get<string>(
+    this.database = this.configService.getOrThrow<string>('ATHENA_DATABASE');
+    this.outputLocation = this.configService.getOrThrow<string>(
       'ATHENA_OUTPUT_LOCATION',
     );
   }

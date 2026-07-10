@@ -77,11 +77,13 @@ describe('SaveWebhookToComunicacaoSpotService', () => {
 
   beforeEach(() => {
     s3Send = jest.spyOn(S3Client.prototype, 'send');
+    const get = (key: string) =>
+      key === 'COMUNICACAO_SPOT_LOCATION'
+        ? 's3://main-prd-lawsuit-frame/comunicacao-spot'
+        : undefined;
     const configService = {
-      get: (key: string) =>
-        key === 'COMUNICACAO_SPOT_LOCATION'
-          ? 's3://main-prd-lawsuit-frame/comunicacao-spot'
-          : undefined,
+      get,
+      getOrThrow: get,
     } as unknown as ConfigService;
 
     service = new SaveWebhookToComunicacaoSpotService(configService);
