@@ -122,9 +122,14 @@ export class CacheProcessoToRedisService {
   async execute(body: Root): Promise<void> {
     const decision = decideWebhookPersist(body);
     if (!decision.persist) {
-      this.logger.log(
-        `Processo ${body.numero_processo} retornou ${decision.reason} — cache no Redis não será atualizado.`,
-      );
+      // NAO_ENCONTRADO/ERRO sem dado novo de verdade — não sobrescreve
+      // partes/movimentações/instâncias já cacheadas com uma resposta vazia,
+      // mas ainda atualiza statusColeta/motivoErro. Sem isso, um processo
+      // marcado SINCRONIZANDO (por `TriggerScrapingService`) que falha de
+      // verdade na tentativa de sincronizar fica travado nesse status pra
+      // sempre no cache — o front nunca sai do "Sincronizando" nem mostra o
+      // erro real, mesmo a extração já tendo terminado (com falha).
+      await this.applyStatusOnlyUpdate(body, decision.reason);
       return;
     }
 
@@ -147,5 +152,46 @@ export class CacheProcessoToRedisService {
     );
 
     this.logger.log(`Cache atualizado no Redis: ${key}`);
+  }
+
+  private async applyStatusOnlyUpdate(
+    body: Root,
+    reason?: string,
+  ): Promise<void> {
+    const key = redisKeyForProcesso(body.numero_processo);
+    const raw = await this.redis.get(key);
+
+    if (!raw) {
+      this.logger.log(
+        `Processo ${body.numero_processo} retornou ${reason} — sem cache prévio no Redis, nada a atualizar.`,
+      );
+      return;
+    }
+
+    try {
+      const cached = JSON.parse(raw) as Record<string, unknown>;
+      const updated = {
+        ...cached,
+        statusColeta: body.status ?? null,
+        motivoErro: body.motivo_erro != null ? String(body.motivo_erro) : null,
+        enriquecidoEm: toAthenaTimestampString(new Date()),
+      };
+
+      await this.redis.set(
+        key,
+        JSON.stringify(updated),
+        'EX',
+        CACHE_TTL_SECONDS,
+      );
+      this.logger.log(
+        `Processo ${body.numero_processo} retornou ${reason} — status atualizado no Redis, mantendo dado anterior.`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao atualizar status no cache Redis para ${body.numero_processo}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 }

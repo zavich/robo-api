@@ -31,26 +31,78 @@ const makeBody = (overrides: Partial<Root> = {}): Root =>
   }) as Root;
 
 describe('CacheProcessoToRedisService', () => {
-  let redis: { set: jest.Mock };
+  let redis: { get: jest.Mock; set: jest.Mock };
   let service: CacheProcessoToRedisService;
 
   beforeEach(() => {
-    redis = { set: jest.fn().mockResolvedValue('OK') };
+    redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue('OK') };
     service = new CacheProcessoToRedisService(redis as any);
   });
 
-  it('não grava no Redis quando o status é NAO_ENCONTRADO', async () => {
+  it('não grava no Redis quando o status é NAO_ENCONTRADO e não há cache prévio', async () => {
     await service.execute(makeBody({ status: 'NAO_ENCONTRADO' }));
 
     expect(redis.set).not.toHaveBeenCalled();
   });
 
-  it('não grava no Redis quando o status é ERRO com motivo_erro preenchido', async () => {
+  it('não grava no Redis quando o status é ERRO com motivo_erro preenchido e não há cache prévio', async () => {
     await service.execute(
       makeBody({ status: 'ERRO', motivo_erro: 'SEM_DADOS_ORGAO_ZERO' }),
     );
 
     expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  it('atualiza só o status no Redis (preservando partes/movimentações/instâncias) quando ERRO chega com cache prévio real', async () => {
+    // Reproduz o bug: processo já tinha SUCESSO cacheado (provavelmente
+    // marcado SINCRONIZANDO por TriggerScrapingService antes desse retry), e
+    // essa tentativa de sincronizar falhou de verdade. Sem esse tratamento,
+    // o cache ficava travado em SINCRONIZANDO pra sempre.
+    redis.get.mockResolvedValue(
+      JSON.stringify({
+        cnjNumber: '1000580-10.2023.5.02.0492',
+        statusColeta: 'SINCRONIZANDO',
+        enriquecidoEm: '2026-01-01 00:00:00.000',
+        partes: [{ nome: 'Fulano' }],
+        movimentacoes: [{ id: '1' }],
+        instancias: [{ instanciaId: '1' }],
+      }),
+    );
+
+    await service.execute(
+      makeBody({ status: 'ERRO', motivo_erro: 'SEM_DADOS_ORGAO_ZERO' }),
+    );
+
+    expect(redis.set).toHaveBeenCalledTimes(1);
+    const [, payload] = redis.set.mock.calls[0];
+    const saved = JSON.parse(payload);
+
+    expect(saved.statusColeta).toBe('ERRO');
+    expect(saved.motivoErro).toBe('SEM_DADOS_ORGAO_ZERO');
+    expect(saved.partes).toEqual([{ nome: 'Fulano' }]);
+    expect(saved.movimentacoes).toEqual([{ id: '1' }]);
+    expect(saved.instancias).toEqual([{ instanciaId: '1' }]);
+    expect(saved.enriquecidoEm).not.toBe('2026-01-01 00:00:00.000');
+  });
+
+  it('atualiza só o status no Redis quando NAO_ENCONTRADO chega com cache prévio real', async () => {
+    redis.get.mockResolvedValue(
+      JSON.stringify({
+        cnjNumber: '1000580-10.2023.5.02.0492',
+        statusColeta: 'SINCRONIZANDO',
+        enriquecidoEm: '2026-01-01 00:00:00.000',
+        partes: [{ nome: 'Fulano' }],
+      }),
+    );
+
+    await service.execute(makeBody({ status: 'NAO_ENCONTRADO' }));
+
+    expect(redis.set).toHaveBeenCalledTimes(1);
+    const [, payload] = redis.set.mock.calls[0];
+    const saved = JSON.parse(payload);
+
+    expect(saved.statusColeta).toBe('NAO_ENCONTRADO');
+    expect(saved.partes).toEqual([{ nome: 'Fulano' }]);
   });
 
   it('grava no Redis com a mesma forma de resposta do FindProcessoService', async () => {
