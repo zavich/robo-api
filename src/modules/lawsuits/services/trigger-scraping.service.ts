@@ -6,6 +6,7 @@ import {
   redisKeyForProcesso,
   toAthenaTimestampString,
 } from './cache-processo-to-redis.service';
+import { FindProcessoService } from './find-processo.service';
 
 // Dispara a extração no scraping-robo-api direto pelo número do processo, sem
 // nenhuma leitura/escrita no Mongo (Process/ProcessStatus) — o módulo lawsuits
@@ -15,7 +16,10 @@ import {
 export class TriggerScrapingService {
   private readonly logger = new Logger(TriggerScrapingService.name);
 
-  constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
+  constructor(
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    private readonly findProcessoService: FindProcessoService,
+  ) {}
 
   async execute(numeroCnj: string, options?: { documents?: boolean }) {
     await this.markAsSincronizando(numeroCnj);
@@ -59,20 +63,28 @@ export class TriggerScrapingService {
   // preservando partes/movimentações/instâncias já cacheadas. Quem consome
   // via `FindProcessoService` continua vendo o último dado bom, só com o
   // status indicando que uma nova sincronização está em andamento, sem
-  // esperar o webhook real chegar. Se ainda não existir nada no cache
-  // (processo nunca teve webhook), não faz nada — não tem dado prévio pra
-  // preservar, e falha aqui nunca deve impedir o disparo da extração real.
+  // esperar o webhook real chegar.
+  //
+  // Usa `FindProcessoService.execute()` (Redis, com fallback pro Athena) em
+  // vez de ler só o Redis direto — sem isso, todo processo cujo cache no
+  // Redis já tinha expirado (ou nunca existiu, ou foi limpo pelo próprio
+  // `FindProcessoService` quando o Athena "alcançou" o cache — ver
+  // `athenaCaughtUp`) nunca tinha SINCRONIZANDO marcado em lugar nenhum: o
+  // front consultava e só via o último status concluído (SUCESSO/ERRO),
+  // sem nenhum indício visual de que uma nova sincronização estava rodando.
+  // Se nem Redis nem Athena têm nada pra esse CNJ ainda, não faz nada — não
+  // tem dado prévio pra preservar, e falha aqui nunca deve impedir o
+  // disparo da extração real.
   private async markAsSincronizando(numeroCnj: string): Promise<void> {
     try {
-      const key = redisKeyForProcesso(numeroCnj);
-      const raw = await this.redis.get(key);
-      if (!raw) {
+      const current = await this.findProcessoService.execute(numeroCnj);
+      if (!current) {
         return;
       }
 
-      const cached = JSON.parse(raw) as Record<string, unknown>;
+      const key = redisKeyForProcesso(numeroCnj);
       const updated = {
-        ...cached,
+        ...current,
         statusColeta: 'SINCRONIZANDO',
         enriquecidoEm: toAthenaTimestampString(new Date()),
       };
