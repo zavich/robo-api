@@ -10,8 +10,10 @@ import { ConfigService } from '@nestjs/config';
 
 const POLL_INTERVAL_MS = 1000;
 // Sem partição por cnj_number, a query faz table scan completo — pode levar
-// bem mais que alguns segundos dependendo do tamanho da tabela.
-const MAX_POLL_ATTEMPTS = 60;
+// bem mais que alguns segundos dependendo do tamanho da tabela. 60 tentativas
+// (~60s) gerava falso timeout em queries mais pesadas ou com o Athena
+// enfileirado; 300 tentativas dá ~5 minutos de espera antes de desistir.
+const MAX_POLL_ATTEMPTS = 300;
 
 @Injectable()
 export class AthenaQueryService {

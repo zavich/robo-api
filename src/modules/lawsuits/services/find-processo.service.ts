@@ -115,7 +115,13 @@ export class FindProcessoService {
   // `new Date(...)` do V8 interpreta como horário LOCAL, não UTC — o que
   // desalinha a comparação se rodar num processo Node fora de UTC.
   private parseUtcTimestamp(value: string): Date {
-    return new Date(value.includes('T') ? value : `${value.replace(' ', 'T')}Z`);
+    // Só pula o "Z" se o valor já trouxer timezone explícito (Z ou +HH:mm/
+    // -HH:mm) — um valor com "T" mas sem timezone (ex.: vindo de outra
+    // fonte que já usa formato ISO, só sem offset) ainda era passado direto
+    // pro `new Date(...)`, que o V8 interpreta como horário LOCAL, não UTC.
+    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
+    const hasTimezone = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(isoLike);
+    return new Date(hasTimezone ? isoLike : `${isoLike}Z`);
   }
 
   private athenaCaughtUp(
