@@ -1,8 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  NoSuchKey,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { InsertLawsuitPlaceholderService } from './insert-lawsuit-placeholder.service';
 import { CacheProcessoToRedisService } from './cache-processo-to-redis.service';
+import { FetchComunicacaoSpotService } from './fetch-comunicacao-spot.service';
 
 describe('InsertLawsuitPlaceholderService', () => {
   let service: InsertLawsuitPlaceholderService;
@@ -30,9 +36,14 @@ describe('InsertLawsuitPlaceholderService', () => {
 
     cacheProcessoToRedisService = { execute: jest.fn() };
 
+    const fetchComunicacaoSpotService = new FetchComunicacaoSpotService(
+      configService,
+    );
+
     service = new InsertLawsuitPlaceholderService(
       configService,
       cacheProcessoToRedisService as unknown as CacheProcessoToRedisService,
+      fetchComunicacaoSpotService,
     );
   });
 

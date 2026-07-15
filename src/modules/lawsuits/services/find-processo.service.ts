@@ -1,8 +1,18 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import Redis from 'ioredis';
 import { AthenaQueryService } from './athena-query.service';
 import { parseCnj } from '../utils/cnj.util';
-import { redisKeyForProcesso } from './cache-processo-to-redis.service';
+import {
+  buildProcessoResponse,
+  CACHE_TTL_SECONDS,
+  redisKeyForProcesso,
+} from './cache-processo-to-redis.service';
+import { FetchComunicacaoSpotService } from './fetch-comunicacao-spot.service';
 
 interface ProcessoRow {
   cnj_number: string;
@@ -58,6 +68,7 @@ export class FindProcessoService {
 
   constructor(
     private readonly athenaQueryService: AthenaQueryService,
+    private readonly fetchComunicacaoSpotService: FetchComunicacaoSpotService,
     @Inject('REDIS_CLIENT')
     private readonly redis: Redis,
   ) {}
@@ -91,7 +102,43 @@ export class FindProcessoService {
       return cached;
     }
 
+    // Sem cache no Redis (expirou — TTL de 30 dias — ou nunca foi setado).
+    // Antes de cair pro Athena, tenta ler direto de comunicacao-spot: é
+    // escrito no mesmo instante do webhook que o cache do Redis, só que sem
+    // TTL — sobrevive ao cache expirar, e continua mais atual que o Athena
+    // pelo mesmo motivo do comentário acima.
+    const fromSpot = await this.fromComunicacaoSpot(
+      numeroCnj,
+      trt,
+      anoProcesso,
+    );
+    if (fromSpot) {
+      await this.redis
+        .set(redisKey, JSON.stringify(fromSpot), 'EX', CACHE_TTL_SECONDS)
+        .catch(() => undefined);
+      return fromSpot;
+    }
+
     return athenaResult;
+  }
+
+  private async fromComunicacaoSpot(
+    numeroCnj: string,
+    trt: string,
+    anoProcesso: number,
+  ) {
+    const comunicacaoSpot =
+      await this.fetchComunicacaoSpotService.execute(numeroCnj);
+
+    // Um marcador "BUSCANDO" (sem `resposta.instancias` de verdade) não deve
+    // substituir um resultado real que o Athena já tenha, ainda que atrasado.
+    const hasRealData =
+      (comunicacaoSpot?.resposta?.instancias?.length ?? 0) > 0;
+    if (!comunicacaoSpot || !hasRealData) {
+      return null;
+    }
+
+    return buildProcessoResponse(comunicacaoSpot, trt, anoProcesso);
   }
 
   private parseCache(raw: string | null, numeroCnj: string): any | null {
@@ -133,14 +180,21 @@ export class FindProcessoService {
     const athenaDate = this.parseUtcTimestamp(athenaResult.enriquecidoEm);
     const cachedDate = this.parseUtcTimestamp(cachedEnriquecidoEm as string);
 
-    if (Number.isNaN(athenaDate.getTime()) || Number.isNaN(cachedDate.getTime())) {
+    if (
+      Number.isNaN(athenaDate.getTime()) ||
+      Number.isNaN(cachedDate.getTime())
+    ) {
       return false;
     }
 
     return athenaDate.getTime() >= cachedDate.getTime();
   }
 
-  private async queryAthena(numeroCnj: string, trt: string, anoProcesso: number) {
+  private async queryAthena(
+    numeroCnj: string,
+    trt: string,
+    anoProcesso: number,
+  ) {
     // Queries separadas (em paralelo) em vez de um join único: partes,
     // movimentações e instâncias não têm relação entre si, então juntar
     // todas de uma vez geraria produto cartesiano entre elas.

@@ -9,6 +9,7 @@ import { SaveWebhookToComunicacaoSpotService } from './services/save-webhook-to-
 import { CacheProcessoToRedisService } from './services/cache-processo-to-redis.service';
 import { SearchNewLawsuitService } from './services/search-new-lawsuit.service';
 import { InsertLawsuitPlaceholderService } from './services/insert-lawsuit-placeholder.service';
+import { FetchComunicacaoSpotService } from './services/fetch-comunicacao-spot.service';
 
 @Module({
   controllers: [LawsuitsController],
@@ -22,6 +23,7 @@ import { InsertLawsuitPlaceholderService } from './services/insert-lawsuit-place
     CacheProcessoToRedisService,
     SearchNewLawsuitService,
     InsertLawsuitPlaceholderService,
+    FetchComunicacaoSpotService,
   ],
   exports: [
     FindProcessoService,

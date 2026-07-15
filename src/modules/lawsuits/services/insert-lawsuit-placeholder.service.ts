@@ -1,15 +1,10 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  GetObjectCommand,
-  NoSuchKey,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
-import { Root } from 'src/modules/process/interfaces/process.interface';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { resolveComunicacaoSpotObject } from '../utils/comunicacao-spot-object.util';
 import { buildBuscandoPlaceholder } from '../utils/buscando-placeholder.util';
 import { CacheProcessoToRedisService } from './cache-processo-to-redis.service';
+import { FetchComunicacaoSpotService } from './fetch-comunicacao-spot.service';
 
 // Insere um marcador "BUSCANDO" em comunicacao-spot pra um processo que
 // ainda não tem registro lá — diferente de `SearchNewLawsuitService`, NÃO
@@ -32,6 +27,7 @@ export class InsertLawsuitPlaceholderService {
   constructor(
     private readonly configService: ConfigService,
     private readonly cacheProcessoToRedisService: CacheProcessoToRedisService,
+    private readonly fetchComunicacaoSpotService: FetchComunicacaoSpotService,
   ) {
     const accessKeyId = this.configService.get<string>('ATHENA_ACCESS_KEY_ID');
     const secretAccessKey = this.configService.get<string>(
@@ -56,7 +52,7 @@ export class InsertLawsuitPlaceholderService {
       throw new BadRequestException('Número de processo inválido');
     }
 
-    const existente = await this.fetchExisting(ref.bucket, ref.key);
+    const existente = await this.fetchComunicacaoSpotService.execute(numeroCnj);
     if (existente) {
       this.logger.log(
         `Já existe registro em comunicacao-spot pra ${numeroCnj} (s3://${ref.bucket}/${ref.key}) — aproveitando pra cache no Redis.`,
@@ -65,7 +61,8 @@ export class InsertLawsuitPlaceholderService {
       await this.cacheProcessoToRedisService.execute(existente);
 
       return {
-        message: 'Processo já possuía registro em comunicacao-spot — cache atualizado no Redis',
+        message:
+          'Processo já possuía registro em comunicacao-spot — cache atualizado no Redis',
         alreadyExists: true,
         cached: true,
       };
@@ -91,28 +88,5 @@ export class InsertLawsuitPlaceholderService {
       alreadyExists: false,
       cached: false,
     };
-  }
-
-  private async fetchExisting(
-    bucket: string,
-    key: string,
-  ): Promise<Root | null> {
-    try {
-      const response = await this.s3Client.send(
-        new GetObjectCommand({ Bucket: bucket, Key: key }),
-      );
-      const raw = await response.Body?.transformToString('utf-8');
-      return raw ? (JSON.parse(raw) as Root) : null;
-    } catch (error) {
-      if (error instanceof NoSuchKey) {
-        return null;
-      }
-      this.logger.warn(
-        `Falha ao buscar JSON existente em s3://${bucket}/${key}, assumindo que não existe: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      return null;
-    }
   }
 }

@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpException,
@@ -10,10 +11,23 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
+import { comConcorrenciaLimitada } from 'src/utils/concurrency';
 import { FindProcessoService } from './services/find-processo.service';
 import { TriggerScrapingService } from './services/trigger-scraping.service';
 import { SearchNewLawsuitService } from './services/search-new-lawsuit.service';
 import { InsertLawsuitPlaceholderService } from './services/insert-lawsuit-placeholder.service';
+import { parseCnj } from './utils/cnj.util';
+import {
+  SYNC_BATCH_CONCURRENCY,
+  SyncBatchSchemaBody,
+  syncBatchSchemaPipe,
+} from './dtos/sync-batch.dto';
+
+export interface SyncBatchItemResult {
+  numeroCnj: string;
+  status: 'accepted' | 'invalid' | 'error';
+  message?: string;
+}
 
 @ApiTags('Lawsuits')
 @Controller('lawsuits')
@@ -46,7 +60,9 @@ export class LawsuitsController {
         const response = error.getResponse();
         return res
           .status(status)
-          .json(typeof response === 'string' ? { message: response } : response);
+          .json(
+            typeof response === 'string' ? { message: response } : response,
+          );
       }
 
       return res.status(500).json({
@@ -61,6 +77,57 @@ export class LawsuitsController {
   @UseGuards(ApiKeyAuthGuard)
   async sync(@Param('numeroCnj') numeroCnj: string) {
     return this.triggerScrapingService.execute(numeroCnj);
+  }
+
+  // Mesma extração do `/sync`, só que pra vários CNJs de uma vez. Valida cada
+  // CNJ antes de disparar (o `TriggerScrapingService` engole silenciosamente
+  // um CNJ inválido em vez de rejeitar, então validamos aqui pra reportar por
+  // item). Concorrência limitada porque nem Redis nem o enfileiramento no
+  // scraping-robo-api têm proteção própria contra rajada — só o worker de
+  // scraping em si é limitado por TRT.
+  @Post('sync-batch')
+  @ApiBearerAuth()
+  @UseGuards(ApiKeyAuthGuard)
+  async syncBatch(
+    @Body(syncBatchSchemaPipe) body: SyncBatchSchemaBody,
+  ): Promise<SyncBatchItemResult[]> {
+    // Remove duplicatas (preservando a primeira ocorrência) — evita disparar,
+    // e custear, a mesma extração duas vezes no mesmo lote por engano.
+    const numerosUnicos = Array.from(new Set(body.numerosCnj));
+
+    const invalidos: SyncBatchItemResult[] = [];
+    const validos: string[] = [];
+
+    for (const numeroCnj of numerosUnicos) {
+      if (parseCnj(numeroCnj)) {
+        validos.push(numeroCnj);
+      } else {
+        invalidos.push({
+          numeroCnj,
+          status: 'invalid',
+          message: 'Número de processo inválido',
+        });
+      }
+    }
+
+    const processados = await comConcorrenciaLimitada(
+      validos,
+      SYNC_BATCH_CONCURRENCY,
+      async (numeroCnj): Promise<SyncBatchItemResult> => {
+        try {
+          await this.triggerScrapingService.execute(numeroCnj);
+          return { numeroCnj, status: 'accepted' };
+        } catch (error) {
+          return {
+            numeroCnj,
+            status: 'error',
+            message: error instanceof Error ? error.message : String(error),
+          };
+        }
+      },
+    );
+
+    return [...invalidos, ...processados];
   }
 
   // Processo ainda não encontrado no Athena — primeira busca, sem documentos
