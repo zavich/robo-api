@@ -141,6 +141,9 @@ export interface Movimentacoes {
   // `publico` e `documentoSigiloso` do PJe, já calculado no scraper.
   publico?: boolean;
   texto?: string;
+  // Anexos (ex: procuração, estatuto, CNPJ) aninhados nesta movimentação,
+  // mesma forma que o PJe e o scraper (normalizeResponse.ts) já usam.
+  anexos?: Movimentacoes[];
 }
 
 export interface Audiencia {

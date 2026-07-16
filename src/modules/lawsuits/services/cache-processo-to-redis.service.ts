@@ -2,12 +2,49 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import {
   Instancia,
+  Movimentacoes,
   Root,
 } from 'src/modules/process/interfaces/process.interface';
 import { parseCnj } from '../utils/cnj.util';
 import { decideWebhookPersist } from '../utils/webhook-persist.util';
 import { extractAssuntos } from '../utils/assunto.util';
 import { toDateFromBrOrNull } from '../utils/date.util';
+
+// Anexos (ex: procuração, estatuto, CNPJ) ficam aninhados aqui, mesma forma
+// que o scraper (normalizeResponse.ts) já entrega — ver `buildMovimentacao`.
+interface BuiltMovimentacao {
+  instanciaId: string | null;
+  grau: string | null;
+  movimentacaoId: string | null;
+  data: string | null;
+  conteudo: string | null;
+  documentoId: string | null;
+  texto: string | null;
+  nomeDocumento: string | null;
+  anexos?: BuiltMovimentacao[];
+}
+
+function buildMovimentacao(
+  instancia: Instancia,
+  mov: Movimentacoes,
+): BuiltMovimentacao {
+  return {
+    instanciaId: toStringOrNull(instancia.id),
+    grau: instancia.instancia ?? null,
+    movimentacaoId: toStringOrNull(mov.id),
+    // Só a data (YYYY-MM-DD) — igual ao que o Athena devolve pra
+    // `data_mov` (coluna DATE). Guardar o `Date` inteiro aqui serializa
+    // como ISO com hora e "Z" no JSON, e o front exibe esse valor cru.
+    data: toDateFromBrOrNull(mov.data)?.toISOString().slice(0, 10) ?? null,
+    conteudo: mov.conteudo ?? null,
+    documentoId: toStringOrNull(mov.pje_doc_id),
+    texto: mov.texto ?? null,
+    nomeDocumento: mov.uniqueNameDocumento ?? null,
+    anexos: mov.anexos?.length
+      ? mov.anexos.map((anexo) => buildMovimentacao(instancia, anexo))
+      : undefined,
+  };
+}
 
 // TTL generoso — o Redis aqui funciona como cache de "última leitura
 // conhecida", não como fonte de verdade; expira sozinho se o processo
@@ -59,19 +96,9 @@ export function buildProcessoResponse(
   );
 
   const movimentacoes = instancias.flatMap((instancia: Instancia) =>
-    (instancia.movimentacoes || []).map((mov) => ({
-      instanciaId: toStringOrNull(instancia.id),
-      grau: instancia.instancia ?? null,
-      movimentacaoId: toStringOrNull(mov.id),
-      // Só a data (YYYY-MM-DD) — igual ao que o Athena devolve pra
-      // `data_mov` (coluna DATE). Guardar o `Date` inteiro aqui serializa
-      // como ISO com hora e "Z" no JSON, e o front exibe esse valor cru.
-      data: toDateFromBrOrNull(mov.data)?.toISOString().slice(0, 10) ?? null,
-      conteudo: mov.conteudo ?? null,
-      documentoId: toStringOrNull(mov.pje_doc_id),
-      texto: mov.texto ?? null,
-      nomeDocumento: mov.uniqueNameDocumento ?? null,
-    })),
+    (instancia.movimentacoes || []).map((mov) =>
+      buildMovimentacao(instancia, mov),
+    ),
   );
 
   const instanciasOut = instancias.map((instancia: Instancia) => {

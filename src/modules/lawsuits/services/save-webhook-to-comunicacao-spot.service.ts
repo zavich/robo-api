@@ -39,6 +39,14 @@ function normalizeMovimentacao(mov: Movimentacoes): Record<string, unknown> {
     normalized.publico = mov.publico;
   }
 
+  // Anexos (ex: procuração, estatuto, CNPJ) aninhados nesta movimentação,
+  // mesma forma que o Redis (cache-processo-to-redis.service.ts) já grava —
+  // sem isso, todo merge em comunicacao-spot descartava os anexos em
+  // silêncio, já que essa função monta o objeto campo a campo.
+  if (mov.anexos?.length) {
+    normalized.anexos = mov.anexos.map(normalizeMovimentacao);
+  }
+
   return normalized;
 }
 
