@@ -65,13 +65,12 @@ export class TriggerScrapingService {
   // status indicando que uma nova sincronização está em andamento, sem
   // esperar o webhook real chegar.
   //
-  // Usa `FindProcessoService.execute()` (Redis, com fallback pro Athena) em
-  // vez de ler só o Redis direto — sem isso, todo processo cujo cache no
-  // Redis já tinha expirado (ou nunca existiu, ou foi limpo pelo próprio
-  // `FindProcessoService` quando o Athena "alcançou" o cache — ver
-  // `athenaCaughtUp`) nunca tinha SINCRONIZANDO marcado em lugar nenhum: o
-  // front consultava e só via o último status concluído (SUCESSO/ERRO),
-  // sem nenhum indício visual de que uma nova sincronização estava rodando.
+  // Usa `FindProcessoService.execute()` (Redis, com fallback pro
+  // comunicacao-spot e por fim pro Athena) em vez de ler só o Redis direto —
+  // sem isso, todo processo cujo cache no Redis já tinha expirado (ou nunca
+  // existiu) nunca tinha SINCRONIZANDO marcado em lugar nenhum: o front
+  // consultava e só via o último status concluído (SUCESSO/ERRO), sem
+  // nenhum indício visual de que uma nova sincronização estava rodando.
   // Se nem Redis nem Athena têm nada pra esse CNJ ainda, não faz nada — não
   // tem dado prévio pra preservar, e falha aqui nunca deve impedir o
   // disparo da extração real.

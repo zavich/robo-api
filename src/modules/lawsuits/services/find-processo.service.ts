@@ -82,31 +82,26 @@ export class FindProcessoService {
     const { trt, anoProcesso } = parsed;
     const redisKey = redisKeyForProcesso(numeroCnj);
 
-    // Redis é atualizado direto no ato do webhook (sempre a versão mais
-    // recente); o Athena só reflete o que foi processado em batch e pode
-    // estar bem mais atrasado. Consulta os dois em paralelo: se o Athena já
-    // alcançou (ou superou) a data do cache, ele virou a versão mais atual —
-    // apaga o cache (não serve mais pra nada) e devolve o Athena. Enquanto o
-    // Athena não alcançar, o cache continua sendo a resposta.
-    const [cachedRaw, athenaResult] = await Promise.all([
-      this.redis.get(redisKey),
-      this.queryAthena(numeroCnj, trt, anoProcesso),
-    ]);
-
+    // Redis e comunicacao-spot são escritos pelo mesmo webhook, no mesmo
+    // instante (WebhookService.execute) — sempre mais atuais que o Athena
+    // (batch, que pode ficar bem atrasado) e, diferente dele, carregam
+    // estrutura que o Athena não tem (ex.: anexos aninhados em cada
+    // movimentação, colunas fixas não suportam isso). Por isso o Athena
+    // nunca deve substituir um resultado real vindo de qualquer um dos
+    // dois — antes comparava `enriquecido_em` e deixava o Athena "alcançar"
+    // e sobrescrever o cache, descartando esse dado mais completo em
+    // silêncio assim que o batch rodasse de novo.
+    const cachedRaw = await this.redis.get(redisKey);
     const cached = this.parseCache(cachedRaw, numeroCnj);
     if (cached) {
-      if (this.athenaCaughtUp(athenaResult, cached.enriquecidoEm)) {
-        await this.redis.del(redisKey).catch(() => undefined);
-        return athenaResult;
-      }
       return cached;
     }
 
     // Sem cache no Redis (expirou — TTL de 30 dias — ou nunca foi setado).
     // Antes de cair pro Athena, tenta ler direto de comunicacao-spot: é
     // escrito no mesmo instante do webhook que o cache do Redis, só que sem
-    // TTL — sobrevive ao cache expirar, e continua mais atual que o Athena
-    // pelo mesmo motivo do comentário acima.
+    // TTL — sobrevive ao cache expirar, e continua mais completo/atual que
+    // o Athena pelo mesmo motivo do comentário acima.
     const fromSpot = await this.fromComunicacaoSpot(
       numeroCnj,
       trt,
@@ -119,7 +114,9 @@ export class FindProcessoService {
       return fromSpot;
     }
 
-    return athenaResult;
+    // Último recurso — nem Redis nem comunicacao-spot têm dado real ainda
+    // pra esse processo.
+    return this.queryAthena(numeroCnj, trt, anoProcesso);
   }
 
   private async fromComunicacaoSpot(
@@ -154,40 +151,6 @@ export class FindProcessoService {
       );
       return null;
     }
-  }
-
-  // Timestamp do Athena e do cache vêm no mesmo formato hoje
-  // ("YYYY-MM-DD HH:mm:ss.SSS", sem timezone — UTC implícito), mas trata os
-  // dois do mesmo jeito por segurança: sem "Z"/offset explícito, o
-  // `new Date(...)` do V8 interpreta como horário LOCAL, não UTC — o que
-  // desalinha a comparação se rodar num processo Node fora de UTC.
-  private parseUtcTimestamp(value: string): Date {
-    // Só pula o "Z" se o valor já trouxer timezone explícito (Z ou +HH:mm/
-    // -HH:mm) — um valor com "T" mas sem timezone (ex.: vindo de outra
-    // fonte que já usa formato ISO, só sem offset) ainda era passado direto
-    // pro `new Date(...)`, que o V8 interpreta como horário LOCAL, não UTC.
-    const isoLike = value.includes('T') ? value : value.replace(' ', 'T');
-    const hasTimezone = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(isoLike);
-    return new Date(hasTimezone ? isoLike : `${isoLike}Z`);
-  }
-
-  private athenaCaughtUp(
-    athenaResult: { enriquecidoEm?: string | null } | null,
-    cachedEnriquecidoEm: unknown,
-  ): boolean {
-    if (!athenaResult?.enriquecidoEm || !cachedEnriquecidoEm) return false;
-
-    const athenaDate = this.parseUtcTimestamp(athenaResult.enriquecidoEm);
-    const cachedDate = this.parseUtcTimestamp(cachedEnriquecidoEm as string);
-
-    if (
-      Number.isNaN(athenaDate.getTime()) ||
-      Number.isNaN(cachedDate.getTime())
-    ) {
-      return false;
-    }
-
-    return athenaDate.getTime() >= cachedDate.getTime();
   }
 
   private async queryAthena(

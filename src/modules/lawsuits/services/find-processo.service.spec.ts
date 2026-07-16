@@ -80,97 +80,33 @@ describe('FindProcessoService', () => {
     expect(result).toBeNull();
   });
 
-  it('devolve o cache do Redis quando o Athena ainda está atrasado', async () => {
+  it('devolve o cache do Redis mesmo quando o Athena tem dado mais novo — Athena nunca sobrescreve dado real', async () => {
     const cached = {
       cnjNumber: numeroCnj,
       statusColeta: 'SUCESSO',
       enriquecidoEm: '2026-07-06T19:36:26.000Z',
     };
     redis.get.mockResolvedValue(JSON.stringify(cached));
-    // Athena sem nenhuma linha ainda pro processo (não alcançou o cache).
-    athenaQueryService.query.mockResolvedValue([]);
 
     const result = await service.execute(numeroCnj);
 
     expect(result).toEqual(cached);
     expect(redis.del).not.toHaveBeenCalled();
+    // Athena nem precisa ser consultado quando já há cache — evita gasto à toa.
+    expect(athenaQueryService.query).not.toHaveBeenCalled();
   });
 
-  it('devolve o cache quando o Athena tem dado mas com enriquecido_em mais antigo', async () => {
+  it('não consulta comunicacao-spot quando já há cache no Redis', async () => {
     const cached = {
       cnjNumber: numeroCnj,
       statusColeta: 'SUCESSO',
       enriquecidoEm: '2026-07-06T19:36:26.000Z',
     };
     redis.get.mockResolvedValue(JSON.stringify(cached));
-    athenaQueryService.query
-      .mockResolvedValueOnce([
-        {
-          cnj_number: numeroCnj,
-          status_coleta: 'SUCESSO',
-          motivo_erro: null,
-          enriquecido_em: '2026-07-01 10:00:00.000', // mais antigo que o cache
-          origem: 'TRT2',
-          num_instancias: '1',
-          trt: 'TRT2',
-          ano_processo: '2023',
-          parte_instancia_id: null,
-          parte_id: null,
-          parte_tipo: null,
-          parte_polo: null,
-          parte_nome: null,
-          parte_doc_tipo: null,
-          parte_doc_numero: null,
-          parte_advogado_de: null,
-          parte_principal: null,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
 
-    const result = await service.execute(numeroCnj);
+    await service.execute(numeroCnj);
 
-    expect(result).toEqual(cached);
-    expect(redis.del).not.toHaveBeenCalled();
-  });
-
-  it('apaga o cache e devolve o Athena quando ele já alcançou (ou passou) a data do cache', async () => {
-    const cached = {
-      cnjNumber: numeroCnj,
-      statusColeta: 'SUCESSO',
-      enriquecidoEm: '2026-07-06T19:36:26.000Z',
-    };
-    redis.get.mockResolvedValue(JSON.stringify(cached));
-    athenaQueryService.query
-      .mockResolvedValueOnce([
-        {
-          cnj_number: numeroCnj,
-          status_coleta: 'SUCESSO',
-          motivo_erro: null,
-          enriquecido_em: '2026-07-06 19:36:26.000', // mesma data do cache
-          origem: 'TRT2',
-          num_instancias: '1',
-          trt: 'TRT2',
-          ano_processo: '2023',
-          parte_instancia_id: null,
-          parte_id: null,
-          parte_tipo: null,
-          parte_polo: null,
-          parte_nome: null,
-          parte_doc_tipo: null,
-          parte_doc_numero: null,
-          parte_advogado_de: null,
-          parte_principal: null,
-        },
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
-
-    const result = await service.execute(numeroCnj);
-
-    expect(redis.del).toHaveBeenCalledWith(redisKeyForProcesso(numeroCnj));
-    expect(result.cnjNumber).toBe(numeroCnj);
-    expect(result.enriquecidoEm).toBe('2026-07-06 19:36:26.000');
+    expect(fetchComunicacaoSpotService.execute).not.toHaveBeenCalled();
   });
 
   it('usa o JSON de comunicacao-spot quando não há cache no Redis e ele tem dado real', async () => {
