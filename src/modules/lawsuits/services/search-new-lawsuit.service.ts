@@ -18,7 +18,7 @@ export class SearchNewLawsuitService {
     private readonly triggerScrapingService: TriggerScrapingService,
   ) {}
 
-  async execute(numeroCnj: string) {
+  async execute(numeroCnj: string, userId: string) {
     const parsed = parseCnj(numeroCnj);
     if (!parsed) {
       throw new BadRequestException('Número de processo inválido');
@@ -29,7 +29,7 @@ export class SearchNewLawsuitService {
     // Primeira busca: só movimentações (documents:false) — documentos
     // restritos ficam pra um sync manual depois, evitando gastar
     // captcha/custo num processo que o usuário ainda nem confirmou existir.
-    await this.triggerScrapingService.execute(numeroCnj, {
+    await this.triggerScrapingService.execute(numeroCnj, userId, {
       documents: false,
     });
 

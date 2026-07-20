@@ -51,8 +51,42 @@ function buildMovimentacao(
 // nunca mais receber webhook, em vez de crescer pra sempre.
 export const CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-export function redisKeyForProcesso(numeroCnj: string): string {
-  return `lawsuit:processo:${numeroCnj}`;
+// TTL da lista de espera e do lock de disparo — bem acima do tempo real de
+// uma extração, só pra não deixar waiter/lock preso pra sempre se o webhook
+// nunca chegar (ex.: scraping travou/caiu sem avisar).
+export const WAITERS_TTL_SECONDS = 60 * 60;
+export const INFLIGHT_TTL_SECONDS = 60 * 60;
+
+// Cada usuário tem sua própria chave — o resultado de um scraping disparado
+// por um usuário não pode ser lido por outro antes de virar registro oficial
+// no banco (Athena/comunicacao-spot). Ver `redisWaitersKeyForProcesso` pra
+// como o fan-out por usuário é resolvido quando o webhook chega.
+export function redisKeyForProcesso(numeroCnj: string, userId: string): string {
+  return `lawsuit:processo:${numeroCnj}:user:${userId}`;
+}
+
+// Set com os userIds aguardando o resultado de um scraping em andamento pra
+// esse CNJ — permite dedupar o disparo real ao scraping-robo-api entre vários
+// usuários pedindo o mesmo CNJ (só um dispara de fato; os demais só entram
+// nessa lista) sem misturar o cache de um com o de outro.
+export function redisWaitersKeyForProcesso(numeroCnj: string): string {
+  return `lawsuit:waiters:${numeroCnj}`;
+}
+
+// Lock simples (SET NX) usado só pra decidir se um scraping já está em
+// andamento pra esse CNJ — não guarda dado nenhum, só existe/não existe.
+export function redisInflightKeyForProcesso(numeroCnj: string): string {
+  return `lawsuit:inflight:${numeroCnj}`;
+}
+
+export async function addLawsuitWaiter(
+  redis: Redis,
+  numeroCnj: string,
+  userId: string,
+): Promise<void> {
+  const key = redisWaitersKeyForProcesso(numeroCnj);
+  await redis.sadd(key, userId);
+  await redis.expire(key, WAITERS_TTL_SECONDS);
 }
 
 function toStringOrNull(value: unknown): string | null {
@@ -146,7 +180,31 @@ export class CacheProcessoToRedisService {
     private readonly redis: Redis,
   ) {}
 
+  // Registra `userId` como aguardando o próximo resultado computado pra esse
+  // CNJ, sem precisar que um scraping tenha sido disparado (usado por
+  // `InsertLawsuitPlaceholderService` quando já existe dado real em
+  // comunicacao-spot — reaproveita o mesmo mecanismo de fan-out abaixo em vez
+  // de escrever direto numa chave global).
+  async registerWaiter(numeroCnj: string, userId: string): Promise<void> {
+    await addLawsuitWaiter(this.redis, numeroCnj, userId);
+  }
+
   async execute(body: Root): Promise<void> {
+    const waiters = await this.redis.smembers(
+      redisWaitersKeyForProcesso(body.numero_processo),
+    );
+
+    if (waiters.length === 0) {
+      // Ninguém está esperando esse resultado — não dá pra atribuir o dado a
+      // um usuário específico, e gravar numa chave global voltaria a vazar
+      // pra todo mundo. Webhook "órfão" (ex.: retry tardio depois do TTL da
+      // lista de espera expirar) só não atualiza cache nenhum.
+      this.logger.log(
+        `Webhook de ${body.numero_processo} sem usuários aguardando — nada a cachear no Redis.`,
+      );
+      return;
+    }
+
     const decision = decideWebhookPersist(body);
     if (!decision.persist) {
       // NAO_ENCONTRADO/ERRO sem dado novo de verdade — não sobrescreve
@@ -156,7 +214,8 @@ export class CacheProcessoToRedisService {
       // verdade na tentativa de sincronizar fica travado nesse status pra
       // sempre no cache — o front nunca sai do "Sincronizando" nem mostra o
       // erro real, mesmo a extração já tendo terminado (com falha).
-      await this.applyStatusOnlyUpdate(body, decision.reason);
+      await this.applyStatusOnlyUpdate(body, waiters, decision.reason);
+      await this.clearWaitState(body.numero_processo);
       return;
     }
 
@@ -165,32 +224,54 @@ export class CacheProcessoToRedisService {
       this.logger.warn(
         `Número de processo inválido no webhook: ${body.numero_processo}`,
       );
+      await this.clearWaitState(body.numero_processo);
       return;
     }
 
     const response = buildProcessoResponse(body, parsed.trt, parsed.anoProcesso);
-    const key = redisKeyForProcesso(body.numero_processo);
+    const payload = JSON.stringify(response);
 
-    await this.redis.set(
-      key,
-      JSON.stringify(response),
-      'EX',
-      CACHE_TTL_SECONDS,
+    await Promise.all(
+      waiters.map((userId) =>
+        this.redis.set(
+          redisKeyForProcesso(body.numero_processo, userId),
+          payload,
+          'EX',
+          CACHE_TTL_SECONDS,
+        ),
+      ),
     );
 
-    this.logger.log(`Cache atualizado no Redis: ${key}`);
+    this.logger.log(
+      `Cache atualizado no Redis pra ${waiters.length} usuário(s) aguardando: ${body.numero_processo}`,
+    );
+
+    await this.clearWaitState(body.numero_processo);
   }
 
   private async applyStatusOnlyUpdate(
     body: Root,
+    waiters: string[],
     reason?: string,
   ): Promise<void> {
-    const key = redisKeyForProcesso(body.numero_processo);
+    await Promise.all(
+      waiters.map((userId) =>
+        this.applyStatusOnlyUpdateForUser(body, userId, reason),
+      ),
+    );
+  }
+
+  private async applyStatusOnlyUpdateForUser(
+    body: Root,
+    userId: string,
+    reason?: string,
+  ): Promise<void> {
+    const key = redisKeyForProcesso(body.numero_processo, userId);
     const raw = await this.redis.get(key);
 
     if (!raw) {
       this.logger.log(
-        `Processo ${body.numero_processo} retornou ${reason} — sem cache prévio no Redis, nada a atualizar.`,
+        `Processo ${body.numero_processo} retornou ${reason} — sem cache prévio no Redis pro usuário ${userId}, nada a atualizar.`,
       );
       return;
     }
@@ -211,14 +292,21 @@ export class CacheProcessoToRedisService {
         CACHE_TTL_SECONDS,
       );
       this.logger.log(
-        `Processo ${body.numero_processo} retornou ${reason} — status atualizado no Redis, mantendo dado anterior.`,
+        `Processo ${body.numero_processo} retornou ${reason} — status atualizado no Redis do usuário ${userId}, mantendo dado anterior.`,
       );
     } catch (error) {
       this.logger.warn(
-        `Falha ao atualizar status no cache Redis para ${body.numero_processo}: ${
+        `Falha ao atualizar status no cache Redis (${key}) para ${body.numero_processo}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
     }
+  }
+
+  private async clearWaitState(numeroCnj: string): Promise<void> {
+    await Promise.all([
+      this.redis.del(redisWaitersKeyForProcesso(numeroCnj)),
+      this.redis.del(redisInflightKeyForProcesso(numeroCnj)),
+    ]);
   }
 }

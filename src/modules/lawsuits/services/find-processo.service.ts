@@ -7,12 +7,7 @@ import {
 import Redis from 'ioredis';
 import { AthenaQueryService } from './athena-query.service';
 import { parseCnj } from '../utils/cnj.util';
-import {
-  buildProcessoResponse,
-  CACHE_TTL_SECONDS,
-  redisKeyForProcesso,
-} from './cache-processo-to-redis.service';
-import { FetchComunicacaoSpotService } from './fetch-comunicacao-spot.service';
+import { redisKeyForProcesso } from './cache-processo-to-redis.service';
 
 interface ProcessoRow {
   cnj_number: string;
@@ -68,74 +63,33 @@ export class FindProcessoService {
 
   constructor(
     private readonly athenaQueryService: AthenaQueryService,
-    private readonly fetchComunicacaoSpotService: FetchComunicacaoSpotService,
     @Inject('REDIS_CLIENT')
     private readonly redis: Redis,
   ) {}
 
-  async execute(numeroCnj: string) {
+  async execute(numeroCnj: string, userId: string) {
     const parsed = parseCnj(numeroCnj);
     if (!parsed) {
       throw new BadRequestException('Número de processo inválido');
     }
 
     const { trt, anoProcesso } = parsed;
-    const redisKey = redisKeyForProcesso(numeroCnj);
+    const redisKey = redisKeyForProcesso(numeroCnj, userId);
 
-    // Redis e comunicacao-spot são escritos pelo mesmo webhook, no mesmo
-    // instante (WebhookService.execute) — sempre mais atuais que o Athena
-    // (batch, que pode ficar bem atrasado) e, diferente dele, carregam
-    // estrutura que o Athena não tem (ex.: anexos aninhados em cada
-    // movimentação, colunas fixas não suportam isso). Por isso o Athena
-    // nunca deve substituir um resultado real vindo de qualquer um dos
-    // dois — antes comparava `enriquecido_em` e deixava o Athena "alcançar"
-    // e sobrescrever o cache, descartando esse dado mais completo em
-    // silêncio assim que o batch rodasse de novo.
+    // Chave por usuário: só quem disparou (ou está aguardando) uma
+    // sincronização vê esse cache — dado fresco de um scraping não deve
+    // vazar pra outro usuário antes de virar registro oficial no banco
+    // (Athena), ver `CacheProcessoToRedisService`.
     const cachedRaw = await this.redis.get(redisKey);
     const cached = this.parseCache(cachedRaw, numeroCnj);
     if (cached) {
       return cached;
     }
 
-    // Sem cache no Redis (expirou — TTL de 30 dias — ou nunca foi setado).
-    // Antes de cair pro Athena, tenta ler direto de comunicacao-spot: é
-    // escrito no mesmo instante do webhook que o cache do Redis, só que sem
-    // TTL — sobrevive ao cache expirar, e continua mais completo/atual que
-    // o Athena pelo mesmo motivo do comentário acima.
-    const fromSpot = await this.fromComunicacaoSpot(
-      numeroCnj,
-      trt,
-      anoProcesso,
-    );
-    if (fromSpot) {
-      await this.redis
-        .set(redisKey, JSON.stringify(fromSpot), 'EX', CACHE_TTL_SECONDS)
-        .catch(() => undefined);
-      return fromSpot;
-    }
-
-    // Último recurso — nem Redis nem comunicacao-spot têm dado real ainda
-    // pra esse processo.
+    // Sem cache no Redis desse usuário — cai direto pro Athena. Comunicacao
+    // spot fica fora dessa consulta (só o webhook e o
+    // `InsertLawsuitPlaceholderService` continuam lendo/escrevendo lá).
     return this.queryAthena(numeroCnj, trt, anoProcesso);
-  }
-
-  private async fromComunicacaoSpot(
-    numeroCnj: string,
-    trt: string,
-    anoProcesso: number,
-  ) {
-    const comunicacaoSpot =
-      await this.fetchComunicacaoSpotService.execute(numeroCnj);
-
-    // Um marcador "BUSCANDO" (sem `resposta.instancias` de verdade) não deve
-    // substituir um resultado real que o Athena já tenha, ainda que atrasado.
-    const hasRealData =
-      (comunicacaoSpot?.resposta?.instancias?.length ?? 0) > 0;
-    if (!comunicacaoSpot || !hasRealData) {
-      return null;
-    }
-
-    return buildProcessoResponse(comunicacaoSpot, trt, anoProcesso);
   }
 
   private parseCache(raw: string | null, numeroCnj: string): any | null {

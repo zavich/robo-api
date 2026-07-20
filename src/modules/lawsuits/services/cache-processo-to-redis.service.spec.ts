@@ -2,6 +2,8 @@ import { Root } from 'src/modules/process/interfaces/process.interface';
 import {
   CacheProcessoToRedisService,
   redisKeyForProcesso,
+  redisInflightKeyForProcesso,
+  redisWaitersKeyForProcesso,
 } from './cache-processo-to-redis.service';
 
 const makeBody = (overrides: Partial<Root> = {}): Root =>
@@ -31,21 +33,49 @@ const makeBody = (overrides: Partial<Root> = {}): Root =>
   }) as Root;
 
 describe('CacheProcessoToRedisService', () => {
-  let redis: { get: jest.Mock; set: jest.Mock };
+  let redis: {
+    get: jest.Mock;
+    set: jest.Mock;
+    smembers: jest.Mock;
+    sadd: jest.Mock;
+    expire: jest.Mock;
+    del: jest.Mock;
+  };
   let service: CacheProcessoToRedisService;
 
+  const numeroCnj = '1000580-10.2023.5.02.0492';
+
   beforeEach(() => {
-    redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue('OK') };
+    redis = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue('OK'),
+      smembers: jest.fn().mockResolvedValue([]),
+      sadd: jest.fn().mockResolvedValue(1),
+      expire: jest.fn().mockResolvedValue(1),
+      del: jest.fn().mockResolvedValue(1),
+    };
     service = new CacheProcessoToRedisService(redis as any);
   });
 
-  it('não grava no Redis quando o status é NAO_ENCONTRADO e não há cache prévio', async () => {
+  it('não grava nada no Redis quando não há nenhum usuário aguardando (waiters vazio)', async () => {
+    await service.execute(makeBody());
+
+    expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  it('não grava no Redis quando o status é NAO_ENCONTRADO e não há cache prévio pro waiter', async () => {
+    redis.smembers.mockResolvedValue(['user-a']);
+
     await service.execute(makeBody({ status: 'NAO_ENCONTRADO' }));
 
     expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.del).toHaveBeenCalledWith(redisWaitersKeyForProcesso(numeroCnj));
+    expect(redis.del).toHaveBeenCalledWith(redisInflightKeyForProcesso(numeroCnj));
   });
 
-  it('não grava no Redis quando o status é ERRO com motivo_erro preenchido e não há cache prévio', async () => {
+  it('não grava no Redis quando o status é ERRO com motivo_erro preenchido e não há cache prévio pro waiter', async () => {
+    redis.smembers.mockResolvedValue(['user-a']);
+
     await service.execute(
       makeBody({ status: 'ERRO', motivo_erro: 'SEM_DADOS_ORGAO_ZERO' }),
     );
@@ -53,28 +83,30 @@ describe('CacheProcessoToRedisService', () => {
     expect(redis.set).not.toHaveBeenCalled();
   });
 
-  it('atualiza só o status no Redis (preservando partes/movimentações/instâncias) quando ERRO chega com cache prévio real', async () => {
-    // Reproduz o bug: processo já tinha SUCESSO cacheado (provavelmente
-    // marcado SINCRONIZANDO por TriggerScrapingService antes desse retry), e
-    // essa tentativa de sincronizar falhou de verdade. Sem esse tratamento,
-    // o cache ficava travado em SINCRONIZANDO pra sempre.
-    redis.get.mockResolvedValue(
-      JSON.stringify({
-        cnjNumber: '1000580-10.2023.5.02.0492',
-        statusColeta: 'SINCRONIZANDO',
-        enriquecidoEm: '2026-01-01 00:00:00.000',
-        partes: [{ nome: 'Fulano' }],
-        movimentacoes: [{ id: '1' }],
-        instancias: [{ instanciaId: '1' }],
-      }),
-    );
+  it('atualiza só o status no Redis de cada waiter (preservando partes/movimentações/instâncias) quando ERRO chega com cache prévio real', async () => {
+    redis.smembers.mockResolvedValue(['user-a', 'user-b']);
+    redis.get.mockImplementation(async (key: string) => {
+      if (key === redisKeyForProcesso(numeroCnj, 'user-a')) {
+        return JSON.stringify({
+          cnjNumber: numeroCnj,
+          statusColeta: 'SINCRONIZANDO',
+          enriquecidoEm: '2026-01-01 00:00:00.000',
+          partes: [{ nome: 'Fulano' }],
+          movimentacoes: [{ id: '1' }],
+          instancias: [{ instanciaId: '1' }],
+        });
+      }
+      return null;
+    });
 
     await service.execute(
       makeBody({ status: 'ERRO', motivo_erro: 'SEM_DADOS_ORGAO_ZERO' }),
     );
 
+    // Só user-a tinha cache prévio — user-b é ignorado (nada a atualizar).
     expect(redis.set).toHaveBeenCalledTimes(1);
-    const [, payload] = redis.set.mock.calls[0];
+    const [key, payload] = redis.set.mock.calls[0];
+    expect(key).toBe(redisKeyForProcesso(numeroCnj, 'user-a'));
     const saved = JSON.parse(payload);
 
     expect(saved.statusColeta).toBe('ERRO');
@@ -86,9 +118,10 @@ describe('CacheProcessoToRedisService', () => {
   });
 
   it('atualiza só o status no Redis quando NAO_ENCONTRADO chega com cache prévio real', async () => {
+    redis.smembers.mockResolvedValue(['user-a']);
     redis.get.mockResolvedValue(
       JSON.stringify({
-        cnjNumber: '1000580-10.2023.5.02.0492',
+        cnjNumber: numeroCnj,
         statusColeta: 'SINCRONIZANDO',
         enriquecidoEm: '2026-01-01 00:00:00.000',
         partes: [{ nome: 'Fulano' }],
@@ -105,7 +138,9 @@ describe('CacheProcessoToRedisService', () => {
     expect(saved.partes).toEqual([{ nome: 'Fulano' }]);
   });
 
-  it('grava no Redis com a mesma forma de resposta do FindProcessoService', async () => {
+  it('grava no Redis de cada usuário aguardando, com a mesma forma de resposta do FindProcessoService', async () => {
+    redis.smembers.mockResolvedValue(['user-a', 'user-b']);
+
     const body = makeBody({
       resposta: {
         instancias: [
@@ -147,8 +182,15 @@ describe('CacheProcessoToRedisService', () => {
 
     await service.execute(body);
 
+    expect(redis.set).toHaveBeenCalledTimes(2);
     expect(redis.set).toHaveBeenCalledWith(
-      redisKeyForProcesso('1000580-10.2023.5.02.0492'),
+      redisKeyForProcesso(numeroCnj, 'user-a'),
+      expect.any(String),
+      'EX',
+      60 * 60 * 24 * 30,
+    );
+    expect(redis.set).toHaveBeenCalledWith(
+      redisKeyForProcesso(numeroCnj, 'user-b'),
       expect.any(String),
       'EX',
       60 * 60 * 24 * 30,
@@ -161,7 +203,7 @@ describe('CacheProcessoToRedisService', () => {
     // números/booleanos nativos do webhook precisam ser convertidos, senão
     // comparação estrita no front (ex: `principal === "true"`) quebra em
     // silêncio pra quem lê do cache no Redis em vez do Athena.
-    expect(saved.cnjNumber).toBe('1000580-10.2023.5.02.0492');
+    expect(saved.cnjNumber).toBe(numeroCnj);
     expect(saved.trt).toBe('TRT2');
     expect(saved.anoProcesso).toBe('2023');
     expect(typeof saved.numInstancias).toBe('string');
@@ -188,5 +230,29 @@ describe('CacheProcessoToRedisService', () => {
     expect(saved.movimentacoes[0].movimentacaoId).toBe('30');
     expect(saved.movimentacoes[0].documentoId).toBe('555');
     expect(saved.movimentacoes[0].data).toBe('2026-12-31');
+  });
+
+  it('limpa a lista de espera e o lock de inflight depois de gravar', async () => {
+    redis.smembers.mockResolvedValue(['user-a']);
+
+    await service.execute(makeBody());
+
+    expect(redis.del).toHaveBeenCalledWith(redisWaitersKeyForProcesso(numeroCnj));
+    expect(redis.del).toHaveBeenCalledWith(redisInflightKeyForProcesso(numeroCnj));
+  });
+
+  describe('registerWaiter', () => {
+    it('registra o usuário na lista de espera com TTL', async () => {
+      await service.registerWaiter(numeroCnj, 'user-a');
+
+      expect(redis.sadd).toHaveBeenCalledWith(
+        redisWaitersKeyForProcesso(numeroCnj),
+        'user-a',
+      );
+      expect(redis.expire).toHaveBeenCalledWith(
+        redisWaitersKeyForProcesso(numeroCnj),
+        60 * 60,
+      );
+    });
   });
 });

@@ -8,6 +8,8 @@ describe('SearchNewLawsuitService', () => {
   let insertLawsuitPlaceholderService: { execute: jest.Mock };
   let triggerScrapingService: { execute: jest.Mock };
 
+  const userId = 'user-a';
+
   beforeEach(() => {
     insertLawsuitPlaceholderService = { execute: jest.fn() };
     triggerScrapingService = { execute: jest.fn() };
@@ -19,7 +21,7 @@ describe('SearchNewLawsuitService', () => {
   });
 
   it('rejeita número de processo inválido sem tocar em comunicacao-spot ou disparar extração', async () => {
-    await expect(service.execute('invalido')).rejects.toThrow(
+    await expect(service.execute('invalido', userId)).rejects.toThrow(
       BadRequestException,
     );
 
@@ -27,18 +29,20 @@ describe('SearchNewLawsuitService', () => {
     expect(triggerScrapingService.execute).not.toHaveBeenCalled();
   });
 
-  it('garante marcador BUSCANDO em comunicacao-spot e dispara extração sem documentos', async () => {
+  it('garante marcador BUSCANDO em comunicacao-spot e dispara extração sem documentos, repassando o usuário só pro trigger', async () => {
     const numeroCnj = '1000580-10.2023.5.02.0492';
 
-    const result = await service.execute(numeroCnj);
+    const result = await service.execute(numeroCnj, userId);
 
     expect(insertLawsuitPlaceholderService.execute).toHaveBeenCalledWith(
       numeroCnj,
     );
 
-    expect(triggerScrapingService.execute).toHaveBeenCalledWith(numeroCnj, {
-      documents: false,
-    });
+    expect(triggerScrapingService.execute).toHaveBeenCalledWith(
+      numeroCnj,
+      userId,
+      { documents: false },
+    );
 
     expect(result).toEqual({ message: 'Busca iniciada' });
   });

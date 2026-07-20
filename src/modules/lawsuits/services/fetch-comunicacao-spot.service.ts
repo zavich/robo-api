@@ -4,11 +4,12 @@ import { GetObjectCommand, NoSuchKey, S3Client } from '@aws-sdk/client-s3';
 import { Root } from 'src/modules/process/interfaces/process.interface';
 import { resolveComunicacaoSpotObject } from '../utils/comunicacao-spot-object.util';
 
-// Lê o JSON de um processo direto de comunicacao-spot (S3) — a mesma fonte
-// que o webhook grava sincronicamente a cada extração, sem o atraso do
-// pipeline batch do Athena. Compartilhado entre quem cria o marcador
-// BUSCANDO (`InsertLawsuitPlaceholderService`) e o GET de processo
-// (`FindProcessoService`), pra não duplicar a config do client S3.
+// Lê o JSON de um processo direto de comunicacao-spot (S3). Usado só por
+// `InsertLawsuitPlaceholderService`, e só pra checar se já existe algo ali
+// (nunca sobrescrever um registro de outro coletor) — comunicacao-spot não é
+// mais fonte de consulta (a consulta de processo é só Redis + Athena, ver
+// `FindProcessoService`), então ninguém mais deve interpretar o conteúdo
+// devolvido aqui pra decidir uma resposta de busca.
 @Injectable()
 export class FetchComunicacaoSpotService {
   private readonly logger = new Logger(FetchComunicacaoSpotService.name);

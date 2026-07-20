@@ -32,6 +32,15 @@ process.on('uncaughtException', (error) => {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Express habilita ETag fraco por padrão (`etag: 'weak'`) — pra qualquer
+  // resposta cujo corpo não mudou desde a última chamada (ex.: mesma
+  // consulta de CNJ retornando o mesmo JSON), ele intercepta o
+  // `res.json()`/`res.send()` e devolve 304 com corpo vazio quando o cliente
+  // reenvia `If-None-Match`. Isso não tem relação com o cache no Redis do
+  // módulo lawsuits — é cache HTTP condicional do Express, sem benefício
+  // real numa API JSON dinâmica como essa, e só confunde quem consome.
+  app.getHttpAdapter().getInstance().set('etag', false);
+
   // ZodValidationPipe valida DTOs criados com createZodDto (nestjs-zod).
   // ValidationPipe(transform) mantém coerção de tipos para DTOs class-validator.
   // whitelist/forbidNonWhitelisted omitidos: whitelist zeraria todos os campos Zod.

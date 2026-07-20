@@ -5,11 +5,12 @@ import {
   HttpException,
   Param,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ApiKeyAuthGuard } from '../authentication/guards/apikey-auth.guard';
 import { comConcorrenciaLimitada } from 'src/utils/concurrency';
 import { FindProcessoService } from './services/find-processo.service';
@@ -44,7 +45,11 @@ export class LawsuitsController {
   @UseGuards(ApiKeyAuthGuard)
   async findOne(@Param('numeroCnj') numeroCnj: string, @Res() res: Response) {
     try {
-      const processo = await this.findProcessoService.execute(numeroCnj);
+      const userId = res.req.user.id;
+      const processo = await this.findProcessoService.execute(
+        numeroCnj,
+        userId,
+      );
 
       if (!processo) {
         return res.status(404).json({ message: 'Processo não encontrado' });
@@ -75,8 +80,8 @@ export class LawsuitsController {
   @Post(':numeroCnj/sync')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
-  async sync(@Param('numeroCnj') numeroCnj: string) {
-    return this.triggerScrapingService.execute(numeroCnj);
+  async sync(@Param('numeroCnj') numeroCnj: string, @Req() req: Request) {
+    return this.triggerScrapingService.execute(numeroCnj, req.user.id);
   }
 
   // Mesma extração do `/sync`, só que pra vários CNJs de uma vez. Valida cada
@@ -90,7 +95,10 @@ export class LawsuitsController {
   @UseGuards(ApiKeyAuthGuard)
   async syncBatch(
     @Body(syncBatchSchemaPipe) body: SyncBatchSchemaBody,
+    @Req() req: Request,
   ): Promise<SyncBatchItemResult[]> {
+    const userId = req.user.id;
+
     // Remove duplicatas (preservando a primeira ocorrência) — evita disparar,
     // e custear, a mesma extração duas vezes no mesmo lote por engano.
     const numerosUnicos = Array.from(new Set(body.numerosCnj));
@@ -115,7 +123,7 @@ export class LawsuitsController {
       SYNC_BATCH_CONCURRENCY,
       async (numeroCnj): Promise<SyncBatchItemResult> => {
         try {
-          await this.triggerScrapingService.execute(numeroCnj);
+          await this.triggerScrapingService.execute(numeroCnj, userId);
           return { numeroCnj, status: 'accepted' };
         } catch (error) {
           return {
@@ -136,8 +144,8 @@ export class LawsuitsController {
   @Post(':numeroCnj/search')
   @ApiBearerAuth()
   @UseGuards(ApiKeyAuthGuard)
-  async search(@Param('numeroCnj') numeroCnj: string) {
-    return this.searchNewLawsuitService.execute(numeroCnj);
+  async search(@Param('numeroCnj') numeroCnj: string, @Req() req: Request) {
+    return this.searchNewLawsuitService.execute(numeroCnj, req.user.id);
   }
 
   // Só insere o marcador BUSCANDO em comunicacao-spot (de acordo com o TRT e
