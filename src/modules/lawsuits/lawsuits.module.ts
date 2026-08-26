@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { MonitoringModule } from '../monitoring/monitoring.module';
 import { LawsuitsController } from './lawsuits.controller';
 import { AthenaQueryService } from './services/athena-query.service';
 import { FindProcessoService } from './services/find-processo.service';
@@ -12,6 +13,7 @@ import { InsertLawsuitPlaceholderService } from './services/insert-lawsuit-place
 import { FetchComunicacaoSpotService } from './services/fetch-comunicacao-spot.service';
 
 @Module({
+  imports: [MonitoringModule],
   controllers: [LawsuitsController],
   providers: [
     AthenaQueryService,

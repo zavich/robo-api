@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LawsuitsModule } from 'src/modules/lawsuits/lawsuits.module';
+import { MonitoringModule } from 'src/modules/monitoring/monitoring.module';
 import { AwsAppModule } from 'src/service/aws/aws.module';
 import { BrapiService } from 'src/service/brapi/brapi.service';
 import { NextStepsModule } from 'src/service/next-steps/next-steps.module';
@@ -131,6 +132,7 @@ import { ProcessStateMachineService } from './services/process-state-machine.ser
     ScheduleModule.forRoot(),
     NotificationModule,
     LawsuitsModule,
+    MonitoringModule,
   ],
   controllers: [ProcessController],
   providers: [

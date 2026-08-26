@@ -15,6 +15,10 @@ const makeCacheProcessoToRedisService = () => ({
   execute: jest.fn(),
 });
 
+const makeRecordPipelineEventService = () => ({
+  recordWebhook: jest.fn(),
+});
+
 const makeBody = (overrides: Record<string, unknown> = {}) =>
   ({
     numero_processo: '0000001-00.2024.5.03.0001',
@@ -45,6 +49,9 @@ describe('WebhookService', () => {
   let cacheProcessoToRedisService: ReturnType<
     typeof makeCacheProcessoToRedisService
   >;
+  let recordPipelineEventService: ReturnType<
+    typeof makeRecordPipelineEventService
+  >;
   let gateway: { processUpdated: jest.Mock };
 
   beforeEach(() => {
@@ -54,12 +61,15 @@ describe('WebhookService', () => {
     saveWebhookToComunicacaoSpotService.execute.mockResolvedValue(undefined);
     cacheProcessoToRedisService = makeCacheProcessoToRedisService();
     cacheProcessoToRedisService.execute.mockResolvedValue(undefined);
+    recordPipelineEventService = makeRecordPipelineEventService();
+    recordPipelineEventService.recordWebhook.mockResolvedValue(undefined);
     gateway = { processUpdated: jest.fn() };
 
     service = new WebhookService(
       redis as any,
       saveWebhookToComunicacaoSpotService as any,
       cacheProcessoToRedisService as any,
+      recordPipelineEventService as any,
       gateway as any,
     );
   });

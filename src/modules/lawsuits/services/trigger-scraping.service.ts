@@ -1,4 +1,9 @@
-import { BadGatewayException, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import axios, { AxiosError } from 'axios';
 import Redis from 'ioredis';
 import { Root } from 'src/modules/process/interfaces/process.interface';
@@ -12,12 +17,19 @@ import {
   toAthenaTimestampString,
 } from './cache-processo-to-redis.service';
 import { FindProcessoService } from './find-processo.service';
+import { RecordPipelineEventService } from 'src/modules/monitoring/services/record-pipeline-event.service';
 import { parseCnj } from '../utils/cnj.util';
 
 // Dispara a extração no scraping-robo-api direto pelo número do processo, sem
 // nenhuma leitura/escrita no Mongo (Process/ProcessStatus) — o módulo lawsuits
 // é a nova base (Athena), então evitamos aprofundar o acoplamento com o schema
 // antigo que está sendo substituído.
+
+// O disparo é só um enfileiramento do outro lado (responde na hora); um
+// tempo alto aqui não é espera legítima, é conexão pendurada segurando o
+// request do usuário e, no lote, uma das 5 vagas de concorrência.
+const SCRAPING_DISPATCH_TIMEOUT_MS = 15_000;
+
 @Injectable()
 export class TriggerScrapingService {
   private readonly logger = new Logger(TriggerScrapingService.name);
@@ -25,6 +37,7 @@ export class TriggerScrapingService {
   constructor(
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly findProcessoService: FindProcessoService,
+    private readonly recordPipelineEventService: RecordPipelineEventService,
   ) {}
 
   async execute(
@@ -54,15 +67,27 @@ export class TriggerScrapingService {
     }
 
     try {
+      const documents = options?.documents ?? true;
+
       await axios.post(
         `${process.env.SCRAPING_BASE_URL}/processos/${numeroCnj}`,
-        { documents: options?.documents ?? true, priority: true },
+        { documents, priority: true },
         {
           headers: {
             Authorization: `Bearer ${process.env.SCRAPING_API_KEY}`,
           },
+          timeout: SCRAPING_DISPATCH_TIMEOUT_MS,
         },
       );
+
+      // Só depois do POST aceito: registrar antes contaria como disparo uma
+      // chamada que o scraping recusou, inflando o "em andamento" com coletas
+      // que nunca vão gerar webhook.
+      await this.recordPipelineEventService.recordDispatch({
+        numeroCnj,
+        userId,
+        documents,
+      });
 
       return { message: 'Processo enviado para extração' };
     } catch (error) {
@@ -137,10 +162,7 @@ export class TriggerScrapingService {
     userId: string,
   ): Promise<void> {
     try {
-      const current = await this.findProcessoService.execute(
-        numeroCnj,
-        userId,
-      );
+      const current = await this.findProcessoService.execute(numeroCnj, userId);
 
       const updated = current
         ? {

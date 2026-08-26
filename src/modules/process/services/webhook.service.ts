@@ -10,6 +10,7 @@ import { Root } from '../interfaces/process.interface';
 import { NotificationsGateway } from 'src/gateway/notifications.gateway';
 import { SaveWebhookToComunicacaoSpotService } from 'src/modules/lawsuits/services/save-webhook-to-comunicacao-spot.service';
 import { CacheProcessoToRedisService } from 'src/modules/lawsuits/services/cache-processo-to-redis.service';
+import { RecordPipelineEventService } from 'src/modules/monitoring/services/record-pipeline-event.service';
 
 type IdempotencyAcquisition =
   | {
@@ -40,6 +41,7 @@ export class WebhookService implements OnModuleInit {
     private readonly redis: Redis,
     private readonly saveWebhookToComunicacaoSpotService: SaveWebhookToComunicacaoSpotService,
     private readonly cacheProcessoToRedisService: CacheProcessoToRedisService,
+    private readonly recordPipelineEventService: RecordPipelineEventService,
     private readonly gateway: NotificationsGateway,
   ) {}
 
@@ -83,6 +85,10 @@ export class WebhookService implements OnModuleInit {
       ]);
 
       await this.redis.set(idempotencyKey, 'DONE', 'EX', 60 * 60 * 24);
+      // Depois da persistência e dentro do try: o que a tela de
+      // monitoramento mostra é o ciclo que de fato se completou, não o
+      // webhook que chegou e falhou ao ser gravado.
+      await this.recordPipelineEventService.recordWebhook(body);
       this.gateway.processUpdated(body.numero_processo);
     } catch (error: unknown) {
       this.logger.error(

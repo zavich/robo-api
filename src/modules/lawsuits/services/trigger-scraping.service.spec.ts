@@ -16,6 +16,7 @@ describe('TriggerScrapingService', () => {
     expire: jest.Mock;
   };
   let findProcessoService: { execute: jest.Mock };
+  let recordPipelineEventService: { recordDispatch: jest.Mock };
   let axiosPost: jest.SpyInstance;
 
   const numeroCnj = '1000580-10.2023.5.02.0492';
@@ -30,9 +31,13 @@ describe('TriggerScrapingService', () => {
       expire: jest.fn().mockResolvedValue(1),
     };
     findProcessoService = { execute: jest.fn() };
+    recordPipelineEventService = {
+      recordDispatch: jest.fn().mockResolvedValue(undefined),
+    };
     service = new TriggerScrapingService(
       redis as any,
       findProcessoService as any,
+      recordPipelineEventService as any,
     );
     axiosPost = jest.spyOn(axios, 'post').mockResolvedValue({ data: {} });
   });

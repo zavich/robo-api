@@ -1,6 +1,33 @@
+// Tempos medidos pelo worker do scraping-robo-api e anexados ao webhook
+// (ver `WebhookTimings` em scraping-robo-api/src/interfaces/normalize.ts).
+// Opcional de propósito: webhooks disparados por versões anteriores do
+// scraping — ou por retentativas de jobs antigos ainda na fila — chegam sem
+// esse campo, e nada no fluxo de persistência pode depender dele.
+export interface WebhookTimings {
+  queueWaitMs: number | null;
+  totalMs: number;
+  trt: number | null;
+  documents: boolean;
+  // `documentosPublicos` e `documentosRestritos` são MUTUAMENTE EXCLUSIVOS:
+  // medem o mesmo trabalho — baixar os documentos — por caminhos diferentes
+  // do worker. Com `documents: false` o tempo cai em `documentosPublicos`;
+  // com `documents: true` o fluxo de autos baixa públicos e restritos na
+  // mesma passada (ProcessDocumentsFindService filtra por `item.documento`,
+  // sem separar) e todo o tempo cai em `documentosRestritos`. Um deles é
+  // sempre null — o que NÃO significa que nada foi baixado por aquele
+  // caminho; significa que aquele caminho não foi o usado.
+  stages: {
+    login: number | null;
+    fetchMovimentacoes: number | null;
+    documentosPublicos: number | null;
+    documentosRestritos: number | null;
+  };
+}
+
 export interface Root {
   id: number;
   webhookId?: string;
+  timings?: WebhookTimings;
   created_at: CreatedAt;
   enviar_callback: string;
   link_api: string;
